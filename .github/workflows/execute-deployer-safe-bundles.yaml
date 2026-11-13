@@ -81,8 +81,9 @@ jobs:
           fi
           # Deployer secrets are per L1, as in deploy-ecosystem-upgrade.yaml.
           case "$ENVIRONMENT" in
-            mainnet)       l1=1        secret=MAINNET key="$KEY_MAINNET" ;;
-            stage|testnet) l1=11155111 secret=SEPOLIA key="$KEY_SEPOLIA" ;;
+            mainnet|zksync-os-mainnet) l1=1        secret=MAINNET key="$KEY_MAINNET" ;;
+            stage|testnet)             l1=11155111 secret=SEPOLIA key="$KEY_SEPOLIA" ;;
+            *) echo "error: no L1 for environment $ENVIRONMENT" >&2; exit 1 ;;
           esac
           rpc_chain=$(bash protocol-ops.sh --tag "$PROTOCOL_OPS_TAG" cast chain-id --rpc-url "$L1_RPC_URL")
           if [[ "$rpc_chain" != "$l1" ]]; then

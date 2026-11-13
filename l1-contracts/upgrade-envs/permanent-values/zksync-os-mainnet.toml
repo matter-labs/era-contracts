@@ -6,9 +6,10 @@ l1_chain_id = 1
 # 20250714, 886229927.
 testnet_verifier = false
 
-# The ZK token's asset id is network-wide (origin chain 324 and the token address), the same as in
-# `mainnet.toml`.
-zk_token_asset_id = "0x83e2fbc0a739b3c765de4c2b4bf8072a71ea8fbb09c8cf579c71425d8bc8804a"
+# The ZK token as this ecosystem's L1NativeTokenVault (0x3e1615c7…) registers it: the L1 token
+# 0x66A5cFB2… as L1-native (origin 1). Not `mainnet.toml`'s 324-origin id, which this NTV has never
+# registered: the chains already run with this one.
+zk_token_asset_id = "0x3a38577a86db1c11f5d17ced1d0c3757370aed1b14a1829de6fef58c6d0741d2"
 
 [permanent_contracts]
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
