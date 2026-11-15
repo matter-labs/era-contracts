@@ -7,8 +7,9 @@ import {LegState, AtomicFlow, AtomicFlowPreimage, ImtProof, AtomicFinalityProof}
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Per-chain coordinator for the atomic interop flow: `append` commits a source leg at send
 /// time, `requireFlowFinalized` gates atomic execution on the destination, and
-/// `authorizeRefund`/`claimRefund` implement the timeout path. Never custodies funds. Deployed as an
-/// L2 predeploy (no constructor). See {protocol-docs/atomicity/flow.md#the-atomicflowmanager}.
+/// `authorizeRefund`/`claimRefund` implement the timeout path, and `recordExpiry`/`authorizeExpiryRefund`
+/// the expiry of a single-leg flow ({protocol-docs/atomicity/expiry.md}). Never custodies funds. Deployed
+/// as an L2 predeploy (no constructor). See {protocol-docs/atomicity/flow.md#the-atomicflowmanager}.
 interface IAtomicFlowManager {
     /// @notice Emitted when a source leg is committed to this chain's IMT.
     event FlowCommitted(bytes32 indexed flowId, bytes32 indexed bundleHash, uint64 deadline, uint256 leafIndex);
@@ -106,6 +107,6 @@ interface IAtomicFlowManager {
     /// @notice The interop center authorized to call `append`.
     function interopCenter() external view returns (address);
 
-    /// @notice The interop handler authorized to call `requireFlowFinalized`.
+    /// @notice The interop handler authorized to call `requireFlowFinalized` and `recordExpiry`.
     function interopHandler() external view returns (address);
 }

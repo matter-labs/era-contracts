@@ -132,7 +132,10 @@ uses, so later roots do not invalidate it.
 
 Atomic `deadline` is a settlement-layer timestamp that separates finality from timeout; it is not a
 general message expiration field. A finalized bundle remains executable subject to its destination
-status and permissions. An L2 -> L1 withdrawal likewise has no trigger-style expiration.
+status and permissions. An L2 -> L1 withdrawal likewise has no trigger-style expiration. The exception
+is a single-leg flow that opted into expiry: once `ATOMIC_FLOW_EXPIRY_DELAY` has passed after its
+deadline, the destination may expire its unexecuted leg and the source then refunds it
+([expiry](../atomicity/expiry.md)).
 
 Interop provides no confidentiality. Send calldata, `InteropBundleSent`, and the data needed to
 reconstruct commitment/proof paths expose the bundle contents. The sender-scoped salt provides
@@ -172,9 +175,11 @@ authorized unbundler may then provide one desired status per call:
 - `Unprocessed` leaves it for a later unbundle operation.
 
 `Unbundled` is not terminal for the whole bundle; subsequent unbundle calls may process remaining
-calls. Per-call state prevents execution replay. Cancellation is a destination processing decision and
-does not by itself reverse source-chain burns. Atomic timeout recovery is a separate source-side path
-and becomes available only when a flow fails finality.
+calls. Per-call state prevents execution replay. A bundle of an expirable flow that is still
+`Unreceived` or `Verified` may instead become `Expired`, which is terminal
+([expiry](../atomicity/expiry.md)). Cancellation is a destination processing decision and does not by
+itself reverse source-chain burns. Atomic recovery is a separate source-side path and becomes available
+only when a flow fails finality or, for an expirable flow, when the destination expired its leg.
 
 ### Cross-chain executor/unbundler rescue
 
@@ -227,7 +232,8 @@ In particular:
   every destination transaction to be submitted.
 
 Recovery reverses recognized source-side burns best-effort. It is not compensation for a destination
-call that was permitted and then failed, and it is not available after the flow finalized. Full proof,
+call that was permitted and then failed, and it is not available after the flow finalized, except
+for an expirable flow whose leg the destination expired ([expiry](../atomicity/expiry.md)). Full proof,
 soundness, liveness, and recovery limitations are documented in {protocol-docs/atomicity/README.md}.
 
 ## Deployment and platform scope

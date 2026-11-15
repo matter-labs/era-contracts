@@ -55,7 +55,9 @@ presenting a second source of truth for the contract behavior.
    destination handler. The handler validates destination context, proof, status, and call versions,
    marks the bundle processed before external calls, and invokes each ERC-7786 recipient.
 6. If an atomic flow misses its deadline, a timeout proof makes committed source legs claimable for
-   best-effort recovery instead of executable.
+   best-effort recovery instead of executable. A finalized single-leg flow that opted into expiry
+   becomes claimable too once its destination expired the unexecuted leg
+   ([expiry](../atomicity/expiry.md)).
 
 Execution is not automatic and atomic finality does not force all destinations to execute. It proves
 that execution is allowed everywhere or recovery is allowed on committed source legs, never both.

@@ -4,7 +4,7 @@ pragma solidity ^0.8.21;
 import {IMTLeaf} from "../common/libraries/IndexedMerkleTree.sol";
 
 /// @notice Per-`(flowId, bundleHash)` source-leg lifecycle in {AtomicFlowManager}: `Unset ->
-/// Committed` (send; terminal on the happy path), `-> Revertable -> Reverted` (timeout path).
+/// Committed` (send; terminal on the happy path), `-> Revertable -> Reverted` (timeout or expiry path).
 /// Destination execution is NOT tracked here — the {InteropHandler}'s own `bundleStatus` is the
 /// replay guard, exactly as for a normal interop bundle.
 enum LegState {
@@ -14,8 +14,9 @@ enum LegState {
     Reverted
 }
 
-/// @notice A single IMT proof against a source chain's interop commitment tree, used both for
-/// inclusion ({AtomicInteropProof.verifyInclusion}; `leaf` holds the commit value) and non-inclusion
+/// @notice A single IMT proof against a chain's interop commitment tree, used both for inclusion
+/// ({AtomicInteropProof.verifyInclusion}; `leaf` holds a leg's commit value, or for an expiry refund the
+/// destination's expiry value) and non-inclusion
 /// ({AtomicInteropProof.verifyTimeoutAbsence}; `leaf` is the low-nullifier leaf bracketing the absent
 /// value). Two authentication layers: `settlementProof` proves `chainImtRoot` is the batch's
 /// begin/end IMT leaf of the chain batch root against an imported interop root, and `imtProof` proves

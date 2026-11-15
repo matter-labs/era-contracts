@@ -7,7 +7,7 @@ import {ZiskTestnetVerifier} from "contracts/state-transition/verifiers/ZiskTest
 import {ZiskVerifier} from "contracts/state-transition/verifiers/ZiskVerifier.sol";
 
 import {CoreUpgrade_v36} from "deploy-scripts/upgrade/v36/CoreUpgrade_v36.s.sol";
-import {AuthoredL2Side, DefaultCTMUpgrade} from "deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
+import {AuthoredL2Side} from "deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {CTMUpgradeForTests_v36} from "./_EcosystemUpgradeForTests_v36.sol";
 
 /// @notice A same-minor PATCH prepare: it replaces the VERIFIER and nothing else. The release is
@@ -29,9 +29,8 @@ contract CoreUpgradeForTests_v36_1 is CoreUpgrade_v36 {
 contract CTMUpgradeForTests_v36_1 is CTMUpgradeForTests_v36 {
     /// @notice The one change of this patch: a fresh verifier, which the release then pins and the
     ///         upgrade engine installs on every chain from the composed proposal.
-    /// @dev Skips v36's L2 delegate composer: a patch carries no L2 leg (see {authorL2Side}).
     function deployNewCTMContracts() public virtual override {
-        DefaultCTMUpgrade.deployNewCTMContracts();
+        super.deployNewCTMContracts();
         _useLiveZiskVerifier();
         deployVerifiers();
     }

@@ -92,8 +92,8 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     /// @dev Deployed on first use; see {ReleaseMemberProbe} for why it is a separate contract.
     ReleaseMemberProbe internal releaseMemberProbe;
 
-    /// @notice The composer of `L2DefaultUpgrade`'s arguments that {standardL2Side} pins, once
-    ///         {deployL2DelegateComposer} deployed it.
+    /// @notice The composer of `L2DefaultUpgrade`'s arguments that {standardL2Side} pins.
+    /// @dev Deployed on first use.
     address public l2DelegateComposer;
 
     struct UpgradeDeployedAddresses {
@@ -596,18 +596,21 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ///         edge — no delegate, no extra bytecode, no composer, nothing to publish. A version
     ///         whose L2 built-ins change derives their rows from the release pair on-chain and MUST
     ///         author the delegate that initializes them and list every bytecode the resulting plan
-    ///         needs published (the v35 bootstrap shows the shape).
+    ///         needs published ({standardL2Side} is the standard such side).
     function authorL2Side() internal virtual returns (AuthoredL2Side memory side) {
         // The zero value is the L1-only side: an empty plan and nothing to publish.
         return side;
     }
 
     /// @notice The standard L2 side, which a version opts into from {authorL2Side}: the delegate
-    ///         (`L2DefaultUpgrade`), the composer {deployL2DelegateComposer} deployed for it, and every
-    ///         bytecode the composed transaction needs published — the built-ins, the ZKsync OS
-    ///         baselines and the delegate.
+    ///         (`L2DefaultUpgrade`), the composer {l2DelegateComposer} for it, and every bytecode the
+    ///         composed transaction needs published — the built-ins, the ZKsync OS baselines and the
+    ///         delegate.
     function standardL2Side() internal returns (AuthoredL2Side memory side) {
-        require(l2DelegateComposer != address(0), "L2 delegate composer not deployed");
+        // Deployed here rather than in {deployNewCTMContracts}, which a transition replacement never runs.
+        if (l2DelegateComposer == address(0)) {
+            l2DelegateComposer = deploySimpleContract("L2DefaultDelegateCalldataComposer");
+        }
         side.plan = AuthoredL2Plan({
             delegateBytecodeInfo: Utils.getZKOSBytecodeInfoForContract("L2DefaultUpgrade.sol", "L2DefaultUpgrade"),
             extraBytecodeInfos: new bytes[](0),
@@ -616,12 +619,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         L2EcosystemContract[] memory delegateArtifact = new L2EcosystemContract[](1);
         delegateArtifact[0] = L2EcosystemContract.L2DefaultUpgrade;
         side.factoryDependencies = CoreOnGatewayHelper.getFullListOfFactoryDependencies(delegateArtifact);
-    }
-
-    /// @notice Deploys the composer {standardL2Side} pins. A version authoring that side calls it
-    ///         before the L2 side is prepared.
-    function deployL2DelegateComposer() internal {
-        l2DelegateComposer = deploySimpleContract("L2DefaultDelegateCalldataComposer");
     }
 
     function getCreationCalldata(string memory _contractName) internal view virtual override returns (bytes memory) {

@@ -10,6 +10,9 @@ import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
 ///         the ecosystem implementations it changes. The base pipeline deploys them and pins them
 ///         in a Core-domain `ProxyUpgradeTransition`, which the merged bundle applies through
 ///         `CoreUpgradeExecutor.applyL1Upgrade`. This prepare emits no governance call of its own.
+/// @dev For signers: the `L1InteropHandler` replacement changes nothing on L1. Its bytecode differs
+///      only in the range checks of the `BundleStatus` enum, which gained `Expired` for L2 expiry
+///      ({protocol-docs/atomicity/expiry.md}); L1 never sets it.
 // solhint-disable-next-line contract-name-capwords
 contract CoreUpgrade_v36 is DefaultCoreUpgrade {
     /// @inheritdoc DefaultCoreUpgrade

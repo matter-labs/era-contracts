@@ -262,7 +262,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
     }
 
     /// @inheritdoc IAtomicRecoverable
-    /// @dev Timeout-refund hook of the atomic interop flow: recognizes only `finalizeDeposit` calls and
+    /// @dev Refund hook (timeout or expiry) of the atomic interop flow: recognizes only `finalizeDeposit` calls and
     /// reverses their burn via the NTV, refunding the original depositor. Returns `false` for any other
     /// call so the {AtomicFlowManager} can skip non-recoverable bundle calls without reverting.
     /// See {protocol-docs/bridging.md#atomic-recovery-hook}.

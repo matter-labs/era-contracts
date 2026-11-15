@@ -201,6 +201,23 @@ contract AtomicFlowManagerExpiryTest is AtomicInteropProofBuilder {
         manager.authorizeExpiryRefund(flow, bundle, fromDestination);
     }
 
+    /// @notice A proof of any other value in the destination's tree (here the leg's commit) authorizes nothing.
+    function test_authorizeExpiryRefund_RevertWhen_ExpiryNotInDestinationTree() public {
+        (AtomicFlow memory flow, bytes memory bundle) = _commitOutgoingLeg(ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION);
+        uint256 notExpiry = AtomicFlowFixtures.commitValue(flow.flowId, keccak256(bundle));
+        uint256 index = _insertCommit(notExpiry);
+        ImtProof memory proof = _realInclusionProof(REMOTE_CHAIN, index, DEADLINE + ATOMIC_FLOW_EXPIRY_DELAY + 1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IMTLeafValueMismatch.selector,
+                AtomicFlowFixtures.expiryValue(flow.flowId, keccak256(bundle)),
+                notExpiry
+            )
+        );
+        manager.authorizeExpiryRefund(flow, bundle, proof);
+    }
+
     function test_authorizeExpiryRefund_RevertWhen_FlowNotExpirable() public {
         (AtomicFlow memory flow, bytes memory bundle) = _commitOutgoingLeg(ATOMIC_FLOW_PREIMAGE_VERSION);
         ImtProof memory expiry;

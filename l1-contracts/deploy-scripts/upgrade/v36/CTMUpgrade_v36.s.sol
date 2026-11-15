@@ -11,12 +11,6 @@ import {AuthoredL2Side, DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUp
 // solhint-disable-next-line contract-name-capwords
 contract CTMUpgrade_v36 is DefaultCTMUpgrade {
     /// @inheritdoc DefaultCTMUpgrade
-    function deployNewCTMContracts() public virtual override {
-        super.deployNewCTMContracts();
-        deployL2DelegateComposer();
-    }
-
-    /// @inheritdoc DefaultCTMUpgrade
     /// @dev Virtual so bytecode-light test harnesses can substitute an L1-only edge.
     function authorL2Side() internal virtual override returns (AuthoredL2Side memory) {
         return standardL2Side();

@@ -57,6 +57,11 @@ const TRANSFER_AMOUNT = ethers.utils.parseEther("0.01");
  *
  * Topology: interopChainIds[0] sends to interopChainIds[1]. The relayer, a different account than the sender, makes
  * the permissionless calls, so the sender's balance moves only by the transfer and its refund.
+ *
+ * Side effect: the expiry imports an L1 root about `ATOMIC_FLOW_EXPIRY_DELAY` ahead on the destination, and its
+ * imported L1 time never moves back. An atomic send from that chain with an hour-scale deadline then fails with
+ * `ManagerFlowDeadlinePassed`, both in a spec after this one and in a `KEEP_CHAINS` re-run of spec 13. Keep this spec
+ * last, or derive such deadlines from the latest imported root as `before` does here.
  */
 describe("16 - Expiry of single-leg flows", function () {
   this.timeout(0);

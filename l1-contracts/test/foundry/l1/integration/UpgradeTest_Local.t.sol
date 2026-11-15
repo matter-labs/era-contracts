@@ -84,7 +84,8 @@ contract CTMUpgradeForLocalTest is CTMUpgrade_v36 {
     }
 
     /// @dev No L2 leg is relayed here, so the edge is L1-only: the base's empty plan, under which the transition
-    ///      composes the all-zero L2 transaction. The anvil upgrade test covers the real L2 side.
+    ///      composes the all-zero L2 transaction. The anvil upgrade test prepares the real L2 leg, but only checks
+    ///      that each chain recorded an L2 upgrade transaction; it does not execute it.
     function authorL2Side() internal override returns (AuthoredL2Side memory) {
         return DefaultCTMUpgrade.authorL2Side();
     }
