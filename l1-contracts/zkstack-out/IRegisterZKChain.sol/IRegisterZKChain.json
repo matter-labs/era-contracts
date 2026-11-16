@@ -55,6 +55,11 @@
             "internalType": "address"
           },
           {
+            "name": "validatorSenderOperatorReverter",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
             "name": "baseToken",
             "type": "address",
             "internalType": "address"
