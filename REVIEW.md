@@ -5,7 +5,7 @@ Reviewers (people and agents) read this whole file. Each section after the first
 There are two kinds of guidance:
 
 - **Style rules** (the first four sections). These are the comments reviewers kept repeating after the agents' review. Raise a break as a `nit` that names the rule, e.g. `nit: REVIEW.md#versions-are-read-not-written`. Don't argue the rule in the thread: if it is wrong, change this file.
-- **What to check** (the last two sections: build, CI and test plumbing, and contract state). These came from real bugs found after the agents' review. Raise them as findings, not nits.
+- **What to check** (the last two sections: build, CI and test plumbing, and contract state). These came from real bugs found after the agents' review. Raise each break as a `should-fix`, or a `blocker` when it would let a broken release, upgrade or contract through; never as a `nit`, so the review isn't clean until it is fixed. Raise them in every round, including in code a fix round added.
 
 Authors and their agents: check the diff against the sections that apply before asking for review, and fix what you find.
 
@@ -21,7 +21,7 @@ Seen in: the upgrade test's version constant ([#2636](https://github.com/matter-
 
 When a change makes something dead, delete it in the same PR: pre-v31 interfaces, stubs for chains or ecosystems that no longer exist, dev contracts no test needs, tests whose subject is gone, and speculative logic for setups nobody runs. Storage that has to stay is renamed `__DEPRECATED_<name>`. Why: dead code is still read, reviewed and kept compiling as if it mattered.
 
-Seen in: `IAdminPreV31` ([#2592](https://github.com/matter-labs/era-contracts/pull/2592#discussion_r4269875655)), `L1MessageRootDev` ([#2561](https://github.com/matter-labs/era-contracts/pull/2561#discussion_r4229432371)), `ServerNotifierHandover.t.sol` ([#2645](https://github.com/matter-labs/era-contracts/pull/2645#discussion_r4444983837)), `EraStub` ([#2673](https://github.com/matter-labs/era-contracts/pull/2673#discussion_r4513494650)), settlement-layer fee logic ([#2592](https://github.com/matter-labs/era-contracts/pull/2592#discussion_r4257416619)), the CTM deadline slot ([#2525](https://github.com/matter-labs/era-contracts/pull/2525#discussion_r4293715628)).
+Seen in: `IAdminPreV31` ([#2592](https://github.com/matter-labs/era-contracts/pull/2592#discussion_r4269875655)), `ServerNotifierHandover.t.sol` ([#2645](https://github.com/matter-labs/era-contracts/pull/2645#discussion_r4444983837)), `EraStub` ([#2673](https://github.com/matter-labs/era-contracts/pull/2673#discussion_r4513494650)) and settlement-layer fee logic ([#2592](https://github.com/matter-labs/era-contracts/pull/2592#discussion_r4257416619)).
 
 ### Reuse before adding
 
@@ -31,7 +31,7 @@ Seen in: a helper duplicated across the upgrade registry objects ([#2525](https:
 
 ### Things go where the next reader looks
 
-- Constants follow `AGENTS.md` ("Code style requirements" 1–2). In tests, ports, port offsets and versions are named constants too ([#2592](https://github.com/matter-labs/era-contracts/pull/2592#discussion_r4268806287), [#2592](https://github.com/matter-labs/era-contracts/pull/2592#discussion_r4268814356)).
+- Constants follow [`AGENTS.md`](AGENTS.md#code-style-requirements) ("Code style requirements" 1–2), in tests too: the EIP-1967 slot goes in the harness's `const.ts`, not in the helper that reads it ([#2592](https://github.com/matter-labs/era-contracts/pull/2592#discussion_r4268806287)). Ports and port offsets are named constants ([#2592](https://github.com/matter-labs/era-contracts/pull/2592#discussion_r4268814356)).
 - A value that doesn't change between releases goes in `l1-contracts/upgrade-envs/permanent-values/`, not in each release's env ([#2645](https://github.com/matter-labs/era-contracts/pull/2645#discussion_r4444959126)).
 - Dev, simulation and test-only code lives under a `dev`/`test` path, not beside production contracts ([#2525](https://github.com/matter-labs/era-contracts/pull/2525#discussion_r4293972913)).
 - An ecosystem-wide address (e.g. the interop fee manager) is stored once, in the CTM, and read from there, not added as an immutable in each consumer ([#2592](https://github.com/matter-labs/era-contracts/pull/2592#discussion_r4257571186)).
@@ -48,7 +48,7 @@ Why: a stale name makes every reader check what the thing actually does.
 
 ### Known gaps get a one-line comment
 
-A branch that is not expected to trigger, and a known limitation that stays, each get a one-line comment saying so (the "local gotcha" `AGENTS.md` allows). Why: otherwise the next reviewer flags it, or someone "fixes" it.
+A branch that is not expected to trigger, and a known limitation that stays, each get a one-line comment saying so (the "local gotcha" [`AGENTS.md`](AGENTS.md#documentation-and-comments) allows). Why: otherwise the next reviewer flags it, or someone "fixes" it.
 
 Seen in: the maintenance filterer's defensive branches and the bridge cap shared by the Lido and NTV bridges ([#2668](https://github.com/matter-labs/era-contracts/pull/2668#discussion_r4506059099), [#2668](https://github.com/matter-labs/era-contracts/pull/2668#discussion_r4506172555)).
 
@@ -56,7 +56,7 @@ Seen in: the maintenance filterer's defensive branches and the bridge cap shared
 
 These apply to every `.md` file: `protocol-docs/`, `docs/`, and the READMEs.
 
-- Point at another doc with a relative link, `[ecosystem upgrade](../../ecosystem-upgrade.md)`. The `{protocol-docs/<path>.md}` form is for code comments only ([#2530](https://github.com/matter-labs/era-contracts/pull/2530#discussion_r4247474693)). Why: links are clickable and the dead-links check covers them.
+- Point at another doc with a relative link, `[ecosystem upgrade](../../ecosystem-upgrade.md)`. The brace pointer form that [`AGENTS.md`](AGENTS.md#single-source-of-truth-protocol-docs) prescribes is for code comments only ([#2530](https://github.com/matter-labs/era-contracts/pull/2530#discussion_r4247474693)). Why: links are clickable and the dead-links check covers them.
 - Don't write the current or previous release's number. Write "the current release" and paths as `v<minor>/` or `upgrade-envs/v<major>.<minor>.<patch>-<name>/`. Numbers are fine for history ([#2645](https://github.com/matter-labs/era-contracts/pull/2645#discussion_r4444791531)). Why: same as for code, they go stale at the next release.
 - When a role or component goes away, remove the docs that still describe it, e.g. Guardians ([#2668](https://github.com/matter-labs/era-contracts/pull/2668#discussion_r4525548633)). Give the actual reason for a choice, not one that is merely not wrong ([#2561](https://github.com/matter-labs/era-contracts/pull/2561#discussion_r4230827763)).
 
@@ -106,7 +106,7 @@ Seen in: `UpgradeTestSplitProxyAdmin_Local` ([#2673](https://github.com/matter-l
 
 When the code or release a test covers is gone, delete the test, or the half of it that no longer applies. Don't keep it green with stubs. Why: it costs CI time and suggests coverage that isn't there.
 
-Seen in: `ServerNotifierHandover.t.sol` ([#2645](https://github.com/matter-labs/era-contracts/pull/2645#discussion_r4444983837)), `EraStub` ([#2673](https://github.com/matter-labs/era-contracts/pull/2673#discussion_r4513494650)), `L1MessageRootDev` ([#2561](https://github.com/matter-labs/era-contracts/pull/2561#discussion_r4229432371)).
+Seen in: `ServerNotifierHandover.t.sol` ([#2645](https://github.com/matter-labs/era-contracts/pull/2645#discussion_r4444983837)), `EraStub` ([#2673](https://github.com/matter-labs/era-contracts/pull/2673#discussion_r4513494650)).
 
 ## Style rules: `.github/workflows/`
 
@@ -132,7 +132,7 @@ Why: a new branch, partner or release should need no workflow edit.
 
 ## What to check: workflows, `package.json`, `foundry*.toml`, Dockerfiles, harnesses, fixtures
 
-For changes to workflows, `package.json` scripts, `foundry*.toml` profiles, Dockerfiles, test harnesses or fixtures. Breaks here are silent: a gate that can't fail looks like a gate that passes, so per-PR CI won't catch them. Raise them as findings, not nits. For getting CI green see [`docs/ai-review/docs/ci-green.md`](docs/ai-review/docs/ci-green.md).
+For changes to workflows, `package.json` scripts, `foundry*.toml` profiles, Dockerfiles, test harnesses or fixtures. Breaks here are silent: a gate that can't fail looks like a gate that passes, so per-PR CI won't catch them. Raise breaks as `should-fix` or `blocker`, as the top of this file says. For getting CI green see [`docs/ai-review/docs/ci-green.md`](docs/ai-review/docs/ci-green.md).
 
 ### What does the gate actually verify?
 
@@ -166,7 +166,7 @@ Example: five frozen-state upgrade suites (`UpgradeTest_Local`, `UpgradeTestRecu
 
 ## What to check: `l1-contracts/contracts/` state and access
 
-When a change adds privileged setters, caps, counters or feature switches, check each of these. Raise breaks as findings.
+When a change adds privileged setters, caps, counters or feature switches, check each of these. Raise breaks as `should-fix` or `blocker`, as the top of this file says. These are exceptions to the "trusted governance" false positive in [`general.md`](docs/ai-review/docs/general.md#common-false-positives): governance runs backfills and switches one call at a time, so the contract enforces how often and in which order.
 
 ### Can a one-time setter be called again?
 

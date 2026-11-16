@@ -20,5 +20,5 @@ The exceptions for the rules above can exist, but they should be clearly describ
 
 ## Common false positives
 
-- Anything that is invoked by the decentralized governance (`owner` of the contract) is trusted to be invoked with the correct data and the correct number of times. While the implementation of `initialize` itself should be checked. Don't report errors like "this function can be called multiple times" or "params for this function may be wrong/zero address".
+- Anything that is invoked by the decentralized governance (`owner` of the contract) is trusted to be invoked with the correct data and the correct number of times. While the implementation of `initialize` itself should be checked. Don't report errors like "this function can be called multiple times" or "params for this function may be wrong/zero address". Exception: a backfill, migration or seeding function that writes accounting state is set-once, and a switch that depends on such a step checks it (see the contract state section of [`REVIEW.md`](../../../REVIEW.md#what-to-check-l1-contractscontracts-state-and-access)).
 - It is acceptable to rely on concrete implementations of contracts and not their interfaces as long as rule (5) is followed.
