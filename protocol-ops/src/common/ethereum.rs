@@ -10,7 +10,7 @@ use alloy::transports::TransportError;
 use anyhow::Context;
 use tokio::task::block_in_place;
 
-use crate::common::l1_contracts::execution_revert_data;
+use crate::common::l1_contracts::is_execution_revert;
 
 pub type AlloyProvider = RootProvider<Ethereum>;
 
@@ -32,7 +32,7 @@ struct CappedRateLimitPolicy(RateLimitRetryPolicy);
 impl RetryPolicy for CappedRateLimitPolicy {
     fn should_retry(&self, error: &TransportError) -> bool {
         // alloy also matches on message text, which a revert reason can contain.
-        self.0.should_retry(error) && execution_revert_data(error).is_none()
+        self.0.should_retry(error) && !is_execution_revert(error)
     }
 
     fn backoff_hint(&self, error: &TransportError) -> Option<Duration> {
@@ -97,7 +97,7 @@ pub fn query_chain_id_sync(rpc_url: &str) -> anyhow::Result<u64> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::io::{Read, Write};
     use std::net::{TcpListener, TcpStream};
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -147,7 +147,9 @@ mod tests {
 
     /// A local endpoint answering `responses` (status line, JSON-RPC result or error) in turn,
     /// the last repeating; returns its URL and request count.
-    fn serve(responses: &'static [(&'static str, &'static str)]) -> (String, Arc<AtomicUsize>) {
+    pub(crate) fn serve(
+        responses: &'static [(&'static str, &'static str)],
+    ) -> (String, Arc<AtomicUsize>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let url = format!("http://{}", listener.local_addr().unwrap());
         let requests = Arc::new(AtomicUsize::new(0));
