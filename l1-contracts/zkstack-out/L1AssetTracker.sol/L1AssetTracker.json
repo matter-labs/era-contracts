@@ -257,14 +257,14 @@
     "name": "isChainShutdown",
     "inputs": [
       {
-        "name": "chainId",
+        "name": "_chainId",
         "type": "uint256",
         "internalType": "uint256"
       }
     ],
     "outputs": [
       {
-        "name": "isShutdown",
+        "name": "",
         "type": "bool",
         "internalType": "bool"
       }
@@ -273,7 +273,7 @@
   },
   {
     "type": "function",
-    "name": "isShutdownChainNativeAssetAmountSet",
+    "name": "isShutdownChainNativeAssetMinted",
     "inputs": [
       {
         "name": "chainId",
@@ -288,12 +288,35 @@
     ],
     "outputs": [
       {
-        "name": "isSet",
+        "name": "isMinted",
         "type": "bool",
         "internalType": "bool"
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "mintShutdownChainNativeAsset",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -525,29 +548,6 @@
   },
   {
     "type": "function",
-    "name": "setShutdownChainNativeAssetAmount",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "_amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "setShutdownDistributor",
     "inputs": [
       {
@@ -566,25 +566,6 @@
   },
   {
     "type": "function",
-    "name": "shutdownBatchNumber",
-    "inputs": [
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "batchNumber",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "shutdownChain",
     "inputs": [
       {
@@ -594,11 +575,6 @@
       },
       {
         "name": "_distributor",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_chainAdmin",
         "type": "address",
         "internalType": "address"
       }
@@ -621,30 +597,6 @@
         "name": "chainAdmin",
         "type": "address",
         "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "shutdownChainNativeAssetAmount",
-    "inputs": [
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -860,31 +812,6 @@
         "type": "address",
         "indexed": true,
         "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "ShutdownChainNativeAssetAmountSet",
-    "inputs": [
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "assetId",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
       },
       {
         "name": "amount",
@@ -1257,7 +1184,23 @@
   },
   {
     "type": "error",
-    "name": "ShutdownChainNativeAssetAmountAlreadySet",
+    "name": "ShutdownChainNativeAsset",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ShutdownChainNativeAssetAlreadyMinted",
     "inputs": [
       {
         "name": "chainId",
