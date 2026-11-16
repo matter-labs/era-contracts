@@ -85,8 +85,10 @@ error RegisterNewTokenNotAllowed();
 error SettlementFeePayerNotAgreed(address payer, uint256 chainId);
 // 0x2b6d6822
 error SettlementLayerCannotBeShutdown(uint256 chainId);
-// 0x750619e7
-error ShutdownChainNativeAssetAmountAlreadySet(uint256 chainId, bytes32 assetId);
+// 0x92767805
+error ShutdownChainNativeAsset(uint256 chainId, bytes32 assetId);
+// 0xe712bf09
+error ShutdownChainNativeAssetAlreadyMinted(uint256 chainId, bytes32 assetId);
 // 0x07d53557
 error ShutdownDistributorNotInitialized(uint256 chainId);
 // 0x90ed63bb

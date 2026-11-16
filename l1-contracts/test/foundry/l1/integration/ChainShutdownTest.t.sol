@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {stdToml} from "forge-std/StdToml.sol";
 import {Merkle} from "murky/Merkle.sol";
 import {
     ITransparentUpgradeableProxy,
     TransparentUpgradeableProxy
 } from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
@@ -13,11 +15,17 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 
-import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {
+    ETH_TOKEN_ADDRESS,
+    MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+} from "contracts/common/Config.sol";
+import {
+    IBridgehubBase,
     L2TransactionRequestDirect,
     L2TransactionRequestTwoBridgesOuter
 } from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -27,6 +35,9 @@ import {DenyAllTransactionFilterer} from "contracts/transactionFilterer/DenyAllT
 import {ShutdownDistributorInstaller} from "contracts/bridge/shutdown/ShutdownDistributorInstaller.sol";
 import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
+import {Call} from "contracts/governance/Common.sol";
+import {ChainShutdownUpgrade} from "deploy-scripts/upgrade/ChainShutdownUpgrade.s.sol";
 import {IZkSyncLiteSunsetClaimDistributorL1} from "./utils/IZkSyncLiteSunsetClaimDistributorL1.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
@@ -42,24 +53,39 @@ import {
     ChainIsShutdown,
     ChainNotShutdown,
     ChainValidatorNotRemoved,
+    InvalidChainMigrationNumber,
+    InvalidSettlementLayer,
     NoChainBalanceToSend,
     NotShutdownChainNativeAsset,
-    ShutdownChainNativeAssetAmountAlreadySet,
+    SettlementLayerCannotBeShutdown,
+    ShutdownChainNativeAsset,
+    ShutdownChainNativeAssetAlreadyMinted,
     ShutdownDistributorNotInitialized,
     TransactionFiltererNotSet
 } from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
+
+/// @dev This test's ecosystem deployment already deployed implementations of the same code with the default salt, so the
+/// upgrade script gets its own salt to deploy new ones and actually move the proxies.
+contract ChainShutdownUpgradeForTests is ChainShutdownUpgrade {
+    constructor() {
+        setCreate2Salt(keccak256("ChainShutdownUpgradeForTests"));
+    }
+}
 
 /// @notice End-to-end tests of the chain shutdown flow on L1, which needs no changes to the chain's facets:
 /// 1. the governance votes for the shutdown; the proposal names a distributor proxy whose admin is the governance and
 ///    whose implementation lets only the chain admin install the real distributor, once;
 /// 2. when ready, the chain admin nominates the governance as the next admin;
 /// 3. the governance multicall accepts the admin role, removes the ValidatorTimelock, installs the deny-all filterer
-///    and shuts the chain down in the asset tracker, which also sets the distributor;
-/// 4. the chain admin installs the real distributor with the snapshot root through the proxy, and declares
-///    the amounts of the tokens native to the chain;
+///    and shuts the chain down in the asset tracker, which also sets the distributor and records the chain admin
+///    named by the installer;
+/// 4. the chain admin installs the real distributor with the snapshot root through the proxy, and mints to it
+///    the tokens native to the chain that its users still held on it;
 /// 5. anyone sends the chain's L1 funds to the distributor and users claim.
 /// @dev Uses the full L1 ecosystem deployment and real deposits through the Bridgehub, no storage overrides.
 contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
+    using stdToml for string;
+
     uint256 constant GAS_PRICE = 10_000_000;
     uint256 constant L2_GAS_LIMIT = 1_000_000;
     uint256 constant TOKEN_DEPOSIT = 5 ether;
@@ -192,7 +218,7 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         addresses.chainTypeManager.setValidator(chainId, validatorTimelock, false);
         vm.startPrank(governance);
         IZKChain(chain).setTransactionFilterer(denyAllFilterer);
-        assetTracker.shutdownChain(chainId, distributorProxy, chainAdmin);
+        assetTracker.shutdownChain(chainId, distributorProxy);
         vm.stopPrank();
     }
 
@@ -260,11 +286,10 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         emit IL1AssetTracker.ChainShutdown(chainId, lastExecuted, chainAdmin);
         vm.expectEmit(true, true, false, false, address(assetTracker));
         emit IL1AssetTracker.ShutdownDistributorSet(chainId, distributorProxy);
-        assetTracker.shutdownChain(chainId, distributorProxy, chainAdmin);
+        assetTracker.shutdownChain(chainId, distributorProxy);
         vm.stopPrank();
 
         assertTrue(assetTracker.isChainShutdown(chainId));
-        assertEq(assetTracker.shutdownBatchNumber(chainId), lastExecuted);
         assertEq(assetTracker.shutdownChainAdmin(chainId), chainAdmin);
         assertEq(assetTracker.shutdownDistributor(chainId), distributorProxy);
         // The governance keeps the chain admin role, for future rescue operations.
@@ -293,7 +318,7 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         // Not even the former chain admin can shut down a chain on its own.
         vm.prank(chainAdmin);
         vm.expectRevert("Ownable: caller is not the owner");
-        assetTracker.shutdownChain(chainId, distributorProxy, chainAdmin);
+        assetTracker.shutdownChain(chainId, distributorProxy);
     }
 
     function test_shutdownChain_requiresGovernanceAsChainAdmin() public {
@@ -305,7 +330,7 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         // The governance has not accepted the admin role.
         vm.prank(governance);
         vm.expectRevert(abi.encodeWithSelector(ChainAdminNotOwner.selector, chainId, chainAdmin));
-        assetTracker.shutdownChain(chainId, distributorProxy, chainAdmin);
+        assetTracker.shutdownChain(chainId, distributorProxy);
     }
 
     function test_shutdownChain_requiresTransactionFilterer() public {
@@ -317,7 +342,7 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         vm.prank(governance);
         vm.expectRevert(abi.encodeWithSelector(TransactionFiltererNotSet.selector, chainId));
-        assetTracker.shutdownChain(chainId, distributorProxy, chainAdmin);
+        assetTracker.shutdownChain(chainId, distributorProxy);
     }
 
     function test_shutdownChain_requiresValidatorTimelockRemoved() public {
@@ -327,24 +352,79 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         IZKChain(chain).setTransactionFilterer(denyAllFilterer);
 
         vm.expectRevert(abi.encodeWithSelector(ChainValidatorNotRemoved.selector, chainId, validatorTimelock));
-        assetTracker.shutdownChain(chainId, distributorProxy, chainAdmin);
+        assetTracker.shutdownChain(chainId, distributorProxy);
         vm.stopPrank();
     }
 
-    function test_shutdownChain_zeroAddresses() public {
-        vm.startPrank(governance);
+    /// @dev The chain admin of record is read from the installer behind the distributor proxy, so the proxy must
+    /// still have it.
+    function test_shutdownChain_requiresInstallerAsDistributor() public {
+        vm.prank(governance);
+        vm.expectRevert(bytes(""));
+        assetTracker.shutdownChain(chainId, address(0));
+
+        // Once installed, the distributor has no `CHAIN_ADMIN()`.
+        _installDistributor(keccak256("root"), block.timestamp);
+        vm.prank(governance);
+        vm.expectRevert(bytes(""));
+        assetTracker.shutdownChain(chainId, distributorProxy);
+    }
+
+    /// @dev The installer rejects a zero chain admin in its constructor, so a distributor reporting one is mocked:
+    /// `isChainShutdown` is derived from the recorded chain admin, which must not be zero.
+    function test_shutdownChain_zeroChainAdmin() public {
+        vm.mockCall(
+            distributorProxy,
+            abi.encodeCall(ShutdownDistributorInstaller(distributorProxy).CHAIN_ADMIN, ()),
+            abi.encode(address(0))
+        );
+        vm.prank(governance);
         vm.expectRevert(ZeroAddress.selector);
-        assetTracker.shutdownChain(chainId, address(0), chainAdmin);
-        vm.expectRevert(ZeroAddress.selector);
-        assetTracker.shutdownChain(chainId, distributorProxy, address(0));
-        vm.stopPrank();
+        assetTracker.shutdownChain(chainId, distributorProxy);
+    }
+
+    function test_shutdownChain_settlementLayerCannotBeShutdown() public {
+        vm.prank(addresses.bridgehub.owner());
+        addresses.bridgehub.setSettlementLayerStatus(chainId, true);
+
+        vm.prank(governance);
+        vm.expectRevert(abi.encodeWithSelector(SettlementLayerCannotBeShutdown.selector, chainId));
+        assetTracker.shutdownChain(chainId, distributorProxy);
+    }
+
+    /// @dev This test is isolated from Gateway, which this deployment doesn't have: the bridgehub is mocked to report
+    /// that the chain settles on a Gateway.
+    function test_shutdownChain_requiresSettlementOnL1() public {
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeCall(IBridgehubBase.settlementLayer, (chainId)),
+            abi.encode(block.chainid + 1)
+        );
+        vm.prank(governance);
+        vm.expectRevert(InvalidSettlementLayer.selector);
+        assetTracker.shutdownChain(chainId, distributorProxy);
+    }
+
+    /// @dev This test is isolated from Gateway, which this deployment doesn't have: the chain asset handler is mocked to
+    /// report the migration number of a chain that migrated to Gateway and back to L1.
+    function test_shutdownChain_requiresNeverMigratedToGateway() public {
+        vm.mockCall(
+            address(L1AssetTracker(address(assetTracker)).chainAssetHandler()),
+            abi.encodeCall(IChainAssetHandlerBase.migrationNumber, (chainId)),
+            abi.encode(MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1)
+        );
+        vm.prank(governance);
+        vm.expectRevert(
+            abi.encodeWithSelector(InvalidChainMigrationNumber.selector, MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1, 0)
+        );
+        assetTracker.shutdownChain(chainId, distributorProxy);
     }
 
     function test_shutdownChain_twiceReverts() public {
         _shutdown();
         vm.prank(governance);
         vm.expectRevert(ChainIsShutdown.selector);
-        assetTracker.shutdownChain(chainId, distributorProxy, chainAdmin);
+        assetTracker.shutdownChain(chainId, distributorProxy);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -453,6 +533,21 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         _installDistributor(bytes32(0), block.timestamp);
         vm.expectRevert(abi.encodeWithSelector(ShutdownDistributorNotInitialized.selector, chainId));
         assetTracker.sendShutdownChainFunds(chainId, ethAssetId);
+    }
+
+    /// @dev The vault releases the funds of a shut down chain only to the asset tracker, and not while it is paused.
+    function test_transferShutdownChainFunds_guards() public {
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, alice));
+        addresses.l1NativeTokenVault.transferShutdownChainFunds(ethAssetId, alice, 1);
+
+        _shutdown();
+        _deployDistributorForSnapshot();
+        vm.prank(addresses.l1NativeTokenVault.owner());
+        addresses.l1NativeTokenVault.pause();
+        vm.expectRevert("Pausable: paused");
+        assetTracker.sendShutdownChainFunds(chainId, ethAssetId);
+        assertEq(IAssetTrackerBase(address(assetTracker)).chainBalance(chainId, ethAssetId), ethDeposited);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -587,14 +682,6 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         _shutdown();
 
-        // The chain admin declares how much of the token was still held on L2 at shutdown.
-        vm.expectEmit(true, true, false, true, address(assetTracker));
-        emit IL1AssetTracker.ShutdownChainNativeAssetAmountSet(chainId, nativeAssetId, HELD_ON_L2_AT_SHUTDOWN);
-        vm.prank(chainAdmin);
-        assetTracker.setShutdownChainNativeAssetAmount(chainId, nativeAssetId, HELD_ON_L2_AT_SHUTDOWN);
-        assertEq(assetTracker.shutdownChainNativeAssetAmount(chainId, nativeAssetId), HELD_ON_L2_AT_SHUTDOWN);
-        assertTrue(assetTracker.isShutdownChainNativeAssetAmountSet(chainId, nativeAssetId));
-
         // Snapshot: bob held the whole remaining L2 supply.
         snapshotLeaves.push(_leaf(0, bob, address(l1Token), HELD_ON_L2_AT_SHUTDOWN));
         // Murky needs at least two leaves; a zero claim for alice fills the tree.
@@ -605,6 +692,7 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             block.timestamp
         );
 
+        // The chain admin mints to the distributor what was still held on L2 at shutdown.
         vm.expectEmit(true, true, true, true, address(assetTracker));
         emit IL1AssetTracker.ShutdownChainFundsSent(
             chainId,
@@ -612,7 +700,9 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             address(distributor),
             HELD_ON_L2_AT_SHUTDOWN
         );
-        assertEq(assetTracker.sendShutdownChainFunds(chainId, nativeAssetId), HELD_ON_L2_AT_SHUTDOWN);
+        vm.prank(chainAdmin);
+        assetTracker.mintShutdownChainNativeAsset(chainId, nativeAssetId, HELD_ON_L2_AT_SHUTDOWN);
+        assertTrue(assetTracker.isShutdownChainNativeAssetMinted(chainId, nativeAssetId));
 
         // The remaining L2 supply is minted on L1 to the distributor, on top of what was withdrawn before.
         assertEq(l1Token.balanceOf(address(distributor)), HELD_ON_L2_AT_SHUTDOWN);
@@ -621,16 +711,11 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             IAssetTrackerBase(address(assetTracker)).chainBalance(chainId, nativeAssetId),
             chainBalanceBefore - HELD_ON_L2_AT_SHUTDOWN
         );
-        assertEq(assetTracker.shutdownChainNativeAssetAmount(chainId, nativeAssetId), 0);
 
-        // It can only be sent once, and the amount can not be set again.
-        vm.expectRevert(abi.encodeWithSelector(NoChainBalanceToSend.selector, chainId, nativeAssetId));
-        assetTracker.sendShutdownChainFunds(chainId, nativeAssetId);
+        // It can only be minted once.
         vm.prank(chainAdmin);
-        vm.expectRevert(
-            abi.encodeWithSelector(ShutdownChainNativeAssetAmountAlreadySet.selector, chainId, nativeAssetId)
-        );
-        assetTracker.setShutdownChainNativeAssetAmount(chainId, nativeAssetId, 1);
+        vm.expectRevert(abi.encodeWithSelector(ShutdownChainNativeAssetAlreadyMinted.selector, chainId, nativeAssetId));
+        assetTracker.mintShutdownChainNativeAsset(chainId, nativeAssetId, 1);
 
         // Bob claims the token from the distributor.
         bytes32[] memory proof = merkle.getProof(snapshotLeaves, 0);
@@ -640,29 +725,39 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         assertEq(l1Token.balanceOf(address(distributor)), 0);
     }
 
-    function test_setShutdownChainNativeAssetAmount_reverts() public {
+    function test_mintShutdownChainNativeAsset_reverts() public {
         bytes32 nativeAssetId = _withdrawChainNativeToken(alice, WITHDRAWN_BEFORE_SHUTDOWN);
 
         // Not shut down yet: there is no chain admin of record.
         vm.prank(chainAdmin);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, chainAdmin));
-        assetTracker.setShutdownChainNativeAssetAmount(chainId, nativeAssetId, HELD_ON_L2_AT_SHUTDOWN);
+        assetTracker.mintShutdownChainNativeAsset(chainId, nativeAssetId, HELD_ON_L2_AT_SHUTDOWN);
 
         _shutdown();
 
         // Only the chain admin of record, not the governance.
         vm.prank(governance);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governance));
-        assetTracker.setShutdownChainNativeAssetAmount(chainId, nativeAssetId, HELD_ON_L2_AT_SHUTDOWN);
+        assetTracker.mintShutdownChainNativeAsset(chainId, nativeAssetId, HELD_ON_L2_AT_SHUTDOWN);
 
         // Only for tokens native to the chain: L1 tokens are swept from the chain's L1 balance instead.
         vm.prank(chainAdmin);
         vm.expectRevert(abi.encodeWithSelector(NotShutdownChainNativeAsset.selector, chainId, tokenAssetId));
-        assetTracker.setShutdownChainNativeAssetAmount(chainId, tokenAssetId, HELD_ON_L2_AT_SHUTDOWN);
+        assetTracker.mintShutdownChainNativeAsset(chainId, tokenAssetId, HELD_ON_L2_AT_SHUTDOWN);
 
-        // Without a declared amount there is nothing to send for a chain-native token.
+        // The distributor is still the installer, which has no `MERKLE_ROOT()`.
+        vm.prank(chainAdmin);
+        vm.expectRevert(bytes(""));
+        assetTracker.mintShutdownChainNativeAsset(chainId, nativeAssetId, HELD_ON_L2_AT_SHUTDOWN);
+
         _installDistributor(keccak256("root"), block.timestamp);
+        vm.prank(chainAdmin);
         vm.expectRevert(abi.encodeWithSelector(NoChainBalanceToSend.selector, chainId, nativeAssetId));
+        assetTracker.mintShutdownChainNativeAsset(chainId, nativeAssetId, 0);
+        assertFalse(assetTracker.isShutdownChainNativeAssetMinted(chainId, nativeAssetId));
+
+        // Tokens native to the chain have no L1 balance to send: only the chain admin can mint them.
+        vm.expectRevert(abi.encodeWithSelector(ShutdownChainNativeAsset.selector, chainId, nativeAssetId));
         assetTracker.sendShutdownChainFunds(chainId, nativeAssetId);
     }
 
@@ -773,6 +868,67 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         new ShutdownDistributorInstaller(address(0), distributorImplementation);
         vm.expectRevert(ZeroAddress.selector);
         new ShutdownDistributorInstaller(chainAdmin, address(0));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            Upgrade script
+    //////////////////////////////////////////////////////////////*/
+
+    string constant UPGRADE_OUTPUT =
+        "/test/foundry/l1/integration/deploy-scripts/script-out/chain-shutdown-upgrade.toml";
+
+    /// @dev The ecosystem upgrade that adds the shutdown: the script deploys the new implementations and the deny-all
+    /// filterer, and the governance executes the calls from its output. The proxies keep their state, and a chain can
+    /// then be shut down through them.
+    function test_upgradeScript() public {
+        address nativeTokenVault = address(addresses.l1NativeTokenVault);
+        address wethToken = address(addresses.l1NativeTokenVault.WETH_TOKEN());
+        vm.setEnv("CHAIN_SHUTDOWN_UPGRADE_OUTPUT", UPGRADE_OUTPUT);
+        new ChainShutdownUpgradeForTests().run(address(addresses.bridgehub));
+
+        string memory toml = vm.readFile(string.concat(vm.projectRoot(), UPGRADE_OUTPUT));
+        address[2] memory proxies = [address(assetTracker), nativeTokenVault];
+        address[2] memory implementations = [
+            toml.readAddress("$.l1_asset_tracker_implementation_addr"),
+            toml.readAddress("$.l1_native_token_vault_implementation_addr")
+        ];
+        address filterer = toml.readAddress("$.deny_all_transaction_filterer_addr");
+        Call[] memory calls = abi.decode(toml.readBytes("$.governance_calls"), (Call[]));
+
+        assertEq(calls.length, 2);
+        for (uint256 i = 0; i < calls.length; ++i) {
+            ProxyAdmin proxyAdmin = ProxyAdmin(calls[i].target);
+            assertTrue(
+                proxyAdmin.getProxyImplementation(ITransparentUpgradeableProxy(proxies[i])) != implementations[i]
+            );
+            vm.expectEmit(true, false, false, false, proxies[i]);
+            emit IERC1967.Upgraded(implementations[i]);
+            vm.prank(proxyAdmin.owner());
+            (bool success, ) = calls[i].target.call{value: calls[i].value}(calls[i].data);
+            assertTrue(success);
+            assertEq(proxyAdmin.getProxyImplementation(ITransparentUpgradeableProxy(proxies[i])), implementations[i]);
+        }
+
+        // The new implementations have the same immutables.
+        L1AssetTracker upgradedAssetTracker = L1AssetTracker(address(assetTracker));
+        assertEq(address(upgradedAssetTracker.BRIDGE_HUB()), address(addresses.bridgehub));
+        assertEq(address(upgradedAssetTracker.NATIVE_TOKEN_VAULT()), nativeTokenVault);
+        assertEq(address(upgradedAssetTracker.MESSAGE_ROOT()), address(addresses.bridgehub.messageRoot()));
+        assertEq(address(addresses.l1NativeTokenVault.WETH_TOKEN()), wethToken);
+        assertEq(address(addresses.l1NativeTokenVault.ASSET_ROUTER()), address(addresses.sharedBridge));
+        assertEq(address(addresses.l1NativeTokenVault.L1_NULLIFIER()), address(addresses.l1Nullifier));
+        // The proxies keep their state.
+        assertEq(IAssetTrackerBase(address(assetTracker)).chainBalance(chainId, ethAssetId), ethDeposited);
+        assertEq(IAssetTrackerBase(address(assetTracker)).chainBalance(chainId, tokenAssetId), TOKEN_DEPOSIT);
+        assertEq(Ownable2StepUpgradeable(address(assetTracker)).owner(), governance);
+        assertEq(address(addresses.l1NativeTokenVault.l1AssetTracker()), address(assetTracker));
+        assertEq(addresses.l1NativeTokenVault.tokenAddress(tokenAssetId), address(token));
+
+        // A chain can be shut down through the upgraded proxies, with the filterer that the script deployed.
+        denyAllFilterer = filterer;
+        _shutdown();
+        assertTrue(assetTracker.isChainShutdown(chainId));
+        assertEq(IZKChain(chain).getTransactionFilterer(), filterer);
     }
 
     // add this to be excluded from coverage report

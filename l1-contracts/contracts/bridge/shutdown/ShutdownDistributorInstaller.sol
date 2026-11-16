@@ -20,10 +20,11 @@ import {IShutdownClaimDistributor} from "./IShutdownClaimDistributor.sol";
 /// initializer, so the chain admin can not run any other code in the proxy, e.g. code that changes the proxy admin.
 /// After `install`, the proxy no longer points to this contract, so `install` can not be called again and only the
 /// governance (the proxy admin) can upgrade the distributor.
-/// @dev It has no `MERKLE_ROOT()`, so `L1AssetTracker.sendShutdownChainFunds` reverts, and the chain's funds stay in
-/// the vault, until the real distributor is in place.
+/// @dev It has no `MERKLE_ROOT()`, so `L1AssetTracker` sends and mints nothing to the distributor, and the chain's
+/// funds stay in the vault, until the real distributor is in place.
 contract ShutdownDistributorInstaller is ERC1967Upgrade {
     /// @notice The admin of the chain being shut down, the only address that can install the distributor.
+    /// `L1AssetTracker.shutdownChain` reads it through the proxy and records it as the chain admin.
     /// @dev An immutable, so it is read from this contract's code when the proxy delegatecalls into it.
     address public immutable CHAIN_ADMIN;
 
