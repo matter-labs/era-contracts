@@ -14,6 +14,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {CTMUpgradeExecutorFixture} from "./CTMUpgradeExecutor.t.sol";
 import {DefaultCTMUpgrade} from "deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {CTMUpgrade_v35} from "deploy-scripts/upgrade/v35/CTMUpgrade_v35.s.sol";
+import {Utils} from "deploy-scripts/utils/Utils.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
@@ -32,7 +33,12 @@ contract BootstrapAdminCallsHarness is CTMUpgrade_v35 {
     function setLiveInputs(address _notifierProxy, address _ctmProxy, address _executor) external {
         ctmAddresses.stateTransition.proxies.serverNotifier = _notifierProxy;
         ctmAddresses.stateTransition.proxies.chainTypeManager = _ctmProxy;
+        ctmAddresses.admin.transparentProxyAdmin = Utils.getProxyAdminAddress(_ctmProxy);
         ctmUpgradeExecutor = CTMUpgradeExecutor(payable(_executor));
+    }
+
+    function setEcosystemProxyAdmin(address _admin) external {
+        coreAddresses.shared.transparentProxyAdmin = _admin;
     }
 
     function setOutputPath(string memory _path) external {
@@ -143,6 +149,16 @@ contract ServerNotifierHandoverTest is CTMUpgradeExecutorFixture {
         _acceptAsGovernance();
         assertEq(harness.serverNotifierHandoverCalls().length, 0, "and stays done");
         _assertHandedOver();
+    }
+
+    /// @dev A notifier behind the ecosystem ProxyAdmin moves with the rest of the CTM domain
+    ///      (`ctmProxyAdminSplitCalls`), so the ChainAdmin only nominates.
+    function test_bootstrapLeavesANotifierBehindTheEcosystemAdminToTheSplit() public {
+        harness.setEcosystemProxyAdmin(address(notifierAdmin));
+        Call[] memory calls = harness.serverNotifierHandoverCalls();
+        assertEq(calls.length, 1, "only the nomination");
+        assertEq(calls[0].target, address(notifierProxy));
+        assertEq(calls[0].data, abi.encodeCall(Ownable2Step.transferOwnership, (address(ctmExecutor))));
     }
 
     function test_bootstrapAdminCallsSectionRecordsTheHandover() public {

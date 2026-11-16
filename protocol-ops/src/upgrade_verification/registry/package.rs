@@ -37,7 +37,9 @@ use anyhow::Context;
 use crate::common::external_actions::ExternalAction;
 use crate::common::forge::scripts::member_deployments::MemberDeployments;
 use crate::common::forge::scripts::upgrade_executors::UpgradeExecutorsRecord;
-use crate::common::governance_calls::{decode_calls, GovernanceCall, GovernanceCallsTable};
+use crate::common::governance_calls::{
+    ctm_proxy_admin_split_calls, decode_calls, GovernanceCall, GovernanceCallsTable,
+};
 
 use super::records::{member_records_in, records_in};
 use super::views::{CTMUpgradeExecutorView, CoreUpgradeExecutorView};
@@ -83,6 +85,7 @@ impl RegistryPackage {
     pub(crate) fn load_if_registry(ecosystem_toml: &Path) -> anyhow::Result<Option<Self>> {
         let root = read_toml(ecosystem_toml)?;
         let calls = bundle_in(&root)?;
+        ctm_proxy_admin_split_of(&root, &calls)?;
         let legs = recover_legs(&calls)?;
         let migrates = migrate_targets(&calls);
         let replacement = recover_replacement(&calls)?;
@@ -607,6 +610,9 @@ pub(crate) struct BootstrapPackage {
     pub(crate) ctm_key: String,
     /// `[governance_calls] calls` — the one bundle governance signs.
     pub(crate) calls: Vec<GovernanceCall>,
+    /// `[ctms.*.ctm_proxy_admin_split] calls` — what governance executes on its own before the
+    /// bundle to move the CTM domain off the ecosystem ProxyAdmin. Empty without the table.
+    pub(crate) ctm_proxy_admin_split: Vec<GovernanceCall>,
     /// The prepare's declared external actions — calls the objects do NOT describe.
     pub(crate) external_actions: Vec<ExternalAction>,
     /// The package's record of the lifecycle objects' binding values.
@@ -826,6 +832,7 @@ impl BootstrapPackage {
             ),
             reported_singletons: ReportedSingletons::in_package(root, Some(&ctm_key)),
             calls,
+            ctm_proxy_admin_split: ctm_proxy_admin_split_calls(root)?,
             external_actions: external_actions_in(root)?,
             create2_salts: create2_salts_in(root, Some(&ctm_key)),
             lifecycle: lifecycle_inputs_in(root),
@@ -835,6 +842,25 @@ impl BootstrapPackage {
             ctm_key,
         })
     }
+}
+
+/// The `[ctms.*.ctm_proxy_admin_split] calls` of a package whose governance bundle is `bundle`.
+/// A non-empty split is refused unless the bundle runs a bootstrap edge (`migrate()`): only
+/// `verify-bootstrap` reviews a split, so anywhere else it would go out unreviewed.
+pub(crate) fn ctm_proxy_admin_split_of(
+    root: &toml::Value,
+    bundle: &[GovernanceCall],
+) -> anyhow::Result<Vec<GovernanceCall>> {
+    let split = ctm_proxy_admin_split_calls(root)?;
+    if !split.is_empty() && migrate_targets(bundle).is_empty() {
+        anyhow::bail!(
+            "the package carries a CTM-domain ProxyAdmin split ([ctms.*.ctm_proxy_admin_split], \
+             {} calls) but its governance bundle runs no bootstrap edge (`migrate()`): only a \
+             bootstrap package's review verifies a split",
+            split.len()
+        );
+    }
+    Ok(split)
 }
 
 /// Every target the bundle calls `migrate()` on — the bootstrap migrations it drives.

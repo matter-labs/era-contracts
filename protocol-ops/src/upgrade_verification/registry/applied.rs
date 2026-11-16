@@ -1285,6 +1285,7 @@ mod tests {
             reported_singletons: Default::default(),
             ctm_key: "zksync_os".to_string(),
             calls: Vec::new(),
+            ctm_proxy_admin_split: Vec::new(),
             external_actions: Vec::new(),
             create2_salts: Vec::new(),
             lifecycle: Default::default(),
