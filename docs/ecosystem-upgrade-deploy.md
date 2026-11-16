@@ -118,8 +118,12 @@ release an image with them. The
 verifier takes its reviewer inputs from the env config (the upgrade input's `owner_address` and
 CREATE2 salts, the permanent values' `bridgehub_proxy_addr`, the reviewed Bridgehub, and
 `zk_token_asset_id`), so the env must declare them. Committed today: `stage`, `testnet`,
-`mainnet`. The check must pass for both the generate job and the independent bundle-handoff
-verification job.
+`mainnet`, `zksync-os-mainnet`. The check must pass for both the generate job and the independent
+bundle-handoff verification job.
+
+`zksync-os-mainnet` is the ZKsync OS ecosystem on L1 mainnet (Bridgehub `0xEe293Fd0…`, one CTM),
+separate from `mainnet` (the Era ecosystem) and owned by a legacy `Governance.sol` with
+`minDelay() == 0`.
 
 `adi` (single-chain ZKsync OS on L1 mainnet, owned by a legacy `Governance.sol` with a real
 security council and a three-day `minDelay()`) has a v31 config pair

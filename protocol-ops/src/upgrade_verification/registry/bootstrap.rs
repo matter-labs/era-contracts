@@ -23,9 +23,9 @@
 //! sequence in particular is the oracle the bundle is compared against, and an oracle the package
 //! chose is worth nothing until the reviewed creation code is shown to have produced it.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
-use alloy::primitives::{Address, B256, U256};
+use alloy::primitives::{keccak256, Address, B256, U256};
 use alloy::providers::Provider;
 use alloy::sol_types::{SolCall, SolValue};
 
@@ -33,12 +33,13 @@ use crate::common::external_actions::ExternalAction;
 use crate::common::forge::scripts::upgrade_executors::UpgradeExecutorsRecord;
 use crate::common::governance_calls::GovernanceCall;
 use crate::upgrade_verification::constants::{
-    CTM_CONTRACT_SERVER_NOTIFIER_SLOT, EIP1967_PROXY_ADMIN_SLOT,
+    CTM_CONTRACTS, CTM_CONTRACT_SERVER_NOTIFIER_SLOT, EIP1967_PROXY_ADMIN_SLOT,
 };
 use crate::upgrade_verification::report::VerificationResult;
 
 use super::construction::{
-    canonical_create2_address, constructor_args, expect_canonical_construction, ReviewedBuild,
+    canonical_create2_address, constructor_args, ctm_proxy_admin_salt,
+    expect_canonical_construction, ReviewedBuild, CREATE2_AND_TRANSFER, REVIEWED_PROXY_ADMIN,
 };
 use super::declared_calls::{judge_declared_calls, DerivedRun};
 use super::ecosystem_binding::{bind_to_reviewed_ecosystem, EcosystemClaims};
@@ -52,14 +53,15 @@ use super::members::{verify_engine_and_l2_plan, DepartingMembers, BOOTSTRAP_ENGI
 use super::package::BootstrapPackage;
 use super::provenance::{expect_code_identity, tolerate};
 use super::rows::{
-    participating, verify_inventory, verify_inventory_construction, Inventory, InventoryReview,
+    discover_slot_proxy, participating, verify_inventory, verify_inventory_construction, Inventory,
+    InventoryReview,
 };
 use super::upgrade::{
     cross_check, verify_bytecodes_published, verify_proxy_upgrade_transition, verify_release,
     verify_validator_timelock_owner, Publication,
 };
 use super::views::{
-    self, BootstrapCall, BridgehubView, CTMUpgradeExecutorView, CtmView,
+    self, BootstrapCall, BridgehubView, CTMUpgradeExecutorView, CtmView, ProxyAdminView,
     RegistryBootstrapMigrationView, ServerNotifierView, ZkChainGettersView,
 };
 use super::{format_semver, render_derived_payloads};
@@ -277,7 +279,7 @@ pub(crate) async fn verify<P: Provider>(
                 .chain(package.reported_ctm)
                 .collect(),
             core_proxy_admin: bindings.core_proxy_admin,
-            ctm_proxy_admin: bindings.ctm.zip(bindings.ctm_proxy_admin),
+            ctm_proxy_admin: ctm_proxy_admin_claim(&bindings, &package.ctm_proxy_admin_split),
         },
     )
     .await;
@@ -358,10 +360,30 @@ pub(crate) async fn verify<P: Provider>(
     )
     .await;
 
+    // ── 3b. The CTM-domain ProxyAdmin the edge hands to the CTM executor: the CTM's own, not the
+    //    ecosystem's, and in front of every CTM-domain proxy ──
+    result.print_info("\n== Prerequisite: CTM-domain ProxyAdmin ==");
+    let split_moved = verify_ctm_proxy_admin(
+        provider,
+        result,
+        &manifest,
+        bindings.core_proxy_admin,
+        &package.ctm_proxy_admin_split,
+    )
+    .await?;
+    judge_ctm_proxy_admin_construction(result, build, salts, &manifest, &split_moved);
+
     // ── 4. The one-time ServerNotifier handover: a precondition of the edge, half of which
     //    governance cannot perform ──
     result.print_info("\n== Prerequisite: ServerNotifier handover ==");
-    let handover = verify_notifier_handover(provider, result, &manifest, &package.calls).await?;
+    let handover = verify_notifier_handover(
+        provider,
+        result,
+        &manifest,
+        &package.calls,
+        &package.ctm_proxy_admin_split,
+    )
+    .await?;
 
     // ── 5. Readiness: the migration's `validate()` refuses an unpublished L2 dependency ──
     result.print_info("\n== Readiness ==");
@@ -453,6 +475,10 @@ pub(crate) async fn verify<P: Provider>(
             anchor: Some(manifest.ctm),
             departure_unreadable: (!handover.under_ctm_proxy_admin)
                 .then_some(CTM_CONTRACT_SERVER_NOTIFIER_SLOT),
+            departure_admins: bindings
+                .core_proxy_admin
+                .map(|core| split_moved.iter().map(|&proxy| (proxy, core)).collect())
+                .unwrap_or_default(),
             reported: package.reported_singletons,
             reviewed_bridgehub: env.bridgehub(),
         },
@@ -485,6 +511,7 @@ pub(crate) async fn verify<P: Provider>(
                 domain_admin: eco_admin_addr,
                 anchor: reviewed_bridgehub,
                 departure_unreadable: None,
+                departure_admins: Default::default(),
                 reported: Default::default(),
                 reviewed_bridgehub: env.bridgehub(),
             },
@@ -726,8 +753,8 @@ fn judge_lagging_chains(result: &mut VerificationResult, departing: U256, chains
 
 /// The prerequisite's verdict, for the row check that follows it.
 struct NotifierHandover {
-    /// The notifier proxy sits under the manifest's CTM-domain `ProxyAdmin`, so its row can be
-    /// read through that admin like every other.
+    /// The notifier proxy sits under the manifest's CTM-domain `ProxyAdmin`, or the split moves it
+    /// there, so its row can be read like every other.
     under_ctm_proxy_admin: bool,
 }
 
@@ -742,6 +769,289 @@ struct NotifierFacts {
     pending_owner: Option<Address>,
 }
 
+/// Where to point a reviewer whose CTM domain is not split off the ecosystem's `ProxyAdmin`.
+const SPLIT_REMEDY: &str = "rerun the v35 prepare, whose `[ctm_proxy_admin_split] calls` \
+                            governance executes before the bundle";
+
+/// CTM-domain proxies whose admin other checks own: the ServerNotifier moves under the CTM-domain
+/// admin in its own handover ([`verify_notifier_handover`]), and the L1InteropFeeManager is
+/// introduced by this edge (the inventory review holds the package's proxy to the domain admin),
+/// so a pre-v35 CTM does not name it yet. The split may still move either.
+const ADMIN_CHECKED_ELSEWHERE: [&str; 2] = ["ServerNotifier", "L1InteropFeeManager"];
+
+/// What the chain says about the CTM domain: the CTM-domain `ProxyAdmin`'s owner (`None` when it
+/// could not be read, already reported) and every proxy of the domain the CTM names,
+/// `(member, proxy, admin)`.
+struct CtmDomainFacts {
+    owner: Option<Address>,
+    proxies: Vec<(&'static str, Address, Address)>,
+}
+
+/// The CTM-domain `ProxyAdmin` the edge hands to the CTM executor against the live CTM domain:
+/// its owner, and every proxy of the domain's inventory the CTM names ([`discover_slot_proxy`]),
+/// read from its EIP-1967 admin slot and judged with the package's split by
+/// [`judge_ctm_proxy_admin`]. The code of an admin the CTM already sits behind is not held to the
+/// reviewed build: admins deployed before the metadata-less build never match it byte for byte;
+/// one the split creates is held to its construction ([`judge_ctm_proxy_admin_construction`]).
+/// Returns the proxies the split moves.
+///
+/// Reads: the admin's `owner()`, then per CTM-domain proxy member: the CTM's getter for it, then
+/// its admin slot.
+async fn verify_ctm_proxy_admin<P: Provider>(
+    provider: &P,
+    result: &mut VerificationResult,
+    manifest: &views::BootstrapManifest,
+    core_proxy_admin: Option<Address>,
+    split: &[GovernanceCall],
+) -> anyhow::Result<BTreeSet<Address>> {
+    let owner = tolerate(
+        ProxyAdminView::new(manifest.ctmProxyAdmin, provider)
+            .owner()
+            .call()
+            .await,
+        result,
+        "the CTM-domain ProxyAdmin's owner",
+    );
+    let mut proxies = Vec::new();
+    for member in CTM_CONTRACTS {
+        let checked_elsewhere = ADMIN_CHECKED_ELSEWHERE.contains(&member);
+        let proxy =
+            match discover_slot_proxy(provider, Inventory::CtmDomain, member, manifest.ctm).await {
+                Ok(Some(proxy)) if !proxy.is_zero() => proxy,
+                Ok(_) => continue,
+                Err(_) if checked_elsewhere => continue,
+                Err(why) => {
+                    result.report_error(&format!(
+                        "{why}: whether the CTM's {member} sits behind the CTM-domain ProxyAdmin \
+                         is unchecked"
+                    ));
+                    continue;
+                }
+            };
+        // A transparent proxy answers `admin()` only to its admin, so the slot itself is read.
+        let admin = provider
+            .get_storage_at(proxy, EIP1967_PROXY_ADMIN_SLOT.into())
+            .await?;
+        proxies.push((member, proxy, Address::from_word(admin.into())));
+    }
+    Ok(judge_ctm_proxy_admin(
+        result,
+        manifest,
+        core_proxy_admin,
+        &CtmDomainFacts { owner, proxies },
+        split,
+    ))
+}
+
+/// The CTM-domain admin against the ecosystem's, against its owner, and against the admin of
+/// every CTM-domain proxy once the package's split has run. Returns the proxies the split moves.
+///
+/// A CTM deployed before the two-executor model shares the ecosystem `ProxyAdmin`. The bundle
+/// hands that admin to the core executor before it hands "the CTM-domain admin" to the migration,
+/// so the shared case reverts the edge: an ERROR, and the per-proxy verdicts are moot. The v35
+/// prepare instead binds a CTM-domain admin of the CTM's own and moves each proxy still behind the
+/// ecosystem's onto it in the split, one `changeProxyAdmin` per proxy on the ecosystem admin; any
+/// other split call is an ERROR. Governance hands the CTM-domain admin to the migration, so it
+/// must own it. A proxy left behind another admin (a partial split) ends where the CTM executor
+/// can never upgrade it: an ERROR too, whether that admin is the ecosystem's or a third party's.
+fn judge_ctm_proxy_admin(
+    result: &mut VerificationResult,
+    manifest: &views::BootstrapManifest,
+    core_proxy_admin: Option<Address>,
+    facts: &CtmDomainFacts,
+    split: &[GovernanceCall],
+) -> BTreeSet<Address> {
+    let ctm_proxy_admin = manifest.ctmProxyAdmin;
+    match core_proxy_admin {
+        Some(core) if core == ctm_proxy_admin => {
+            result.report_error(&format!(
+                "the CTM-domain ProxyAdmin {ctm_proxy_admin} is the ecosystem ProxyAdmin: the \
+                 bundle hands it to the core executor before handing it to the migration, so the \
+                 edge reverts — {SPLIT_REMEDY}"
+            ));
+            return BTreeSet::new();
+        }
+        Some(core) => result.report_ok(&format!(
+            "the CTM-domain ProxyAdmin {ctm_proxy_admin} is the CTM's own, apart from the ecosystem \
+             ProxyAdmin {core}"
+        )),
+        None => result.report_warn(
+            "the ecosystem ProxyAdmin is unknown (the core executor's PROXY_ADMIN could not be \
+             read), so whether the CTM domain shares it is unchecked",
+        ),
+    }
+    match facts.owner {
+        Some(owner) if owner == manifest.governance => result.report_ok(&format!(
+            "the CTM-domain ProxyAdmin is owned by the manifest's governance {owner}"
+        )),
+        Some(owner) => result.report_error(&format!(
+            "the CTM-domain ProxyAdmin {ctm_proxy_admin} is owned by {owner}, not by the \
+             manifest's governance {}: governance cannot hand it to the migration",
+            manifest.governance
+        )),
+        None => {}
+    }
+
+    let mut moved = BTreeSet::new();
+    for (index, call) in split.iter().enumerate() {
+        let decoded = ProxyAdminView::changeProxyAdminCall::abi_decode(&call.data)
+            .ok()
+            .filter(|_| call.value.is_zero());
+        let stray = match decoded {
+            None => "is no value-free `changeProxyAdmin(address,address)`".to_string(),
+            Some(_) if Some(call.target) != core_proxy_admin => {
+                "is not on the ecosystem ProxyAdmin".to_string()
+            }
+            Some(decoded) if decoded.newAdmin != ctm_proxy_admin => format!(
+                "moves {} under {}, not under the CTM-domain ProxyAdmin {ctm_proxy_admin}",
+                decoded.proxy, decoded.newAdmin
+            ),
+            Some(decoded)
+                if !facts
+                    .proxies
+                    .iter()
+                    .any(|&(_, proxy, admin)| proxy == decoded.proxy && admin == call.target) =>
+            {
+                format!(
+                    "moves {}, which is no CTM-domain proxy behind the ecosystem ProxyAdmin",
+                    decoded.proxy
+                )
+            }
+            Some(decoded) if !moved.insert(decoded.proxy) => {
+                format!("moves {} a second time", decoded.proxy)
+            }
+            Some(_) => continue,
+        };
+        result.report_error(&format!(
+            "the split's call {index} (to {}) {stray}: governance would execute a call this \
+             review does not account for",
+            call.target
+        ));
+    }
+
+    for &(member, proxy, admin) in &facts.proxies {
+        if ADMIN_CHECKED_ELSEWHERE.contains(&member) {
+            continue;
+        }
+        if admin == ctm_proxy_admin {
+            result.report_ok(&format!(
+                "the CTM's {member} {proxy} sits behind the CTM-domain ProxyAdmin"
+            ));
+        } else if Some(admin) == core_proxy_admin && moved.contains(&proxy) {
+            result.report_ok(&format!(
+                "the CTM's {member} {proxy} sits behind the ecosystem ProxyAdmin {admin}, and the \
+                 split moves it under the CTM-domain ProxyAdmin before the bundle"
+            ));
+        } else if Some(admin) == core_proxy_admin {
+            result.report_error(&format!(
+                "the CTM's {member} {proxy} still sits behind the ecosystem ProxyAdmin {admin}, \
+                 which the core executor receives, and the split does not move it: the CTM \
+                 executor could never upgrade it — {SPLIT_REMEDY}"
+            ));
+        } else {
+            result.report_error(&format!(
+                "the CTM's {member} {proxy} sits behind {admin}, neither the CTM-domain \
+                 ProxyAdmin {ctm_proxy_admin} nor the ecosystem's: the CTM executor could never \
+                 upgrade it"
+            ));
+        }
+    }
+    moved
+}
+
+/// The CTM-domain `ProxyAdmin` of a split that moves the CTM itself: the prepare created it, so it
+/// must be the reviewed `ProxyAdmin` the reviewed `Create2AndTransfer` creates for the manifest's
+/// governance under one of the reviewed salts ([`ctm_proxy_admin_salt`]). Any other admin is the
+/// one the CTM already sits behind.
+fn judge_ctm_proxy_admin_construction(
+    result: &mut VerificationResult,
+    build: &ReviewedBuild,
+    salts: &[B256],
+    manifest: &views::BootstrapManifest,
+    moved: &BTreeSet<Address>,
+) {
+    if !moved.contains(&manifest.ctm) {
+        return;
+    }
+    let label = format!(
+        "the CTM-domain ProxyAdmin {} the split moves the CTM under",
+        manifest.ctmProxyAdmin
+    );
+    let (creator, proxy_admin) = match (
+        build.get(CREATE2_AND_TRANSFER.1),
+        build.get(REVIEWED_PROXY_ADMIN.1),
+    ) {
+        (Ok(creator), Ok(proxy_admin)) => (creator, proxy_admin),
+        (Err(why), _) | (_, Err(why)) => {
+            result.report_error(&format!(
+                "{label}: its construction cannot be derived — {why}"
+            ));
+            return;
+        }
+    };
+    if salts.is_empty() {
+        result.report_error(&format!(
+            "{label}: no CREATE2 salt is available, so its construction cannot be derived. Pass \
+             --create2-salt with the reviewed salts from the upgrade env"
+        ));
+        return;
+    }
+    let mut derived = Vec::with_capacity(salts.len());
+    for salt in salts {
+        let inner_salt = ctm_proxy_admin_salt(*salt, manifest.ctm);
+        let args = constructor_args::create2_and_transfer(
+            proxy_admin.creation_code(),
+            inner_salt,
+            manifest.governance,
+        );
+        let created = canonical_create2_address(*salt, creator.creation_code(), &args)
+            .create2(inner_salt, keccak256(proxy_admin.creation_code()));
+        if created == manifest.ctmProxyAdmin {
+            result.report_ok(&format!(
+                "{label} is the reviewed ProxyAdmin the reviewed Create2AndTransfer creates for \
+                 governance {} (CREATE2 salt {salt})",
+                manifest.governance
+            ));
+            return;
+        }
+        derived.push(format!("salt {salt} -> {created}"));
+    }
+    result.report_error(&format!(
+        "{label} is not the reviewed ProxyAdmin the prepare creates for governance {}, which lands \
+         at {}: governance would hand the CTM domain to an admin this review cannot identify",
+        manifest.governance,
+        derived.join("; ")
+    ));
+}
+
+/// The CTM executor's `(CTM, CTM_PROXY_ADMIN())` for [`bind_to_reviewed_ecosystem`], or none for
+/// a CTM the split moves onto that admin: it is held to it with the rest of its domain
+/// ([`judge_ctm_proxy_admin`]).
+fn ctm_proxy_admin_claim(
+    bindings: &LifecycleBindings,
+    split: &[GovernanceCall],
+) -> Option<(Address, Address)> {
+    let claim = bindings.ctm.zip(bindings.ctm_proxy_admin)?;
+    let moved = bindings
+        .core_proxy_admin
+        .is_some_and(|core| split_moves(split, core, claim.0, claim.1));
+    (!moved).then_some(claim)
+}
+
+/// Whether `split` carries `changeProxyAdmin(proxy, new_admin)` on `admin`.
+fn split_moves(
+    split: &[GovernanceCall],
+    admin: Address,
+    proxy: Address,
+    new_admin: Address,
+) -> bool {
+    split.iter().any(|call| {
+        call.target == admin
+            && ProxyAdminView::changeProxyAdminCall::abi_decode(&call.data)
+                .is_ok_and(|decoded| decoded.proxy == proxy && decoded.newAdmin == new_admin)
+    })
+}
+
 /// The one-time ServerNotifier handover `RegistryBootstrapMigration.validate()` requires complete
 /// before `migrate()` can run (see "ServerNotifier: a one-time handover, then an ordinary
 /// CTM-domain proxy" in `docs/upgrade-operations.md`), read live.
@@ -750,6 +1060,7 @@ async fn verify_notifier_handover<P: Provider>(
     result: &mut VerificationResult,
     manifest: &views::BootstrapManifest,
     bundle: &[GovernanceCall],
+    split: &[GovernanceCall],
 ) -> anyhow::Result<NotifierHandover> {
     let Some(row) = manifest
         .ctmProxyUpgrades
@@ -799,17 +1110,20 @@ async fn verify_notifier_handover<P: Provider>(
             "the ServerNotifier's pending owner",
         ),
     };
-    Ok(judge_notifier_handover(result, &facts, manifest, bundle))
+    Ok(judge_notifier_handover(
+        result, &facts, manifest, bundle, split,
+    ))
 }
 
 /// The handover verdict over the live facts: anything short of a completed handover — or a
-/// nomination the bundle's derived first call accepts — is an ERROR, because `migrate()` refuses
-/// it.
+/// nomination the bundle's derived first call accepts, or a proxy move the split makes — is an
+/// ERROR, because `migrate()` refuses it.
 fn judge_notifier_handover(
     result: &mut VerificationResult,
     facts: &NotifierFacts,
     manifest: &views::BootstrapManifest,
     bundle: &[GovernanceCall],
+    split: &[GovernanceCall],
 ) -> NotifierHandover {
     const MISSING: &str = "the ChainAdmin half of the ServerNotifier handover is missing: the \
                            prepare's `[ctm_admin_calls] server_notifier_handover` calls must be \
@@ -840,11 +1154,19 @@ fn judge_notifier_handover(
         None => {}
     }
 
-    let under_ctm_proxy_admin = facts.proxy_admin == manifest.ctmProxyAdmin;
-    if under_ctm_proxy_admin {
+    let split_moves_notifier =
+        split_moves(split, facts.proxy_admin, notifier, manifest.ctmProxyAdmin);
+    let under_ctm_proxy_admin = facts.proxy_admin == manifest.ctmProxyAdmin || split_moves_notifier;
+    if facts.proxy_admin == manifest.ctmProxyAdmin {
         result.report_ok(&format!(
             "the ServerNotifier proxy is administered by the CTM-domain ProxyAdmin {}",
             manifest.ctmProxyAdmin
+        ));
+    } else if split_moves_notifier {
+        result.report_ok(&format!(
+            "the ServerNotifier proxy is administered by {}, and the split moves it under the \
+             CTM-domain ProxyAdmin {} before the bundle",
+            facts.proxy_admin, manifest.ctmProxyAdmin
         ));
     } else {
         result.report_error(&format!(
@@ -1720,6 +2042,7 @@ mod tests {
             reported_singletons: Default::default(),
             ctm_key: "zksync_os".to_string(),
             calls: Vec::new(),
+            ctm_proxy_admin_split: Vec::new(),
             external_actions: Vec::new(),
             create2_salts: Vec::new(),
             lifecycle: Default::default(),
@@ -1906,13 +2229,355 @@ mod tests {
 
     fn judge(facts: &NotifierFacts, bundle: &[GovernanceCall]) -> (VerificationResult, bool) {
         let mut result = VerificationResult::default();
-        let verdict =
-            judge_notifier_handover(&mut result, facts, &manifest_with(notifier_row()), bundle);
+        let verdict = judge_notifier_handover(
+            &mut result,
+            facts,
+            &manifest_with(notifier_row()),
+            bundle,
+            &[],
+        );
         (result, verdict.under_ctm_proxy_admin)
     }
 
     fn accepting_bundle() -> Vec<GovernanceCall> {
         vec![notifier_acceptance(CTM_EXECUTOR, NOTIFIER)]
+    }
+
+    // The CTM-domain proxies besides the CTM and its `TIMELOCK`.
+    const SUPPLIER: Address = Address::repeat_byte(0xB5);
+    const VALIDATOR: Address = Address::repeat_byte(0x7D);
+    const THIRD_PARTY_ADMIN: Address = Address::repeat_byte(0xD3);
+
+    /// The CTM-domain proxies zksync-os mainnet keeps behind one admin: the CTM, its timelock,
+    /// supplier and permissionless validator, each behind `admins[i]`.
+    fn ctm_domain(admins: [Address; 4]) -> Vec<(&'static str, Address, Address)> {
+        [
+            ("ChainTypeManager", CTM),
+            ("ValidatorTimelock", TIMELOCK),
+            ("BytecodesSupplier", SUPPLIER),
+            ("PermissionlessValidator", VALIDATOR),
+        ]
+        .into_iter()
+        .zip(admins)
+        .map(|((member, proxy), admin)| (member, proxy, admin))
+        .collect()
+    }
+
+    /// The domain owned by the manifest's governance.
+    fn domain_facts(admins: [Address; 4]) -> CtmDomainFacts {
+        CtmDomainFacts {
+            owner: Some(manifest_with(notifier_row()).governance),
+            proxies: ctm_domain(admins),
+        }
+    }
+
+    fn judge_domain(
+        ctm_admin: Address,
+        core_admin: Option<Address>,
+        facts: &CtmDomainFacts,
+        split: &[GovernanceCall],
+    ) -> (VerificationResult, BTreeSet<Address>) {
+        let manifest = views::BootstrapManifest {
+            ctmProxyAdmin: ctm_admin,
+            ..manifest_with(notifier_row())
+        };
+        let mut result = VerificationResult::default();
+        let moved = judge_ctm_proxy_admin(&mut result, &manifest, core_admin, facts, split);
+        (result, moved)
+    }
+
+    fn judge_admins(
+        ctm_admin: Address,
+        core_admin: Option<Address>,
+        domain_admins: [Address; 4],
+    ) -> VerificationResult {
+        judge_domain(ctm_admin, core_admin, &domain_facts(domain_admins), &[]).0
+    }
+
+    fn change_proxy_admin(admin: Address, proxy: Address, new_admin: Address) -> GovernanceCall {
+        GovernanceCall {
+            target: admin,
+            value: U256::ZERO,
+            data: ProxyAdminView::changeProxyAdminCall {
+                proxy,
+                newAdmin: new_admin,
+            }
+            .abi_encode(),
+        }
+    }
+
+    /// The split the v35 prepare writes for `proxies` behind the ecosystem admin.
+    fn split_moving(proxies: &[Address]) -> Vec<GovernanceCall> {
+        proxies
+            .iter()
+            .map(|&proxy| change_proxy_admin(ECO_ADMIN, proxy, CTM_ADMIN))
+            .collect()
+    }
+
+    /// A CTM that shares the ecosystem's admin cannot cross the bootstrap: the bundle hands that
+    /// admin to the core executor first. One error, not one per proxy.
+    #[test]
+    fn a_ctm_sharing_the_ecosystem_proxy_admin_fails() {
+        let result = judge_admins(ECO_ADMIN, Some(ECO_ADMIN), [ECO_ADMIN; 4]);
+        assert_eq!(result.errors, 1);
+        assert!(result.has_error("is the ecosystem ProxyAdmin"));
+        assert!(result.has_error("rerun the v35 prepare"));
+    }
+
+    /// The domain still behind the ecosystem admin, the manifest naming the CTM-domain admin the
+    /// prepare bound, and the split moving every proxy (the ServerNotifier and the fee manager
+    /// too): nothing is left behind once it has run.
+    #[test]
+    fn a_pending_split_moving_the_whole_domain_passes() {
+        const FEE_MANAGER: Address = Address::repeat_byte(0xFE);
+        let mut facts = domain_facts([ECO_ADMIN; 4]);
+        facts.proxies.push(("ServerNotifier", NOTIFIER, ECO_ADMIN));
+        facts
+            .proxies
+            .push(("L1InteropFeeManager", FEE_MANAGER, ECO_ADMIN));
+        let everything = [CTM, TIMELOCK, SUPPLIER, VALIDATOR, NOTIFIER, FEE_MANAGER];
+        let (result, moved) = judge_domain(
+            CTM_ADMIN,
+            Some(ECO_ADMIN),
+            &facts,
+            &split_moving(&everything),
+        );
+        assert_eq!((result.errors, result.warnings), (0, 0));
+        assert_eq!(moved, BTreeSet::from(everything));
+    }
+
+    /// A split that does not move the PermissionlessValidator leaves it where the CTM executor
+    /// cannot upgrade it.
+    #[test]
+    fn a_proxy_the_split_does_not_move_fails() {
+        let (result, moved) = judge_domain(
+            CTM_ADMIN,
+            Some(ECO_ADMIN),
+            &domain_facts([ECO_ADMIN; 4]),
+            &split_moving(&[CTM, TIMELOCK, SUPPLIER]),
+        );
+        assert_eq!(result.errors, 1);
+        assert!(result.has_error(&format!(
+            "the CTM's PermissionlessValidator {VALIDATOR} still sits behind the ecosystem \
+             ProxyAdmin {ECO_ADMIN}, which the core executor receives, and the split does not \
+             move it"
+        )));
+        assert!(!moved.contains(&VALIDATOR));
+    }
+
+    /// Every split call is accounted for: each stray one, next to a split that is otherwise
+    /// complete, is one error of its own.
+    #[test]
+    fn a_split_call_the_review_cannot_account_for_fails() {
+        let mut not_a_move = change_proxy_admin(ECO_ADMIN, CTM, CTM_ADMIN);
+        not_a_move.value = U256::from(1);
+        for (stray, why) in [
+            (
+                change_proxy_admin(THIRD_PARTY_ADMIN, CTM, CTM_ADMIN),
+                "is not on the ecosystem ProxyAdmin".to_string(),
+            ),
+            (
+                change_proxy_admin(ECO_ADMIN, CTM, ATTACKER),
+                format!("moves {CTM} under {ATTACKER}, not under the CTM-domain ProxyAdmin"),
+            ),
+            (
+                change_proxy_admin(ECO_ADMIN, ATTACKER, CTM_ADMIN),
+                format!("moves {ATTACKER}, which is no CTM-domain proxy behind the ecosystem"),
+            ),
+            (
+                change_proxy_admin(ECO_ADMIN, CTM, CTM_ADMIN),
+                format!("moves {CTM} a second time"),
+            ),
+            (
+                not_a_move,
+                "is no value-free `changeProxyAdmin(address,address)`".to_string(),
+            ),
+        ] {
+            let mut split = split_moving(&[CTM, TIMELOCK, SUPPLIER, VALIDATOR]);
+            split.push(stray);
+            let (result, _) = judge_domain(
+                CTM_ADMIN,
+                Some(ECO_ADMIN),
+                &domain_facts([ECO_ADMIN; 4]),
+                &split,
+            );
+            assert_eq!(result.errors, 1, "{why}: {:?}", result.error_messages);
+            assert!(
+                result.has_error("the split's call 4 ") && result.has_error(&why),
+                "{why}: {:?}",
+                result.error_messages
+            );
+        }
+    }
+
+    /// The build the prepare creates the CTM-domain admin from, and the admin it lands at for
+    /// `governance` under `SALT`.
+    fn proxy_admin_build() -> ReviewedBuild {
+        ReviewedBuild::from_parts(&[
+            (
+                CREATE2_AND_TRANSFER.0,
+                CREATE2_AND_TRANSFER.1,
+                b"reviewed creation code of Create2AndTransfer".to_vec(),
+            ),
+            (
+                REVIEWED_PROXY_ADMIN.0,
+                REVIEWED_PROXY_ADMIN.1,
+                b"reviewed creation code of ProxyAdmin".to_vec(),
+            ),
+        ])
+    }
+
+    fn created_proxy_admin(governance: Address) -> Address {
+        let build = proxy_admin_build();
+        let proxy_admin = build.get(REVIEWED_PROXY_ADMIN.1).unwrap().creation_code();
+        let inner_salt = ctm_proxy_admin_salt(SALT, CTM);
+        let args = constructor_args::create2_and_transfer(proxy_admin, inner_salt, governance);
+        canonical_create2_address(
+            SALT,
+            build.get(CREATE2_AND_TRANSFER.1).unwrap().creation_code(),
+            &args,
+        )
+        .create2(inner_salt, keccak256(proxy_admin))
+    }
+
+    fn judge_construction(
+        ctm_admin: Address,
+        salts: &[B256],
+        moved: &[Address],
+    ) -> VerificationResult {
+        let manifest = views::BootstrapManifest {
+            ctmProxyAdmin: ctm_admin,
+            ..manifest_with(notifier_row())
+        };
+        let mut result = VerificationResult::default();
+        judge_ctm_proxy_admin_construction(
+            &mut result,
+            &proxy_admin_build(),
+            salts,
+            &manifest,
+            &moved.iter().copied().collect(),
+        );
+        result
+    }
+
+    /// A split that moves the CTM hands it to the admin the prepare created: the reviewed
+    /// `ProxyAdmin`, created for governance under the CTM's salt, and nothing else.
+    #[test]
+    fn the_admin_a_split_creates_is_held_to_its_construction() {
+        let governance = manifest_with(notifier_row()).governance;
+        let created = created_proxy_admin(governance);
+        let result = judge_construction(created, &[SALT], &[CTM, TIMELOCK]);
+        assert_eq!((result.errors, result.warnings), (0, 0));
+
+        let result = judge_construction(ATTACKER, &[SALT], &[CTM, TIMELOCK]);
+        assert_eq!(result.errors, 1);
+        assert!(result.has_error(&format!(
+            "is not the reviewed ProxyAdmin the prepare creates for governance {governance}, \
+             which lands at salt {SALT} -> {created}"
+        )));
+
+        let result = judge_construction(created_proxy_admin(ATTACKER), &[SALT], &[CTM]);
+        assert_eq!(result.errors, 1, "an admin created for another owner");
+
+        let result = judge_construction(created, &[], &[CTM]);
+        assert!(result.has_error("no CREATE2 salt is available"));
+    }
+
+    /// An admin the CTM already sits behind is its own: a split moving only the rest of the
+    /// domain onto it does not hold it to a construction.
+    #[test]
+    fn the_admin_the_ctm_already_has_is_not_held_to_a_construction() {
+        let result = judge_construction(THIRD_PARTY_ADMIN, &[SALT], &[TIMELOCK, SUPPLIER]);
+        assert_eq!((result.errors, result.warnings), (0, 0));
+        let result = judge_construction(THIRD_PARTY_ADMIN, &[], &[]);
+        assert_eq!((result.errors, result.warnings), (0, 0));
+    }
+
+    /// A proxy already behind the CTM-domain admin is no longer the ecosystem admin's to move.
+    #[test]
+    fn a_split_moving_an_already_split_proxy_fails() {
+        let (result, _) = judge_domain(
+            CTM_ADMIN,
+            Some(ECO_ADMIN),
+            &domain_facts([CTM_ADMIN; 4]),
+            &split_moving(&[CTM]),
+        );
+        assert_eq!(result.errors, 1);
+        assert!(result.has_error("which is no CTM-domain proxy behind the ecosystem ProxyAdmin"));
+    }
+
+    /// Before the split has run the CTM is still behind the ecosystem admin, so the executor's
+    /// admin claim is left to the domain's judge; any other split leaves the claim standing.
+    #[test]
+    fn the_ctm_the_split_moves_is_not_claimed_for_its_executor() {
+        let bindings = LifecycleBindings {
+            core_proxy_admin: Some(ECO_ADMIN),
+            ctm: Some(CTM),
+            ctm_proxy_admin: Some(CTM_ADMIN),
+        };
+        assert_eq!(
+            ctm_proxy_admin_claim(&bindings, &split_moving(&[CTM])),
+            None
+        );
+        for split in [
+            Vec::new(),
+            split_moving(&[TIMELOCK]),
+            vec![change_proxy_admin(ECO_ADMIN, CTM, ATTACKER)],
+            vec![change_proxy_admin(THIRD_PARTY_ADMIN, CTM, CTM_ADMIN)],
+        ] {
+            assert_eq!(
+                ctm_proxy_admin_claim(&bindings, &split),
+                Some((CTM, CTM_ADMIN))
+            );
+        }
+    }
+
+    /// Governance hands the CTM-domain admin to the migration, so it must own it.
+    #[test]
+    fn a_ctm_proxy_admin_governance_does_not_own_fails() {
+        let mut facts = domain_facts([CTM_ADMIN; 4]);
+        facts.owner = Some(ATTACKER);
+        let (result, _) = judge_domain(CTM_ADMIN, Some(ECO_ADMIN), &facts, &[]);
+        assert_eq!(result.errors, 1);
+        assert!(result.has_error(&format!(
+            "the CTM-domain ProxyAdmin {CTM_ADMIN} is owned by {ATTACKER}"
+        )));
+    }
+
+    #[test]
+    fn a_split_ctm_domain_passes() {
+        let result = judge_admins(CTM_ADMIN, Some(ECO_ADMIN), [CTM_ADMIN; 4]);
+        assert_eq!((result.errors, result.warnings), (0, 0));
+    }
+
+    /// A split that moved the CTM but left a proxy without a bootstrap row (here the
+    /// PermissionlessValidator) behind the ecosystem admin leaves it where the CTM executor
+    /// cannot upgrade it.
+    #[test]
+    fn a_proxy_left_behind_the_ecosystem_admin_fails() {
+        let mut admins = [CTM_ADMIN; 4];
+        admins[3] = ECO_ADMIN;
+        let result = judge_admins(CTM_ADMIN, Some(ECO_ADMIN), admins);
+        assert_eq!(result.errors, 1);
+        assert!(result.has_error(&format!(
+            "the CTM's PermissionlessValidator {VALIDATOR} still sits behind the ecosystem \
+             ProxyAdmin {ECO_ADMIN}, which the core executor receives"
+        )));
+    }
+
+    #[test]
+    fn a_proxy_behind_a_third_party_admin_fails() {
+        let mut admins = [CTM_ADMIN; 4];
+        admins[3] = THIRD_PARTY_ADMIN;
+        let result = judge_admins(CTM_ADMIN, Some(ECO_ADMIN), admins);
+        assert_eq!(result.errors, 1);
+        assert!(result.has_error("neither the CTM-domain ProxyAdmin"));
+    }
+
+    #[test]
+    fn an_unknown_ecosystem_admin_only_warns() {
+        let result = judge_admins(CTM_ADMIN, None, [CTM_ADMIN; 4]);
+        assert_eq!((result.errors, result.warnings), (0, 1));
     }
 
     #[test]
@@ -1931,6 +2596,27 @@ mod tests {
         let (result, readable) = judge(&facts, &accepting_bundle());
         assert_eq!(result.errors, 0);
         assert!(readable);
+    }
+
+    /// A notifier still behind the ecosystem admin that the split moves under the CTM-domain one
+    /// is read like every other CTM-domain proxy; one the split leaves there is the missing half.
+    #[test]
+    fn a_notifier_the_split_moves_is_under_the_ctm_proxy_admin() {
+        let facts = notifier_facts(CTM_EXECUTOR, Address::ZERO, ECO_ADMIN);
+        let manifest = manifest_with(notifier_row());
+        for (split, readable) in [
+            (split_moving(&[NOTIFIER]), true),
+            (split_moving(&[CTM]), false),
+            (
+                vec![change_proxy_admin(ECO_ADMIN, NOTIFIER, ATTACKER)],
+                false,
+            ),
+        ] {
+            let mut result = VerificationResult::default();
+            let verdict = judge_notifier_handover(&mut result, &facts, &manifest, &[], &split);
+            assert_eq!(verdict.under_ctm_proxy_admin, readable);
+            assert_eq!(result.errors, u64::from(!readable));
+        }
     }
 
     #[test]
@@ -2002,10 +2688,15 @@ mod tests {
         let asserter = Asserter::new();
         let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
         let mut result = VerificationResult::default();
-        let verdict =
-            verify_notifier_handover(&provider, &mut result, &manifest_with(inert_row()), &[])
-                .await
-                .unwrap();
+        let verdict = verify_notifier_handover(
+            &provider,
+            &mut result,
+            &manifest_with(inert_row()),
+            &[],
+            &[],
+        )
+        .await
+        .unwrap();
         assert_eq!(result.errors, 1);
         assert!(!verdict.under_ctm_proxy_admin);
     }
@@ -2021,10 +2712,15 @@ mod tests {
         }
         let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
         let mut result = VerificationResult::default();
-        let verdict =
-            verify_notifier_handover(&provider, &mut result, &manifest_with(notifier_row()), &[])
-                .await
-                .unwrap();
+        let verdict = verify_notifier_handover(
+            &provider,
+            &mut result,
+            &manifest_with(notifier_row()),
+            &[],
+            &[],
+        )
+        .await
+        .unwrap();
         assert!(asserter.read_q().is_empty());
         assert_eq!(result.errors, 0);
         assert!(verdict.under_ctm_proxy_admin);
@@ -2144,6 +2840,11 @@ mod tests {
         /// What the reviewed Bridgehub, and the CTM's own Bridgehub, answer as `messageRoot()`.
         message_root: (Address, Address),
         timelock_owner: Address,
+        /// The PermissionlessValidator's EIP-1967 admin: the CTM-domain admin when split.
+        validator_admin: Address,
+        /// The CTM, its timelock and supplier still behind the ecosystem admin, and the package's
+        /// split moving them and the PermissionlessValidator off it.
+        pending_split: bool,
     }
 
     const BRIDGEHUB: Address = Address::repeat_byte(0xB0);
@@ -2200,9 +2901,25 @@ mod tests {
                 CTMUpgradeExecutorView::CTM_PROXY_ADMINCall {},
                 CTM_ADMIN,
             );
-            for (proxy, admin) in [(BRIDGEHUB, ECO_ADMIN), (CTM, CTM_ADMIN)] {
+            // A split CTM domain: every proxy the CTM names behind the CTM-domain admin, governed
+            // by governance.
+            let domain_admin = if self.pending_split {
+                ECO_ADMIN
+            } else {
+                CTM_ADMIN
+            };
+            for (proxy, admin) in [
+                (BRIDGEHUB, ECO_ADMIN),
+                (CTM, domain_admin),
+                (TIMELOCK, domain_admin),
+                (SUPPLIER, domain_admin),
+                (VALIDATOR, self.validator_admin),
+            ] {
                 l1.storage(proxy, EIP1967_PROXY_ADMIN_SLOT, admin.into_word());
             }
+            l1.answer(CTM_ADMIN, ProxyAdminView::ownerCall {}, governance);
+            l1.answer(CTM, CtmView::L1_BYTECODES_SUPPLIERCall {}, SUPPLIER);
+            l1.answer(CTM, CtmView::PERMISSIONLESS_VALIDATORCall {}, VALIDATOR);
             // The CTM: registered on the reviewed Bridgehub or not, built over another one, at the
             // manifest's departing version with nobody nominated, and naming `TIMELOCK`.
             l1.answer(
@@ -2251,6 +2968,9 @@ mod tests {
 
             let mut package = package();
             package.release = manifest.currentRelease;
+            if self.pending_split {
+                package.ctm_proxy_admin_split = split_moving(&[CTM, TIMELOCK, SUPPLIER, VALIDATOR]);
+            }
             let genesis = ReviewedGenesis {
                 genesis_root: Err("isolated out".to_string()),
                 image: Err("isolated out".to_string()),
@@ -2287,6 +3007,8 @@ mod tests {
             registered: true,
             message_root: (ROOT_PROXY, OTHER_PROXY),
             timelock_owner: governance,
+            validator_admin: CTM_ADMIN,
+            pending_split: false,
         };
         let (control, l1) = control_run.verify().await;
         assert!(
@@ -2301,6 +3023,13 @@ mod tests {
             !control.has_error("is not registered on the reviewed Bridgehub")
                 && !control.has_error("L1MessageRoot is")
                 && !control.has_error("ValidatorTimelock"),
+            "{:?}",
+            control.error_messages
+        );
+        // The CTM-domain prerequisite reads every proxy the CTM names and finds the domain split
+        // (an unreadable getter would report "whether … sits behind … is unchecked").
+        assert!(
+            !control.has_error("sits behind") && !control.has_error("is the ecosystem ProxyAdmin"),
             "{:?}",
             control.error_messages
         );
@@ -2362,6 +3091,41 @@ mod tests {
         assert_eq!(timelock_elsewhere.errors, control.errors + 1);
         assert!(timelock_elsewhere.has_error(&format!(
             "the ValidatorTimelock {TIMELOCK} is owned by {ATTACKER}"
+        )));
+
+        // A partial split: the PermissionlessValidator, which no bootstrap row names, was left
+        // behind the ecosystem admin.
+        let (validator_left_behind, _) = ReviewedRootRun {
+            validator_admin: ECO_ADMIN,
+            ..control_run
+        }
+        .verify()
+        .await;
+        assert_eq!(validator_left_behind.errors, control.errors + 1);
+        assert!(validator_left_behind.has_error(&format!(
+            "the CTM's PermissionlessValidator {VALIDATOR} still sits behind the ecosystem \
+             ProxyAdmin {ECO_ADMIN}"
+        )));
+
+        // Pre-sign, before the split has run: the CTM's admin is held to the split rather than to
+        // the executor's `CTM_PROXY_ADMIN()`, and to its construction, which this empty build
+        // cannot derive; otherwise the run is the control's.
+        let (pending_split, _) = ReviewedRootRun {
+            validator_admin: ECO_ADMIN,
+            pending_split: true,
+            ..control_run
+        }
+        .verify()
+        .await;
+        assert_eq!(
+            pending_split.errors,
+            control.errors + 1,
+            "{:?}",
+            pending_split.error_messages
+        );
+        assert!(pending_split.has_error(&format!(
+            "the CTM-domain ProxyAdmin {CTM_ADMIN} the split moves the CTM under: its \
+             construction cannot be derived"
         )));
     }
 

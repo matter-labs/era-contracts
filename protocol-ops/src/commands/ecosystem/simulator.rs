@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::common::execution_runbook;
 use crate::common::governance_calls::{decode_calls, GovernanceCall, GovernanceCallsTable};
 use crate::common::logger;
+use crate::upgrade_verification::registry::package::ctm_proxy_admin_split_of;
 
 alloy::sol! {
     struct ChainAdminCall {
@@ -371,8 +372,8 @@ pub struct GovernanceTomlToSimulatorArgs {
     #[clap(long)]
     pub governance_toml: Option<PathBuf>,
 
-    /// Transaction-simulator network name. Defaults to `mainnet` for
-    /// `--env mainnet`, otherwise `sepolia`.
+    /// Transaction-simulator network name. Defaults to `mainnet` for an env
+    /// on L1 mainnet (`l1_chain_id = 1`), otherwise `sepolia`.
     #[clap(long)]
     pub network: Option<String>,
 
@@ -564,7 +565,7 @@ struct SimulatorTransaction {
 /// belongs to phase 2 (real-chain broadcast), not the sim.
 const CREATE2_FACTORY: &str = "0x4e59b44847b379578588920ca78fbf26c0b4956c";
 
-/// ETH minted to the governance sender (PUH) with the bundle's first call: it
+/// ETH minted to the governance sender (PUH) with its first call: it
 /// creates the impersonated account on the fork and covers the `value` of any
 /// call in the bundle, such as a `requestL2TransactionDirect{value: y}` /
 /// `...TwoBridges{value: y}` priority request. 10 ETH is well above the
@@ -577,6 +578,10 @@ const GOVERNANCE_SENDER_FUND_ETH: &str = "10";
 
 /// Simulator tag of the governance bundle's transactions.
 const GOVERNANCE_TAG: &str = "governance";
+
+/// Simulator tag of the `[ctms.*.ctm_proxy_admin_split]` transactions governance runs before the
+/// bundle.
+const CTM_PROXY_ADMIN_SPLIT_TAG: &str = "ctm_proxy_admin_split";
 
 /// Subset of `prepare/manifest.json` needed to walk every Safe bundle.
 #[derive(Debug, Deserialize)]
@@ -624,7 +629,7 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
     let network = args.network.unwrap_or_else(|| {
         env_cfg
             .as_ref()
-            .filter(|cfg| cfg.env == "mainnet")
+            .filter(|cfg| cfg.l1_chain_id() == Some(1))
             .map(|_| "mainnet".to_string())
             .unwrap_or_else(|| "sepolia".to_string())
     });
@@ -1253,11 +1258,33 @@ fn governance_toml_to_simulator_transactions(
 ) -> anyhow::Result<Vec<SimulatorTransaction>> {
     let content =
         fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
-    let parsed: GovernanceCallsToml =
+    let root: toml::Value =
         toml::from_str(&content).with_context(|| format!("failed to parse {}", path.display()))?;
+    let parsed: GovernanceCallsToml = root
+        .clone()
+        .try_into()
+        .with_context(|| format!("failed to parse {}", path.display()))?;
+    let bundle = decode_calls(&parsed.governance_calls.calls)
+        .context("failed to decode [governance_calls] calls")?;
+    let split = ctm_proxy_admin_split_of(&root, &bundle)?;
 
-    let mut out =
-        governance_bundle_transactions(&parsed.governance_calls, network, from, descriptions)?;
+    let mut out = governance_transactions(
+        split,
+        CTM_PROXY_ADMIN_SPLIT_TAG,
+        false,
+        network,
+        from,
+        descriptions,
+    );
+    let funded = !out.is_empty();
+    out.extend(governance_transactions(
+        bundle,
+        GOVERNANCE_TAG,
+        funded,
+        network,
+        from,
+        descriptions,
+    ));
     append_test_upgrade_calls(&mut out, &parsed.test_upgrade_calls, network, descriptions)?;
     Ok(out)
 }
@@ -1274,16 +1301,17 @@ pub(super) fn simulator_transaction_tags(path: &PathBuf) -> anyhow::Result<Vec<S
     Ok(txs.into_iter().map(|tx| tx.tag).collect())
 }
 
-/// One simulator transaction per call of the governance bundle, sent by `from`. The first one
-/// mints [`GOVERNANCE_SENDER_FUND_ETH`] to the sender; no other mints.
-fn governance_bundle_transactions(
-    governance_calls: &GovernanceCallsTable,
+/// One simulator transaction tagged `tag` per call of a governance execution, sent by `from`.
+/// Unless the sender is already `funded`, the first one mints [`GOVERNANCE_SENDER_FUND_ETH`] to
+/// it; no other mints.
+fn governance_transactions(
+    calls: Vec<GovernanceCall>,
+    tag: &str,
+    funded: bool,
     network: &str,
     from: Address,
     descriptions: &SimDescriptionRegistry,
-) -> anyhow::Result<Vec<SimulatorTransaction>> {
-    let calls = decode_calls(&governance_calls.calls)
-        .context("failed to decode [governance_calls] calls")?;
+) -> Vec<SimulatorTransaction> {
     let mut out = Vec::with_capacity(calls.len());
     for (idx, call) in calls.into_iter().enumerate() {
         let data_hex = format!("0x{}", hex::encode(&call.data));
@@ -1292,7 +1320,7 @@ fn governance_bundle_transactions(
             .unwrap_or_else(|| {
                 let selector = data_hex.get(..10).unwrap_or("0x");
                 format!(
-                    "[unlabelled] {GOVERNANCE_TAG} call {} to={:#x} sel={selector}",
+                    "[unlabelled] {tag} call {} to={:#x} sel={selector}",
                     idx + 1,
                     call.target
                 )
@@ -1304,13 +1332,13 @@ fn governance_bundle_transactions(
             to: format!("{:#x}", call.target),
             data: data_hex,
             value: wei_to_eth_decimal(call.value),
-            value_to_mint: (idx == 0).then(|| GOVERNANCE_SENDER_FUND_ETH.to_string()),
+            value_to_mint: (idx == 0 && !funded).then(|| GOVERNANCE_SENDER_FUND_ETH.to_string()),
             emulate_all_batches_executed: None,
             emulate_all_batches_executed_for: None,
-            tag: GOVERNANCE_TAG.to_string(),
+            tag: tag.to_string(),
         });
     }
-    Ok(out)
+    out
 }
 
 fn append_test_upgrade_calls(
@@ -1368,6 +1396,7 @@ fn append_test_upgrade_calls(
 mod tests {
     use super::*;
     use crate::common::governance_calls::{encode_calls, GovernanceCall};
+    use crate::upgrade_verification::registry::package::MIGRATE_SELECTOR;
     use alloy::primitives::U256;
 
     /// The one bundle becomes one transaction per call, all tagged `governance` and sent by the
@@ -1388,12 +1417,14 @@ mod tests {
                 data: vec![0x01, 0x02, 0x03, 0x04],
             },
         ];
-        let table = GovernanceCallsTable {
-            calls: format!("0x{}", hex::encode(encode_calls(&calls))),
-        };
-        let txs =
-            governance_bundle_transactions(&table, "l1", from, &SimDescriptionRegistry::default())
-                .unwrap();
+        let txs = governance_transactions(
+            calls.to_vec(),
+            GOVERNANCE_TAG,
+            false,
+            "l1",
+            from,
+            &SimDescriptionRegistry::default(),
+        );
         assert_eq!(txs.len(), 2);
         for (tx, call) in txs.iter().zip(&calls) {
             assert_eq!(tx.tag, GOVERNANCE_TAG);
@@ -1408,6 +1439,86 @@ mod tests {
         assert_eq!(txs[1].value_to_mint, None);
         let json = serde_json::to_string(&txs).unwrap();
         assert!(!json.contains("timeIncrease"), "{json}");
+    }
+
+    fn split_package(bundle: &[GovernanceCall], split: &[GovernanceCall], from: Address) -> String {
+        format!(
+            "[governance_calls]\ncalls = \"0x{}\"\n\n\
+             [ctms.zksync_os.ctm_proxy_admin_split]\n\
+             ecosystem_proxy_admin = \"{}\"\nctm_proxy_admin = \"{}\"\ngovernance = \"{}\"\n\
+             calls = \"0x{}\"\n",
+            hex::encode(encode_calls(bundle)),
+            Address::repeat_byte(0xE0),
+            Address::repeat_byte(0xC0),
+            from,
+            hex::encode(encode_calls(split)),
+        )
+    }
+
+    fn simulate(toml: String, from: Address) -> anyhow::Result<Vec<SimulatorTransaction>> {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("ecosystem.toml");
+        fs::write(&path, toml).unwrap();
+        governance_toml_to_simulator_transactions(
+            &path,
+            "l1",
+            from,
+            &SimDescriptionRegistry::default(),
+        )
+    }
+
+    fn call(target: u8, data: &[u8]) -> GovernanceCall {
+        GovernanceCall {
+            target: Address::repeat_byte(target),
+            value: U256::ZERO,
+            data: data.to_vec(),
+        }
+    }
+
+    /// A pending CTM-domain ProxyAdmin split runs first under its own tag and takes the one mint;
+    /// the bundle after it mints nothing.
+    #[test]
+    fn a_pending_split_runs_first_and_takes_the_one_mint() {
+        let from = Address::repeat_byte(0x99);
+        let split = [
+            call(0xE0, &[0x7e, 0xff, 0x27, 0x5e]),
+            call(0xE0, &[0x7e, 0xff, 0x27, 0x5e]),
+        ];
+        let migrate = call(0x55, &MIGRATE_SELECTOR);
+        let txs = simulate(split_package(&[migrate], &split, from), from).unwrap();
+        let tags: Vec<&str> = txs.iter().map(|tx| tx.tag.as_str()).collect();
+        assert_eq!(
+            tags,
+            [
+                CTM_PROXY_ADMIN_SPLIT_TAG,
+                CTM_PROXY_ADMIN_SPLIT_TAG,
+                GOVERNANCE_TAG
+            ]
+        );
+        let mints: Vec<Option<&str>> = txs.iter().map(|tx| tx.value_to_mint.as_deref()).collect();
+        assert_eq!(mints, [Some(GOVERNANCE_SENDER_FUND_ETH), None, None]);
+        assert!(txs.iter().all(|tx| tx.from == format!("{from:#x}")));
+        assert!(
+            txs[1]
+                .description
+                .starts_with("[unlabelled] ctm_proxy_admin_split call 2 "),
+            "{}",
+            txs[1].description
+        );
+    }
+
+    /// Only a bootstrap package's review verifies a split, so the simulator refuses one beside a
+    /// bundle that runs no `migrate()`.
+    #[test]
+    fn a_split_outside_a_bootstrap_package_is_refused() {
+        let from = Address::repeat_byte(0x99);
+        let split = [call(0xE0, &[0x7e, 0xff, 0x27, 0x5e])];
+        let err = simulate(split_package(&[call(0x22, &[0xaa])], &split, from), from).unwrap_err();
+        assert!(
+            format!("{err:#}").contains("runs no bootstrap edge (`migrate()`)"),
+            "{err:#}"
+        );
+        assert!(simulate(split_package(&[call(0x22, &[0xaa])], &[], from), from).is_ok());
     }
 
     #[test]

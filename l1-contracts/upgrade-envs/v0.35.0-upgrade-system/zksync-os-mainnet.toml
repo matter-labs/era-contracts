@@ -1,0 +1,18 @@
+# Upgrade input for the zksync-os-mainnet environment on the v35 release. See protocol-ops/README.md "Environment inputs".
+
+# What this ecosystem's L1AssetRouter reports (`ERA_CHAIN_ID()`); no Era chain is registered on it.
+era_chain_id = 324
+
+# `bridgehub.owner()`, the signer of the governance bundle.
+owner_address = "0x3d67838307eedEF76026b84170737254A5FaA438"
+
+[contracts]
+# Rotated every release: CREATE2 returns the previously deployed contract if a salt is reused.
+create2_factory_salt = "0x09e1f189fb07bb52db1042ea9fa5b91430634e487d4cbe5140cadeb699b4cdd5"
+# Rotated every release: the legacy `Governance` refuses to schedule an operation id twice.
+legacy_gov_salt = "0xd7a1a807f7b65c4e3bbc281adc1eaa8acf9cd1f5c0d2a58b2b872482dfe870d3"
+
+# Per-CTM CREATE2 salts, keyed by CTM proxy: two CTM prepares deploying a contract with env-wide
+# constructor args need distinct salts.
+[create2_factory_salts]
+"0xF9Fc08eaA6dAD8DDE886F3B174a019c9ac56B2Ef" = "0xc3990888bd7868e69646320aa96362493705b462f3320acadc5b77100db0b51e"
