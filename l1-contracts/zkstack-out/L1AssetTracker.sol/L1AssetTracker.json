@@ -1270,6 +1270,17 @@
   },
   {
     "type": "error",
+    "name": "ZKsyncOSChainCannotBeShutdown",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "ZeroAddress",
     "inputs": []
   }
