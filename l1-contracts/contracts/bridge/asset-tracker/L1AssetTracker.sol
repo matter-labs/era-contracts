@@ -58,7 +58,8 @@ import {
     AssetAlreadyRegistered,
     NotMigratedChain,
     OnlyWhitelistedSettlementLayer,
-    TransientBalanceChangeAlreadySet
+    TransientBalanceChangeAlreadySet,
+    ZKsyncOSChainCannotBeShutdown
 } from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {MAX_TOKEN_BALANCE, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
@@ -392,7 +393,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// are involved: the chain is made inert in the same governance multicall, before this function is called:
     /// 1. the governance accepts the chain admin role, which the chain admin has offered with `setPendingAdmin` once
     ///    it is ready for the shutdown. Until then `acceptAdmin` reverts, and with it the whole multicall;
-    /// 2. the ValidatorTimelock is removed from the chain's validators (`ChainTypeManager.setValidator`),
+    /// 2. the ValidatorTimelocks are removed from the chain's validators (`ChainTypeManager.setValidator`),
     ///    so no batches can be committed, proven or executed;
     /// 3. a transaction filterer that rejects all transactions (`DenyAllTransactionFilterer`) is installed,
     ///    so no deposits or other L1->L2 transactions can be requested.
@@ -402,6 +403,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// ValidatorTimelocks, so these have to be reviewed off-chain before the governance proposal is executed.
     /// @dev Service transactions skip the transaction filterer, but they carry no value and, with no validators,
     /// can never be processed.
+    /// @dev ZKsync OS chains are not supported: once such a chain permanently allows Priority Mode, anyone can activate
+    /// it and process batches without the ValidatorTimelock, so removing the validators would not make the chain inert.
     /// @dev From this point on, no deposits, withdrawals or failed deposit claims can be processed for the chain,
     /// and its funds can only be sent to the shutdown distributor.
     /// @param _chainId The id of the chain to shut down.
@@ -423,6 +426,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         require(chainMigrationNumber == 0, InvalidChainMigrationNumber(chainMigrationNumber, 0));
 
         IGetters zkChain = IGetters(BRIDGE_HUB.getZKChain(_chainId));
+        require(!zkChain.getZKsyncOS(), ZKsyncOSChainCannotBeShutdown(_chainId));
         address currentAdmin = zkChain.getAdmin();
         require(currentAdmin == owner(), ChainAdminNotOwner(_chainId, currentAdmin));
         require(zkChain.getTransactionFilterer() != address(0), TransactionFiltererNotSet(_chainId));

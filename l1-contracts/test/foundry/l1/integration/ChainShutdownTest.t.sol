@@ -29,6 +29,7 @@ import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainA
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {DenyAllTransactionFilterer} from "contracts/transactionFilterer/DenyAllTransactionFilterer.sol";
@@ -61,7 +62,8 @@ import {
     ShutdownChainNativeAsset,
     ShutdownChainNativeAssetAlreadyMinted,
     ShutdownDistributorNotInitialized,
-    TransactionFiltererNotSet
+    TransactionFiltererNotSet,
+    ZKsyncOSChainCannotBeShutdown
 } from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 
 /// @dev This test's ecosystem deployment already deployed implementations of the same code with the default salt, so the
@@ -114,6 +116,8 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     address bob = makeAddr("bob");
 
     uint256 ethDeposited;
+    /// @dev The L1 -> L2 transaction hash of the last ERC20 deposit, to claim it as a failed deposit.
+    bytes32 lastTokenDepositTxHash;
 
     function setUp() public {
         _deployL1Contracts();
@@ -199,7 +203,57 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             _secondBridgeCalldata: abi.encode(address(token), _amount, _user)
         });
         vm.prank(_user);
-        addresses.bridgehub.requestL2TransactionTwoBridges{value: mintValue}(request);
+        lastTokenDepositTxHash = addresses.bridgehub.requestL2TransactionTwoBridges{value: mintValue}(request);
+    }
+
+    /// @dev Mocks the Merkle proofs of L2 -> L1 messages and of L1 -> L2 transaction statuses: the tests using it are
+    /// isolated from the message-root proof verification, everything after it (L1Nullifier, AssetRouter, NTV, asset
+    /// tracker) runs for real. The chain settles directly on L1, so the proofs have no settlement-layer part
+    /// (`settlementLayerChainId == 0`).
+    function _mockMessageRootProofs() internal {
+        address messageRoot = address(addresses.bridgehub.messageRoot());
+        vm.mockCall(
+            messageRoot,
+            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
+            abi.encode(true)
+        );
+        vm.mockCall(
+            messageRoot,
+            abi.encodeWithSelector(IMessageVerification.proveL1ToL2TransactionStatusShared.selector),
+            abi.encode(true)
+        );
+        ProofData memory proofData;
+        vm.mockCall(messageRoot, abi.encodeWithSelector(IMessageRootBase.getProofData.selector), abi.encode(proofData));
+    }
+
+    /// @dev Finalizes on L1 a withdrawal sent by the L2 asset router, with the proofs mocked by `_mockMessageRootProofs`.
+    function _finalizeWithdrawal(uint256 _l2MessageIndex, bytes32 _assetId, bytes memory _transferData) internal {
+        addresses.l1Nullifier.finalizeDeposit(
+            FinalizeL1DepositParams({
+                chainId: chainId,
+                l2BatchNumber: 0,
+                l2MessageIndex: _l2MessageIndex,
+                l2Sender: L2_ASSET_ROUTER_ADDR,
+                l2TxNumberInBatch: 0,
+                message: abi.encodePacked(AssetRouterBase.finalizeDeposit.selector, chainId, _assetId, _transferData),
+                merkleProof: new bytes32[](0)
+            })
+        );
+    }
+
+    /// @dev Claims bob's ERC20 deposit as failed, with the proofs mocked by `_mockMessageRootProofs`.
+    function _claimFailedTokenDeposit(bytes32 _l2TxHash, uint256 _amount) internal {
+        addresses.l1Nullifier.claimFailedDeposit({
+            _chainId: chainId,
+            _depositSender: bob,
+            _l1Token: address(token),
+            _amount: _amount,
+            _l2TxHash: _l2TxHash,
+            _l2BatchNumber: 0,
+            _l2MessageIndex: 0,
+            _l2TxNumberInBatch: 0,
+            _merkleProof: new bytes32[](0)
+        });
     }
 
     /// @dev What the chain admin does once it is ready for the shutdown: nominates the governance as the next admin.
@@ -356,6 +410,25 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.stopPrank();
     }
 
+    /// @dev Chains created before v29 may still have the legacy ValidatorTimelock as a validator, which this deployment
+    /// doesn't set, so the test sets one up.
+    function test_shutdownChain_requiresLegacyValidatorTimelockRemoved() public {
+        address legacyValidatorTimelock = makeAddr("legacyValidatorTimelock");
+        vm.startPrank(ctmOwner);
+        addresses.chainTypeManager.setLegacyValidatorTimelock(legacyValidatorTimelock);
+        addresses.chainTypeManager.setValidator(chainId, legacyValidatorTimelock, true);
+        addresses.chainTypeManager.setValidator(chainId, validatorTimelock, false);
+        vm.stopPrank();
+        _handOverAdminToGovernance();
+        vm.startPrank(governance);
+        IZKChain(chain).acceptAdmin();
+        IZKChain(chain).setTransactionFilterer(denyAllFilterer);
+
+        vm.expectRevert(abi.encodeWithSelector(ChainValidatorNotRemoved.selector, chainId, legacyValidatorTimelock));
+        assetTracker.shutdownChain(chainId, distributorProxy);
+        vm.stopPrank();
+    }
+
     /// @dev The chain admin of record is read from the installer behind the distributor proxy, so the proxy must
     /// still have it.
     function test_shutdownChain_requiresInstallerAsDistributor() public {
@@ -417,6 +490,14 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.expectRevert(
             abi.encodeWithSelector(InvalidChainMigrationNumber.selector, MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1, 0)
         );
+        assetTracker.shutdownChain(chainId, distributorProxy);
+    }
+
+    /// @dev This deployment only has Era chains: the chain is mocked to report that it runs ZKsync OS.
+    function test_shutdownChain_zksyncOSChainCannotBeShutdown() public {
+        vm.mockCall(chain, abi.encodeCall(IGetters.getZKsyncOS, ()), abi.encode(true));
+        vm.prank(governance);
+        vm.expectRevert(abi.encodeWithSelector(ZKsyncOSChainCannotBeShutdown.selector, chainId));
         assetTracker.shutdownChain(chainId, distributorProxy);
     }
 
@@ -482,13 +563,48 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.stopPrank();
     }
 
-    function test_shutdown_blocksWithdrawalAccounting() public {
+    /// @dev Withdrawals from batches executed before the shutdown are in the snapshot, so they can no longer be
+    /// finalized: that would pay them twice. Withdrawal finalization is a public flow, so it runs for real.
+    function test_shutdown_blocksWithdrawals() public {
+        bytes memory transferData = DataEncoding.encodeBridgeMintData({
+            _originalCaller: bob,
+            _remoteReceiver: bob,
+            _originToken: address(token),
+            _amount: 1 ether,
+            _erc20Metadata: ""
+        });
+        _mockMessageRootProofs();
+
+        // Before the shutdown, a withdrawal is paid.
+        _finalizeWithdrawal(0, tokenAssetId, transferData);
+        assertEq(token.balanceOf(bob), 1 ether);
+
         _shutdown();
-        // Isolated check of the L1AssetTracker hook: we call it as the NTV directly, since producing a real
-        // withdrawal would require an executed batch, which is impossible after the shutdown anyway.
-        vm.prank(address(addresses.l1NativeTokenVault));
+
+        // After it, the next one reverts.
         vm.expectRevert(ChainIsShutdown.selector);
-        assetTracker.handleChainBalanceDecreaseOnL1(chainId, ethAssetId, 1);
+        _finalizeWithdrawal(1, tokenAssetId, transferData);
+        assertEq(token.balanceOf(bob), 1 ether);
+        assertEq(IAssetTrackerBase(address(assetTracker)).chainBalance(chainId, tokenAssetId), TOKEN_DEPOSIT - 1 ether);
+    }
+
+    /// @dev Failed deposits are in the snapshot too, so they can no longer be claimed back.
+    function test_shutdown_blocksFailedDepositClaims() public {
+        bytes32 bobDepositTxHash = lastTokenDepositTxHash;
+        _depositToken(bob, 1 ether);
+        _mockMessageRootProofs();
+
+        // Before the shutdown, a failed deposit is claimed back.
+        _claimFailedTokenDeposit(lastTokenDepositTxHash, 1 ether);
+        assertEq(token.balanceOf(bob), 1 ether);
+
+        _shutdown();
+
+        // After it, claiming the first deposit reverts.
+        vm.expectRevert(ChainIsShutdown.selector);
+        _claimFailedTokenDeposit(bobDepositTxHash, TOKEN_DEPOSIT);
+        assertEq(token.balanceOf(bob), 1 ether);
+        assertEq(IAssetTrackerBase(address(assetTracker)).chainBalance(chainId, tokenAssetId), TOKEN_DEPOSIT);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -631,22 +747,8 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     uint256 constant HELD_ON_L2_AT_SHUTDOWN = 7 ether;
 
     /// @dev Finalizes on L1 a withdrawal of a token native to the chain, which deploys its L1 representation and
-    /// registers it in the asset tracker. The Merkle proof of the L2 -> L1 message (`proveL2MessageInclusionShared` and
-    /// `getProofData`) is mocked: this test is isolated from the message-root proof verification, everything after it (L1Nullifier, AssetRouter, NTV, asset tracker)
-    /// runs for real.
+    /// registers it in the asset tracker.
     function _withdrawChainNativeToken(address _receiver, uint256 _amount) internal returns (bytes32 assetId) {
-        vm.mockCall(
-            address(addresses.bridgehub.messageRoot()),
-            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
-        );
-        // The chain settles directly on L1, so the proof has no settlement-layer part (`settlementLayerChainId == 0`).
-        ProofData memory proofData;
-        vm.mockCall(
-            address(addresses.bridgehub.messageRoot()),
-            abi.encodeWithSelector(IMessageRootBase.getProofData.selector),
-            abi.encode(proofData)
-        );
         assetId = DataEncoding.encodeNTVAssetId(chainId, L2_NATIVE_TOKEN);
         bytes memory transferData = DataEncoding.encodeBridgeMintData({
             _originalCaller: _receiver,
@@ -660,17 +762,8 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
                 abi.encode(uint8(18))
             )
         });
-        addresses.l1Nullifier.finalizeDeposit(
-            FinalizeL1DepositParams({
-                chainId: chainId,
-                l2BatchNumber: 0,
-                l2MessageIndex: 0,
-                l2Sender: L2_ASSET_ROUTER_ADDR,
-                l2TxNumberInBatch: 0,
-                message: abi.encodePacked(AssetRouterBase.finalizeDeposit.selector, chainId, assetId, transferData),
-                merkleProof: new bytes32[](0)
-            })
-        );
+        _mockMessageRootProofs();
+        _finalizeWithdrawal(0, assetId, transferData);
         vm.clearMockedCalls();
     }
 

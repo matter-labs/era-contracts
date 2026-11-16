@@ -101,3 +101,5 @@ error TotalPreV31SupplyShouldBeZero(bytes32 _assetId, uint256 _totalSupply);
 error TransactionFiltererNotSet(uint256 chainId);
 // 0x03a5ba47
 error TransientBalanceChangeAlreadySet(uint256 storedAssetId, uint256 storedAmount);
+// 0x9164bc93
+error ZKsyncOSChainCannotBeShutdown(uint256 chainId);
