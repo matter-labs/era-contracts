@@ -1,0 +1,31 @@
+sequenceDiagram
+  autonumber
+  box rgb(241,245,249)
+    actor U as Alice
+  end
+  box rgb(219,234,254)
+    participant A as Chain A
+  end
+  box rgb(237,233,254)
+    participant E as Ethereum
+  end
+  box rgb(220,252,231)
+    participant B as Chain B
+  end
+  box rgb(254,243,199)
+    participant X as Executor
+  end
+  U->>A: send leg 1<br/>(funds leave Alice)
+  rect rgb(254,226,226)
+    Note over A,B: legs must settle<br/>by the deadline (Ethereum time)
+    A->>E: settle batch<br/>with leg 1
+    B->>E: settle batches,<br/>none with leg 2
+  end
+  rect rgb(254,202,202)
+    Note over U,X: Deadline passes: leg 2 is missing, the flow can never be finalized
+  end
+  E->>A: import an interop root<br/>newer than the deadline
+  X->>B: get timeout proof<br/>for leg 2
+  X->>A: authorize refund<br/>with that proof
+  X->>A: claim refund<br/>for leg 1
+  A->>U: return Alice's<br/>funds

@@ -123,16 +123,23 @@ jobs:
       # a wholly untracked directory into one entry -- and a new contract adds exactly that
       # (zkstack-out/<Name>.sol/). Staging first makes git report the files individually.
       - name: Stage generated artifacts
+        id: stage
         run: |
           set -euo pipefail
           read -r -a paths <<<"$GENERATED_PATHS" # same split as ghcommit-action's
           git add -A -- "${paths[@]}"
-          # Report what moved, so the dispatch log says which checks this should clear.
-          git --no-pager diff --cached --stat
+          if git diff --cached --quiet; then
+            echo "No generated-artifact changes to commit"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git --no-pager diff --cached --stat # report what moved, so the dispatch log says which checks this should clear
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       # Minted only after the PR's own build scripts have run, so no write-capable credential exists
       # while they execute. Scoped to this repository's contents, valid for an hour, revoked at job end.
       - name: Mint GitHub App token
+        if: steps.stage.outputs.changed == 'true'
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
@@ -142,8 +149,9 @@ jobs:
 
       # Committed through the GitHub API, so GitHub signs the commit (Verified) and the org's
       # required-signatures rule no longer blocks the PR. The App token, unlike GITHUB_TOKEN, also
-      # triggers the PR's workflows on the new commit. Commits nothing if no artifact changed.
+      # triggers the PR's workflows on the new commit.
       - name: Commit and push changes (signed by GitHub)
+        if: steps.stage.outputs.changed == 'true'
         uses: planetscale/ghcommit-action@a6b150b81dca5dd027baa898604418eec9e11465 # v0.2.22
         with:
           commit_message: "chore: update generated artifacts from CI"

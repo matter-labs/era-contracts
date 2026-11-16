@@ -21,3 +21,5 @@
   [`l1-contracts/deploy-scripts/upgrade/README.md`](../l1-contracts/deploy-scripts/upgrade/README.md).
 - Historical ZKsync Era contract documentation is maintained in the
   [zksync-era repository](https://github.com/matter-labs/zksync-era/blob/main/docs/src/specs/contracts).
+
+[Release tags](release-tags.md): how release tags are named and created, and the daily check that every live CTM version is tagged.
