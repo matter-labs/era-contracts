@@ -5,7 +5,7 @@ Reviewers (people and agents) read this whole file. Each section after the first
 There are two kinds of guidance:
 
 - **Style rules** (the first four sections). These are the comments reviewers kept repeating after the agents' review. Raise a break as a `nit` that names the rule, e.g. `nit: REVIEW.md#versions-are-read-not-written`. Don't argue the rule in the thread: if it is wrong, change this file.
-- **What to check** (the last two sections: build, CI and test plumbing, and contract state). These came from real bugs found after the agents' review. Raise each break as a `should-fix`, or a `blocker` when it would let a broken release, upgrade or contract through; never as a `nit`, so the review isn't clean until it is fixed. Raise them in every round, including in code a fix round added.
+- **What to check** (the last two sections: build, CI and test plumbing, and contract state). These came from real bugs caught in review. Raise each break as a `should-fix`, or a `blocker` when it would let a broken release, upgrade or contract through; never as a `nit`, so the review isn't clean until it is fixed. Raise them in every round, including in code a fix round added.
 
 Authors and their agents: check the diff against the sections that apply before asking for review, and fix what you find.
 
@@ -166,7 +166,7 @@ Example: five frozen-state upgrade suites (`UpgradeTest_Local`, `UpgradeTestRecu
 
 ## What to check: `l1-contracts/contracts/` state and access
 
-When a change adds privileged setters, caps, counters or feature switches, check each of these. Raise breaks as `should-fix` or `blocker`, as the top of this file says. These are exceptions to the "trusted governance" false positive in [`general.md`](docs/ai-review/docs/general.md#common-false-positives): governance runs backfills and switches one call at a time, so the contract enforces how often and in which order.
+When a change adds privileged setters, caps, counters or feature switches, check each of these. Raise breaks as `should-fix` or `blocker`, as the top of this file says. The set-once and prerequisite checks are exceptions to the "trusted governance" false positive in [`general.md`](docs/ai-review/docs/general.md#common-false-positives): governance runs backfills and switches one call at a time, so the contract enforces how often and in which order.
 
 ### Can a one-time setter be called again?
 
