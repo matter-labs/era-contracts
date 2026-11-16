@@ -1,0 +1,22 @@
+# Upgrade input for the zksync-os-mainnet environment on the v34 release. See protocol-ops/README.md "Environment inputs".
+
+# What this ecosystem's L1AssetRouter reports (`ERA_CHAIN_ID()`); no Era chain is registered on it.
+era_chain_id = 324
+
+# Delay armed on the `GovernanceUpgradeTimer` this upgrade deploys, bounding the window between stage 0
+# and stage 1 becoming executable. The timer is a fresh contract each upgrade, so it is a per-release input.
+governance_upgrade_timer_initial_delay = 172800
+
+# `bridgehub.owner()`, the signer of every governance stage.
+owner_address = "0x3d67838307eedEF76026b84170737254A5FaA438"
+
+[contracts]
+# Rotated every release: CREATE2 returns the previously deployed contract if a salt is reused.
+create2_factory_salt = "0xabf90cdb9b8c1f233fe1f13005da09d4da88866717f001473d6cc78b448a8acb"
+# Salt for legacy `Governance.sol` op ids, rotated so they do not collide with executed ones.
+legacy_gov_salt = "0x57d00402490ca9cdbae7498ca732754c6a6b2996a81f99f93b02b53ce2a2cb03"
+
+# Per-CTM CREATE2 salts, keyed by CTM proxy: each CTM prepare deploys its own `GovernanceUpgradeTimer`
+# with env-wide constructor args, so two CTMs need distinct salts.
+[create2_factory_salts]
+"0xF9Fc08eaA6dAD8DDE886F3B174a019c9ac56B2Ef" = "0x12674b80affe18cd4f07661e7cc1dd7426ea5b7940e5826c0187acc8ede88302"
