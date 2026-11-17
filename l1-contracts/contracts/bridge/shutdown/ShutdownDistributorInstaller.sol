@@ -72,6 +72,7 @@ contract ShutdownDistributorInstaller is ERC1967Upgrade {
     function install(bytes32 _merkleRoot, uint256 _windowStart, address _distributorOwner) external {
         require(msg.sender == CHAIN_ADMIN, Unauthorized(msg.sender));
         // `address(this)` is the proxy, which delegatecalls into this contract.
+        // slither-disable-next-line unused-return
         (, address distributor) = L1_ASSET_TRACKER.shutdownChainInfo(CHAIN_ID);
         require(distributor == address(this), InvalidShutdownDistributor(CHAIN_ID, address(this)));
         _upgradeToAndCall(
