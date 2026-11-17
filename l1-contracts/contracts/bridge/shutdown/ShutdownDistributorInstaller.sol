@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {ERC1967Upgrade} from "@openzeppelin/contracts-v4/proxy/ERC1967/ERC1967Upgrade.sol";
 
 import {EmptyBytes32, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
-import {InvalidShutdownDistributor} from "../asset-tracker/AssetTrackerErrors.sol";
+import {DistributorOwnerIsProxyAdmin, InvalidShutdownDistributor} from "../asset-tracker/AssetTrackerErrors.sol";
 import {IL1AssetTracker} from "../asset-tracker/IL1AssetTracker.sol";
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 import {NotChainAdmin} from "../../state-transition/L1StateTransitionErrors.sol";
@@ -24,7 +24,7 @@ import {IShutdownClaimDistributor} from "./IShutdownClaimDistributor.sol";
 /// initializer, so the chain admin can not run any other code in the proxy, e.g. code that changes the proxy admin.
 /// After `install`, the proxy no longer points to this contract, so `install` can not be called again and only the
 /// governance (the proxy admin) can upgrade the distributor.
-/// @dev It has no `MERKLE_ROOT()`, so `L1AssetTracker` sends and mints nothing to the distributor, and the chain's
+/// @dev Its `MERKLE_ROOT()` is zero, so `L1AssetTracker` sends and mints nothing to the distributor, and the chain's
 /// funds stay in the vault, until the real distributor is in place.
 contract ShutdownDistributorInstaller is ERC1967Upgrade {
     /// @notice The asset tracker that records the shutdown of the chain.
@@ -81,6 +81,8 @@ contract ShutdownDistributorInstaller is ERC1967Upgrade {
         require(msg.sender == CHAIN_ADMIN, Unauthorized(msg.sender));
         // The distributor does not check the root, and with a zero root `L1AssetTracker` never sends it any funds.
         require(_merkleRoot != bytes32(0), EmptyBytes32());
+        // The proxy does not let its admin call the distributor, so such an owner could never pause it.
+        require(_distributorOwner != _getAdmin(), DistributorOwnerIsProxyAdmin(_distributorOwner));
         // `address(this)` is the proxy, which delegatecalls into this contract.
         // slither-disable-next-line unused-return
         (, address distributor) = L1_ASSET_TRACKER.shutdownChainInfo(CHAIN_ID);
@@ -90,5 +92,11 @@ contract ShutdownDistributorInstaller is ERC1967Upgrade {
             abi.encodeCall(IShutdownClaimDistributor.initialize, (_merkleRoot, _windowStart, _distributorOwner)),
             false
         );
+    }
+
+    /// @notice Zero, the root of a distributor that is not installed yet, so that `L1AssetTracker` rejects it.
+    // solhint-disable-next-line func-name-mixedcase
+    function MERKLE_ROOT() external pure returns (bytes32) {
+        return bytes32(0);
     }
 }

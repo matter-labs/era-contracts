@@ -27,6 +27,8 @@ error ChainIsShutdown();
 error ChainNotShutdown(uint256 chainId);
 // 0xa0d39c49
 error ChainValidatorNotRemoved(uint256 chainId, address validator);
+// 0x5cd1502b
+error DistributorOwnerIsProxyAdmin(address distributorOwner);
 // 0x07859b3b
 error InsufficientChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount);
 // 0xb13a28eb

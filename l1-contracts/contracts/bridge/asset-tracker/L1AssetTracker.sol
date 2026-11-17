@@ -523,7 +523,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         // Never zero: once the chain is shut down, the distributor is always a non-zero address set by the governance.
         address distributor = shutdownChainInfo[_chainId].distributor;
         // The distributor proxy starts with the `ShutdownDistributorInstaller` implementation, until the chain admin
-        // installs the distributor. Until then, `MERKLE_ROOT()` reverts (or is zero), so the funds stay in the vault,
+        // installs the distributor. Until then, `MERKLE_ROOT()` is zero, so the funds stay in the vault,
         // where the governance can still redirect them by replacing the distributor.
         require(
             IShutdownClaimDistributor(distributor).MERKLE_ROOT() != bytes32(0),

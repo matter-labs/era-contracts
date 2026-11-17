@@ -55,6 +55,7 @@ import {
     ChainIsShutdown,
     ChainNotShutdown,
     ChainValidatorNotRemoved,
+    DistributorOwnerIsProxyAdmin,
     InvalidChainMigrationNumber,
     InvalidSettlementLayer,
     InvalidShutdownDistributor,
@@ -707,8 +708,9 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         assetTracker.sendShutdownChainFunds(chainId, ethAssetId);
 
         _shutdown();
-        // The distributor is still the installer, which has no `MERKLE_ROOT()`.
-        vm.expectRevert(bytes(""));
+        // The distributor is still the installer, whose `MERKLE_ROOT()` is zero.
+        assertEq(IZkSyncLiteSunsetClaimDistributorL1(distributorProxy).MERKLE_ROOT(), bytes32(0));
+        vm.expectRevert(abi.encodeWithSelector(ShutdownDistributorNotInitialized.selector, chainId));
         assetTracker.sendShutdownChainFunds(chainId, ethAssetId);
 
         // `install` rejects a zero root, but the governance can set a distributor initialized without one, which is
@@ -907,9 +909,9 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.expectRevert(abi.encodeWithSelector(NotShutdownChainNativeAsset.selector, chainId, tokenAssetId));
         assetTracker.mintShutdownChainNativeAsset(chainId, tokenAssetId, HELD_ON_L2_AT_SHUTDOWN);
 
-        // The distributor is still the installer, which has no `MERKLE_ROOT()`.
+        // The distributor is still the installer, whose `MERKLE_ROOT()` is zero.
         vm.prank(chainAdmin);
-        vm.expectRevert(bytes(""));
+        vm.expectRevert(abi.encodeWithSelector(ShutdownDistributorNotInitialized.selector, chainId));
         assetTracker.mintShutdownChainNativeAsset(chainId, nativeAssetId, HELD_ON_L2_AT_SHUTDOWN);
 
         _installDistributor(keccak256("root"), block.timestamp);
@@ -1006,6 +1008,11 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.prank(chainAdmin);
         vm.expectRevert(EmptyBytes32.selector);
         installer.install(bytes32(0), block.timestamp, distributorOwner);
+
+        // The proxy admin could never pause the distributor, since the proxy does not let it call the distributor.
+        vm.prank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(DistributorOwnerIsProxyAdmin.selector, governance));
+        installer.install(root, block.timestamp, governance);
 
         vm.expectEmit(true, false, false, false, distributorProxy);
         emit IERC1967.Upgraded(distributorImplementation);
