@@ -48,20 +48,20 @@ pub(super) struct LifecycleReview {
     pub(super) records: UpgradeExecutorsRecord,
 }
 
-/// The core executor a package drives: the core leg's target, or the bootstrap manifest's
-/// `coreExecutor`.
+/// The core executor a package drives: the core leg's target, or the package's
+/// `core_upgrade_executor_addr`.
 pub(super) struct CoreExecutorReview {
     pub(super) address: Address,
     /// The ecosystem `ProxyAdmin` it must have been built over (package `transparent_proxy_admin`).
     pub(super) proxy_admin: Option<Address>,
 }
 
-/// The CTM executor a package drives: the CTM legs' target, the bootstrap manifest's
-/// `ctmExecutor`, or a replacement's `forward` target.
+/// The CTM executor a package drives: the CTM legs' target, the package's
+/// `ctm_upgrade_executor_addr`, or a replacement's `forward` target.
 pub(super) struct CtmExecutorReview {
     pub(super) address: Address,
     /// The CTM it must have been built over — the independently reviewed intended CTM
-    /// (`[ctms.*.state_transition] chain_type_manager_proxy`, or the bootstrap manifest's).
+    /// (`[ctms.*.state_transition] chain_type_manager_proxy`).
     pub(super) ctm: Option<Address>,
     /// The CTM-domain `ProxyAdmin` it must have been built over.
     pub(super) ctm_proxy_admin: Option<Address>,
@@ -443,8 +443,7 @@ fn missing_record(label: &str, address: Address) -> String {
     format!(
         "{label} at {address} has no executor record, so its construction cannot be re-derived \
          and it is unverified. Pass --executor-record with the output of the run that deployed \
-         it: the `ecosystem init` / `ctm init` forge output, or the bootstrap package, which \
-         carries its own"
+         it: the `ecosystem init` / `ctm init` forge output"
     )
 }
 
@@ -915,8 +914,8 @@ mod tests {
         assert!(!reviewed.contains_key(&pair.ctm_executor));
     }
 
-    /// A zero binding is an error here even where the reviewed value is zero too (a bootstrap
-    /// manifest's): live and recorded alike, and the executor is not established. The executor
+    /// A zero binding is an error here even where the reviewed value is zero too: live and
+    /// recorded alike, and the executor is not established. The executor
     /// constructors refuse one, so such an executor cannot be the deployed one.
     #[tokio::test]
     async fn a_zero_binding_fails_even_against_a_zero_review() {

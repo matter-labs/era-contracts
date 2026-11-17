@@ -5,7 +5,7 @@
 //! `CTMTransition` its transition leg applies, and is read from that object on chain. That is why
 //! one loader serves every release.
 //!
-//! Three kinds, told apart by the CALLDATA governance will execute rather than by a flag. Each is
+//! Two kinds, told apart by the CALLDATA governance will execute rather than by a flag. Each is
 //! ONE governance bundle, `[governance_calls] calls`:
 //!
 //! * an UPGRADE, the ordinary case: one contiguous run of 1..3 executor legs in canonical order —
@@ -14,16 +14,13 @@
 //!   `CTMUpgradeExecutor.applyCTMUpgrade(transition)` — each present only when its object is.
 //!   Everything executable is a function of those objects, so the package's reviewable content is
 //!   their addresses and the executors they are sent to.
-//! * a BOOTSTRAP edge, the one-time migration onto the registry model: the bundle calls
-//!   `migrate()`. Governance executes the list a `RegistryBootstrapSequence` derives (the core
-//!   transition rides it), ending in the edge's completion check.
 //! * a transition REPLACEMENT: one `CTMUpgradeExecutor.forward` carrying
 //!   `ChainTypeManager.replaceUpgradeTransition` (see
 //!   `protocol-docs/ecosystem-upgrade-coordination.md#replacing-a-committed-transition`), and no
 //!   executor leg.
 //!
-//! A bundle mixing kinds — legs beside a `migrate()` (beyond the sequence's own core leg) or beside
-//! a replacing `forward` — is refused, as is one that is none of them. In every kind an object is
+//! A bundle mixing kinds — legs beside a replacing `forward` — is refused, as is one that is
+//! neither. In every kind an object is
 //! recovered from the calldata, never from the prepare's summary of it, and the summary field is
 //! then a cross-check: a disagreement means the reviewer read one upgrade and governance would sign
 //! another.
@@ -42,10 +39,8 @@ use crate::common::governance_calls::{decode_calls, GovernanceCall, GovernanceCa
 use super::records::{member_records_in, records_in};
 use super::views::{CTMUpgradeExecutorView, CoreUpgradeExecutorView};
 
-/// `RegistryBootstrapMigration.migrate()`.
-pub(crate) const MIGRATE_SELECTOR: [u8; 4] = [0x8f, 0xd3, 0xab, 0x80];
 /// `Ownable2Step.transferOwnership(address)` — the nomination a bundle would smuggle past a
-/// reviewer, which the tests append to a derived sequence.
+/// reviewer, which the tests send to an executor or forward through one.
 #[cfg(test)]
 pub(crate) const TRANSFER_OWNERSHIP_SELECTOR: [u8; 4] = [0xf2, 0xfd, 0xe3, 0x8b];
 
@@ -54,63 +49,35 @@ pub(crate) const TRANSFER_OWNERSHIP_SELECTOR: [u8; 4] = [0xf2, 0xfd, 0xe3, 0x8b]
 pub(crate) enum RegistryPackage {
     /// The ordinary case: 1..3 executor legs, sent to the domain executors directly.
     Upgrade(UpgradePackage),
-    /// The one-time migration onto the registry model.
-    Bootstrap(BootstrapPackage),
     /// A compare-and-replace of a committed transition.
-    Replacement(Box<ReplacementPackage>),
+    Replacement(ReplacementPackage),
 }
 
 impl RegistryPackage {
     /// Reads `ecosystem_toml` and decides which kind of upgrade it drives, from its calldata: a
-    /// `migrate()` call makes a bootstrap edge, a `forward` carrying `replaceUpgradeTransition` a
-    /// replacement, and executor legs an upgrade. A package mixing them, or that is none of them,
-    /// is REFUSED rather than verified as the nearest match: it is an input this tool cannot
+    /// `forward` carrying `replaceUpgradeTransition` makes a replacement, and executor legs an
+    /// upgrade. A package mixing them, or that is neither, is REFUSED rather than verified as the nearest match: it is an input this tool cannot
     /// review.
     pub(crate) fn load(ecosystem_toml: &Path) -> anyhow::Result<Self> {
         Self::load_if_registry(ecosystem_toml)?.with_context(|| {
             format!(
                 "{} is neither kind of package this tool reviews: its governance bundle calls no \
                  executor entrypoint (applyL1Upgrade, applyInfrastructureUpgrade, \
-                 applyCTMUpgrade), no `migrate()` and no `forward` that replaces a transition, so \
+                 applyCTMUpgrade) and no `forward` that replaces a transition, so \
                  this tool cannot say what it does",
                 ecosystem_toml.display()
             )
         })
     }
 
-    /// [`Self::load`], except that a bundle carrying none of the three kinds' calls is `None`
+    /// [`Self::load`], except that a bundle carrying neither kind's calls is `None`
     /// rather than refused: a governance TOML that is not a registry package at all.
     pub(crate) fn load_if_registry(ecosystem_toml: &Path) -> anyhow::Result<Option<Self>> {
         let root = read_toml(ecosystem_toml)?;
         let calls = bundle_in(&root)?;
         let legs = recover_legs(&calls)?;
-        let migrates = migrate_targets(&calls);
         let replacement = recover_replacement(&calls)?;
 
-        if !migrates.is_empty() {
-            if let Some(forward) = &replacement {
-                anyhow::bail!(
-                    "mixed kinds: the bundle runs a bootstrap edge (`migrate()`) and replaces a \
-                     transition (`forward` at call {}) in one package; each is reviewed on its own",
-                    forward.index
-                );
-            }
-            // The bootstrap sequence applies the core transition itself; a CTM leg has no place
-            // in it — the edge installs its release through the migration.
-            if let Some(leg) = legs.iter().find(|leg| leg.kind.is_ctm()) {
-                anyhow::bail!(
-                    "mixed kinds: the bundle runs a bootstrap edge (`migrate()`) and also calls \
-                     {} (call {}): a bootstrap carries no CTM executor leg",
-                    leg.kind.entrypoint(),
-                    leg.index
-                );
-            }
-            return Ok(Some(Self::Bootstrap(BootstrapPackage::load(
-                ecosystem_toml,
-                &root,
-                calls,
-            )?)));
-        }
         if let Some(forward) = replacement {
             if let Some(leg) = legs.first() {
                 anyhow::bail!(
@@ -121,12 +88,12 @@ impl RegistryPackage {
                     leg.index
                 );
             }
-            return Ok(Some(Self::Replacement(Box::new(ReplacementPackage::load(
+            return Ok(Some(Self::Replacement(ReplacementPackage::load(
                 ecosystem_toml,
                 &root,
                 forward,
                 calls,
-            )?))));
+            )?)));
         }
         if legs.is_empty() {
             return Ok(None);
@@ -350,7 +317,11 @@ pub(crate) struct UpgradePackage {
     pub(crate) calls: Vec<GovernanceCall>,
     /// The prepare's declared external actions — the calls no leg describes.
     pub(crate) external_actions: Vec<ExternalAction>,
-    /// Every CREATE2 salt the package records; see [`BootstrapPackage::create2_salts`].
+    /// Every CREATE2 salt the package records, in the order they were found. A prepare deploys
+    /// the core leg under the ecosystem salt and each CTM leg under that CTM's, so an object's
+    /// address is re-derivable under one of them — which one is reported rather than assumed.
+    /// Empty for a package produced before the prepare recorded them, in which case the reviewer
+    /// supplies the reviewed salts on the command line.
     pub(crate) create2_salts: Vec<B256>,
     /// The package's record of the lifecycle objects' binding values.
     pub(crate) lifecycle: LifecycleInputs,
@@ -516,7 +487,7 @@ impl UpgradePackage {
 /// The package's record of the values the lifecycle objects — the two domain executors — were
 /// constructed over. Those objects set their bindings as constructor immutables, so their
 /// construction is the only identity check they get, and the executors' recorded bindings are
-/// held against THESE values (plus the bootstrap manifest) rather than against the objects' own
+/// held against THESE values rather than against the objects' own
 /// answers.
 ///
 /// Each is optional at load so the report can name exactly which one an older package lacks;
@@ -582,49 +553,6 @@ fn lifecycle_inputs_in(root: &toml::Value) -> LifecycleInputs {
         )
         .filter(|a| !a.is_zero()),
     }
-}
-
-#[derive(Debug)]
-pub(crate) struct BootstrapPackage {
-    /// Objects the prepare names outright.
-    pub(crate) core_transition: Option<Address>,
-    pub(crate) release: Address,
-    /// Recovered from the bundle's `migrate()` call — the executable source of truth.
-    pub(crate) migration: Address,
-    /// `[registry] bootstrap_migration_addr`, when the prepare named it: a cross-check on the
-    /// address recovered from calldata.
-    pub(crate) reported_migration: Option<Address>,
-    /// `[ctms.*.registry] ctm_upgrade_executor_addr`, a cross-check on the manifest's executor.
-    pub(crate) reported_ctm_executor: Option<Address>,
-    /// `[ctms.*.state_transition] chain_type_manager_proxy`, a cross-check on the manifest's CTM.
-    pub(crate) reported_ctm: Option<Address>,
-    /// `[ctms.*.deployed_addresses] transparent_proxy_admin`, a cross-check on the manifest's
-    /// CTM-domain ProxyAdmin.
-    pub(crate) reported_ctm_proxy_admin: Option<Address>,
-    /// See [`UpgradePackage::reported_singletons`].
-    pub(crate) reported_singletons: ReportedSingletons,
-    /// The CTM key under `[ctms]` this package upgrades (e.g. `zksync_os`).
-    pub(crate) ctm_key: String,
-    /// `[governance_calls] calls` — the one bundle governance signs.
-    pub(crate) calls: Vec<GovernanceCall>,
-    /// The prepare's declared external actions — calls the objects do NOT describe.
-    pub(crate) external_actions: Vec<ExternalAction>,
-    /// The package's record of the lifecycle objects' binding values.
-    pub(crate) lifecycle: LifecycleInputs,
-    /// Every CREATE2 salt the package records, in the order they were found. A prepare deploys
-    /// the core leg under the ecosystem salt and each CTM leg under that CTM's, so an object's
-    /// address is re-derivable under one of them — which one is reported rather than assumed.
-    /// Empty for a package produced before the prepare recorded them, in which case the reviewer
-    /// supplies the reviewed salts on the command line.
-    pub(crate) create2_salts: Vec<B256>,
-    /// `[ctms.*.contracts_config] force_deployments_data` — the blob the prepare pinned in the
-    /// release the edge installs.
-    pub(crate) force_deployments_data: Option<Bytes>,
-    /// The executor records the package carries (the v35 prepares record the executors they
-    /// deploy), plus any `--executor-record` the reviewer added.
-    pub(crate) executor_records: UpgradeExecutorsRecord,
-    /// See [`UpgradePackage::member_records`].
-    pub(crate) member_records: MemberDeployments,
 }
 
 fn read_toml(ecosystem_toml: &Path) -> anyhow::Result<toml::Value> {
@@ -756,110 +684,19 @@ fn optional_ctm_key(root: &toml::Value) -> anyhow::Result<Option<String>> {
     }
 }
 
-/// A nonzero object the summary reports for a leg a bootstrap or a replacement does not carry:
-/// the merge derives no leg for either kind, so such an object would be deployed and reviewed but
-/// never applied — refused rather than reported beside a passing review.
-fn refuse_unapplied_objects(
-    kind: &str,
-    reported: &[(&str, Option<Address>)],
-) -> anyhow::Result<()> {
+/// A nonzero object the summary reports for a leg a replacement does not carry: the merge derives
+/// no leg for a replacement, so such an object would be deployed and reviewed but never applied —
+/// refused rather than reported beside a passing review.
+fn refuse_unapplied_objects(reported: &[(&str, Option<Address>)]) -> anyhow::Result<()> {
     for (field, object) in reported {
         if let Some(object) = object {
             anyhow::bail!(
-                "missing leg: the package reports {field} {object}, but a {kind} package carries \
-                 no executor leg to apply it"
+                "missing leg: the package reports {field} {object}, but a replacement package \
+                 carries no executor leg to apply it"
             );
         }
     }
     Ok(())
-}
-
-impl BootstrapPackage {
-    fn load(
-        ecosystem_toml: &Path,
-        root: &toml::Value,
-        calls: Vec<GovernanceCall>,
-    ) -> anyhow::Result<Self> {
-        let migration = sole_migrate_target(&calls)?;
-
-        let ctm_key = sole_ctm_key(root)?;
-        // The edge installs its release through the migration and its core transition through
-        // the derived sequence; a CTM-domain object beside them would never be applied.
-        refuse_unapplied_objects(
-            "bootstrap",
-            &[
-                (
-                    "ctm_infrastructure_transition_addr",
-                    registry_address(root, &ctm_key, "ctm_infrastructure_transition_addr"),
-                ),
-                (
-                    "ctm_transition_addr",
-                    registry_address(root, &ctm_key, "ctm_transition_addr"),
-                ),
-            ],
-        )?;
-        let release = registry_address(root, &ctm_key, "ctm_release_addr")
-            .context("[ctms.*.registry] ctm_release_addr missing, zero or unparsable")?;
-        // The core leg is optional: a CTM-only edge deploys no ecosystem implementations, so
-        // the prepare pins no Core-domain `ProxyUpgradeTransition` (an all-inert inventory is
-        // refused at construction).
-        let core_transition = address_at(root, &["core", "registry", "core_transition_addr"])
-            .filter(|a| !a.is_zero());
-
-        Ok(Self {
-            core_transition,
-            release,
-            migration,
-            reported_migration: registry_address(root, &ctm_key, "bootstrap_migration_addr"),
-            reported_ctm_executor: registry_address(root, &ctm_key, "ctm_upgrade_executor_addr"),
-            reported_ctm: ctm_address(
-                root,
-                &ctm_key,
-                "state_transition",
-                "chain_type_manager_proxy",
-            ),
-            reported_ctm_proxy_admin: ctm_address(
-                root,
-                &ctm_key,
-                "deployed_addresses",
-                "transparent_proxy_admin",
-            ),
-            reported_singletons: ReportedSingletons::in_package(root, Some(&ctm_key)),
-            calls,
-            external_actions: external_actions_in(root)?,
-            create2_salts: create2_salts_in(root, Some(&ctm_key)),
-            lifecycle: lifecycle_inputs_in(root),
-            force_deployments_data: force_deployments_data_in(root, &ctm_key),
-            executor_records: records_in(root, &ecosystem_toml.display().to_string())?,
-            member_records: member_records_in(root, &ecosystem_toml.display().to_string())?,
-            ctm_key,
-        })
-    }
-}
-
-/// Every target the bundle calls `migrate()` on — the bootstrap migrations it drives.
-fn migrate_targets(calls: &[GovernanceCall]) -> Vec<Address> {
-    calls
-        .iter()
-        .filter(|c| c.data.len() == 4 && c.data[..4] == MIGRATE_SELECTOR)
-        .map(|c| c.target)
-        .collect()
-}
-
-/// The migration is whatever the bundle calls `migrate()` on — and there must be exactly one such
-/// call, or the package drives more than one bootstrap edge in a single bundle.
-fn sole_migrate_target(calls: &[GovernanceCall]) -> anyhow::Result<Address> {
-    match migrate_targets(calls).as_slice() {
-        [one] => Ok(*one),
-        [] => anyhow::bail!(
-            "the governance bundle contains no `migrate()` call, so it drives no bootstrap edge"
-        ),
-        many => anyhow::bail!(
-            "the governance bundle calls `migrate()` on {} objects ({many:?}); a bootstrap \
-             package must drive exactly one edge",
-            many.len()
-        ),
-    }
 }
 
 /// A replacement of a committed transition: one `CTMUpgradeExecutor.forward` carrying
@@ -895,7 +732,7 @@ pub(crate) struct ReplacementPackage {
     pub(crate) calls: Vec<GovernanceCall>,
     /// The prepare's declared external actions (the forward is one of them).
     pub(crate) external_actions: Vec<ExternalAction>,
-    /// Every CREATE2 salt the package records; see [`BootstrapPackage::create2_salts`].
+    /// Every CREATE2 salt the package records; see [`UpgradePackage::create2_salts`].
     pub(crate) create2_salts: Vec<B256>,
     /// `[ctms.*.contracts_config] old_protocol_version` — the replaced transition's departing
     /// version, a cross-check.
@@ -919,20 +756,17 @@ impl ReplacementPackage {
         let ctm_key = sole_ctm_key(root)?;
         // A replacement repairs one committed edge through `forward`; an ecosystem or
         // infrastructure object beside it would be deployed and never applied.
-        refuse_unapplied_objects(
-            "replacement",
-            &[
-                (
-                    "core_transition_addr",
-                    address_at(root, &["core", "registry", "core_transition_addr"])
-                        .filter(|a| !a.is_zero()),
-                ),
-                (
-                    "ctm_infrastructure_transition_addr",
-                    registry_address(root, &ctm_key, "ctm_infrastructure_transition_addr"),
-                ),
-            ],
-        )?;
+        refuse_unapplied_objects(&[
+            (
+                "core_transition_addr",
+                address_at(root, &["core", "registry", "core_transition_addr"])
+                    .filter(|a| !a.is_zero()),
+            ),
+            (
+                "ctm_infrastructure_transition_addr",
+                registry_address(root, &ctm_key, "ctm_infrastructure_transition_addr"),
+            ),
+        ])?;
         Ok(Self {
             forward,
             reported_replaced: registry_address(root, &ctm_key, "replaced_transition_addr"),
@@ -1089,13 +923,6 @@ mod tests {
     }
 
     #[test]
-    fn migrate_selector_matches_the_solidity_signature() {
-        // Guards the hardcoded constant against a signature change.
-        let computed = alloy::primitives::keccak256(b"migrate()");
-        assert_eq!(&computed[..4], &MIGRATE_SELECTOR);
-    }
-
-    #[test]
     fn transfer_ownership_selector_matches_the_solidity_signature() {
         let computed = alloy::primitives::keccak256(b"transferOwnership(address)");
         assert_eq!(&computed[..4], &TRANSFER_OWNERSHIP_SELECTOR);
@@ -1146,39 +973,6 @@ mod tests {
         assert!(LegKind::Infrastructure < LegKind::Transition);
     }
 
-    #[test]
-    fn recovers_the_migration_from_the_bundle() {
-        let migration = Address::repeat_byte(0xAB);
-        let bundle = vec![
-            call(
-                Address::repeat_byte(0x11),
-                TRANSFER_OWNERSHIP_SELECTOR.to_vec(),
-            ),
-            call(migration, MIGRATE_SELECTOR.to_vec()),
-        ];
-        assert_eq!(sole_migrate_target(&bundle).unwrap(), migration);
-    }
-
-    #[test]
-    fn rejects_a_package_with_no_migrate_call() {
-        let bundle = vec![call(
-            Address::repeat_byte(0x11),
-            vec![0xde, 0xad, 0xbe, 0xef],
-        )];
-        let err = sole_migrate_target(&bundle).unwrap_err().to_string();
-        assert!(err.contains("no `migrate()` call"), "{err}");
-    }
-
-    #[test]
-    fn rejects_a_package_driving_two_edges() {
-        let bundle = vec![
-            call(Address::repeat_byte(0xAA), MIGRATE_SELECTOR.to_vec()),
-            call(Address::repeat_byte(0xBB), MIGRATE_SELECTOR.to_vec()),
-        ];
-        let err = sole_migrate_target(&bundle).unwrap_err().to_string();
-        assert!(err.contains("exactly one edge"), "{err}");
-    }
-
     // ───────────────────────── upgrade packages ─────────────────────────
     //
     // A merged prepare output in the exact shape `write_merged_ecosystem_toml` emits — the core
@@ -1219,7 +1013,6 @@ mod tests {
         core_transition: Address,
         infrastructure: Address,
         transition: Address,
-        bootstrap_migration: Address,
         ctm_section: bool,
     }
 
@@ -1229,7 +1022,6 @@ mod tests {
                 core_transition: CORE_TRANSITION,
                 infrastructure: INFRASTRUCTURE,
                 transition: TRANSITION,
-                bootstrap_migration: Address::ZERO,
                 ctm_section: true,
             }
         }
@@ -1266,7 +1058,6 @@ mod tests {
                      ctm_transition_addr = \"{}\"\n\
                      ctm_infrastructure_transition_addr = \"{}\"\n\
                      ctm_release_addr = \"{RELEASE}\"\n\
-                     bootstrap_migration_addr = \"{}\"\n\
                      ctm_upgrade_executor_addr = \"{CTM_EXECUTOR}\"\n\
                      [ctms.zksync_os.state_transition]\n\
                      chain_type_manager_proxy = \"{CTM_PROXY}\"\n\
@@ -1277,7 +1068,6 @@ mod tests {
                     B256::repeat_byte(0x6B),
                     self.transition,
                     self.infrastructure,
-                    self.bootstrap_migration,
                 ));
             }
             body.push_str(&format!(
@@ -1571,62 +1361,12 @@ mod tests {
         assert!(err.contains("unknown selector on an executor"), "{err}");
     }
 
-    /// Q5 mixed kinds: CTM legs beside a bootstrap's `migrate()`.
-    #[test]
-    fn upgrade_legs_beside_a_migrate_are_refused() {
-        let migration = Address::repeat_byte(0x55);
-        let summary = Summary {
-            bootstrap_migration: migration,
-            ..Summary::of(true, false, false)
-        };
-        let err = refusal(
-            &summary,
-            &[
-                core_leg(),
-                transition_leg(),
-                call(migration, MIGRATE_SELECTOR.to_vec()),
-            ],
-        );
-        assert!(err.contains("mixed kinds"), "{err}");
-    }
-
-    /// The bootstrap's own sequence applies the core transition — that one leg is the edge's, not
-    /// an upgrade beside it, so the package loads as a bootstrap.
-    #[test]
-    fn the_bootstrap_sequences_core_leg_is_not_a_mixed_kind() {
-        let migration = Address::repeat_byte(0x55);
-        let summary = Summary {
-            bootstrap_migration: migration,
-            ..Summary::of(true, false, false)
-        };
-        let package =
-            load_str(&summary.toml(&[core_leg(), call(migration, MIGRATE_SELECTOR.to_vec())]))
-                .unwrap();
-        let RegistryPackage::Bootstrap(package) = package else {
-            panic!("a migrate() bundle is a bootstrap");
-        };
-        assert_eq!(package.migration, migration);
-        assert_eq!(package.core_transition, Some(CORE_TRANSITION));
-    }
-
-    /// A bootstrap's summary naming a CTM-domain object: nothing in the edge applies it.
-    #[test]
-    fn a_bootstrap_reporting_a_ctm_object_is_refused() {
-        let migration = Address::repeat_byte(0x55);
-        let summary = Summary {
-            bootstrap_migration: migration,
-            ..Summary::of(true, false, true)
-        };
-        let err = refusal(&summary, &[call(migration, MIGRATE_SELECTOR.to_vec())]);
-        assert!(err.contains("missing leg"), "{err}");
-        assert!(err.contains("bootstrap"), "{err}");
-    }
-
     // ───────────────────────── a release the tool has never heard of ─────────────────────────
     //
-    // `CTMUpgrade_v36 is DefaultCTMUpgrade {}` — an empty subclass. A v36 upgrade is an ORDINARY
-    // registry upgrade, so it must load through the general path with no v36 module, no v36
-    // branch and no v36 constant anywhere in this tree. The loader never learns a release name.
+    // `CTMUpgrade_v36` only adds CTM-domain implementations, which the base pipeline turns into
+    // ordinary infrastructure rows. A v36 upgrade is an ORDINARY registry upgrade, so it must load
+    // through the general path with no v36 module, no v36 branch and no v36 constant anywhere in
+    // this tree. The loader never learns a release name.
 
     /// A release with no module of its own loads as an ordinary upgrade, and every summary field
     /// the verifier holds the CTM executor's immutables against is picked up.
@@ -1639,36 +1379,24 @@ mod tests {
         assert_eq!(package.reported_ctm_proxy_admin, Some(CTM_ADMIN));
     }
 
-    /// The zero `bootstrap_migration_addr` a post-bootstrap release carries must not divert it
-    /// into the bootstrap path.
-    #[test]
-    fn a_zero_bootstrap_field_does_not_divert_an_ordinary_release() {
-        let body = Summary::of(false, false, true).toml(&[transition_leg()]);
-        assert!(body.contains("bootstrap_migration_addr"));
-        assert!(matches!(
-            load_str(&body).unwrap(),
-            RegistryPackage::Upgrade(_)
-        ));
-    }
-
     // ───────────────────────── transition replacements ─────────────────────────
 
-    use super::super::views::{BootstrapCall, CtmView};
+    use super::super::views::{CtmView, ForwardedCall};
 
     const CTM: Address = Address::repeat_byte(0xC7);
     const EXPECTED: Address = Address::repeat_byte(0x7A);
     const REPLACEMENT: Address = Address::repeat_byte(0x7B);
     const DEPARTURE: u64 = 0x23_0000_0000;
 
-    fn inner(target: Address, data: Vec<u8>) -> BootstrapCall {
-        BootstrapCall {
+    fn inner(target: Address, data: Vec<u8>) -> ForwardedCall {
+        ForwardedCall {
             target,
             value: U256::ZERO,
             data: data.into(),
         }
     }
 
-    fn replace_call() -> BootstrapCall {
+    fn replace_call() -> ForwardedCall {
         inner(
             CTM,
             CtmView::replaceUpgradeTransitionCall {
@@ -1679,7 +1407,7 @@ mod tests {
         )
     }
 
-    fn deadline_call(version: u64, timestamp: u64) -> BootstrapCall {
+    fn deadline_call(version: u64, timestamp: u64) -> ForwardedCall {
         inner(
             CTM,
             CtmView::setProtocolVersionDeadlineCall {
@@ -1690,7 +1418,7 @@ mod tests {
         )
     }
 
-    fn forward(calls: Vec<BootstrapCall>) -> GovernanceCall {
+    fn forward(calls: Vec<ForwardedCall>) -> GovernanceCall {
         call(
             CTM_EXECUTOR,
             CTMUpgradeExecutorView::forwardCall { _calls: calls }.abi_encode(),
@@ -1736,8 +1464,8 @@ mod tests {
         );
     }
 
-    /// The bootstrap's notifier acceptance is a `forward` too; without a replace it is not a
-    /// replacement, and a package of only ordinary calls has none.
+    /// A `forward` without a replace (here an `acceptOwnership`) is not a replacement, and a
+    /// package of only ordinary calls has none.
     #[test]
     fn a_forward_that_replaces_nothing_is_not_a_replacement() {
         let accept = inner(Address::repeat_byte(0x2A), vec![0x79, 0xba, 0x50, 0x97]);
@@ -1798,8 +1526,8 @@ mod tests {
         assert!(err.contains("more than one `forward`"), "{err}");
     }
 
-    /// The merged package a replacement prepare produces: no `migrate()`, no executor leg, the
-    /// forward in the bundle — classified as its own kind, with every summary field picked up.
+    /// The merged package a replacement prepare produces: no executor leg, the forward in the
+    /// bundle — classified as its own kind, with every summary field picked up.
     fn replacement_body(replacement: &GovernanceCall, extra_registry: &str) -> String {
         format!(
             "[[external_actions]]\n\
@@ -1876,30 +1604,6 @@ mod tests {
         let err = format!("{:#}", load_str(&body).unwrap_err());
         assert!(err.contains("mixed kinds"), "{err}");
         assert!(err.contains("carries no executor leg"), "{err}");
-    }
-
-    /// A bootstrap and a replacement in one bundle are two reviews, not one.
-    #[test]
-    fn a_migrate_beside_a_replacement_is_refused() {
-        let replacement = forward(vec![replace_call()]);
-        let migrate = call(Address::repeat_byte(0x55), MIGRATE_SELECTOR.to_vec());
-        let body = replacement_body(&replacement, "").replace(
-            &format!(
-                "calls = \"0x{}\"",
-                alloy::hex::encode(crate::common::governance_calls::encode_calls(
-                    std::slice::from_ref(&replacement)
-                ))
-            ),
-            &format!(
-                "calls = \"0x{}\"",
-                alloy::hex::encode(crate::common::governance_calls::encode_calls(&[
-                    replacement.clone(),
-                    migrate,
-                ]))
-            ),
-        );
-        let err = format!("{:#}", load_str(&body).unwrap_err());
-        assert!(err.contains("mixed kinds"), "{err}");
     }
 
     /// A replacement whose package also reports a core transition: the merge derives no leg for a

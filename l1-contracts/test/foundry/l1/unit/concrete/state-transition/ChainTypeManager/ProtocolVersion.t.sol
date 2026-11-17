@@ -4,6 +4,9 @@ pragma solidity 0.8.28;
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {NoCommittedUpgradeCutForVersion} from "contracts/common/L1ContractErrors.sol";
+import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {ProtocolVersionTooSmall} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
+import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
@@ -12,7 +15,7 @@ contract ProtocolVersion is ChainTypeManagerTest {
         deploy();
     }
 
-    // setNewVersionUpgrade
+    // setNewVersionUpgradeFromTransition
     function test_SuccessfulSetNewVersionUpgrade() public {
         address chainAddress = createNewChain(getDiamondCutData(diamondInit));
 
@@ -23,13 +26,10 @@ contract ProtocolVersion is ChainTypeManagerTest {
         assertEq(oldProtocolVersionDeadline, type(uint256).max);
 
         uint256 newProtocolVersionSemVer = SemVer.packSemVer(0, 1, 0);
-        address newRelease = _releaseAt(newProtocolVersionSemVer);
 
         _mockGetZKChainFromBridgehub(chainAddress);
 
-        vm.startPrank(governor);
-        chainContractAddress.setNewVersionUpgrade(getDiamondCutData(diamondInit), oldProtocolVersion, 1000, newRelease);
-        vm.stopPrank();
+        address newRelease = _commitMockedEdge(newProtocolVersionSemVer, 1000);
 
         // The edge installs the release OF the version it moves to, in the same call.
         assertEq(chainContractAddress.currentRelease(), newRelease, "the release moved with the version");
@@ -57,9 +57,7 @@ contract ProtocolVersion is ChainTypeManagerTest {
 
         _mockGetZKChainFromBridgehub(chainAddress);
 
-        vm.startPrank(governor);
-        chainContractAddress.setNewVersionUpgrade(getDiamondCutData(diamondInit), 0, 0, _releaseAt(1));
-        vm.stopPrank();
+        _commitMockedEdge(1, 0);
 
         assertEq(chainContractAddress.protocolVersionIsActive(1), true);
     }
@@ -82,13 +80,7 @@ contract ProtocolVersion is ChainTypeManagerTest {
         address chainAddress = createNewChain(getDiamondCutData(diamondInit));
         _mockGetZKChainFromBridgehub(chainAddress);
 
-        vm.prank(governor);
-        chainContractAddress.setNewVersionUpgrade(
-            getDiamondCutData(diamondInit),
-            0,
-            1000,
-            _releaseAt(SemVer.packSemVer(0, 1, 0))
-        );
+        _commitMockedEdge(SemVer.packSemVer(0, 1, 0), 1000);
         assertEq(chainContractAddress.protocolVersionDeadline(0), 1000, "committed deadline");
 
         vm.expectEmit(true, false, false, true);
@@ -126,32 +118,48 @@ contract ProtocolVersion is ChainTypeManagerTest {
         chainContractAddress.executeUpgrade(chainId, getDiamondCutDataWithCustomFacets(address(0), customFacetCuts));
     }
 
-    // upgradeChainFromVersion
-    function test_RevertWhen_UpgradeChainFromVersionWithoutCommittedTransition() public {
-        address chainAddress = createNewChain(getDiamondCutData(diamondInit));
-
-        Diamond.FacetCut[] memory customFacetCuts = new Diamond.FacetCut[](1);
-        customFacetCuts[0] = Diamond.FacetCut({
-            facet: facetCuts[2].facet,
-            action: Diamond.Action.Replace,
-            isFreezable: true,
-            selectors: facetCuts[2].selectors
-        });
-
-        _mockGetZKChainFromBridgehub(chainAddress);
-
-        vm.startPrank(governor);
-        chainContractAddress.setNewVersionUpgrade(
-            getDiamondCutDataWithCustomFacets(address(0), customFacetCuts),
+    /// @dev A genuine `CTMTransition` cannot pin a non-increasing edge (`VersionEdgeLib`), so the
+    ///      CTM's own check is reached only by a counterfeit object; the transition is mocked to
+    ///      isolate it.
+    function test_RevertWhen_TheEdgeDoesNotMoveTheVersionForward() public {
+        ICTMTransition transition = _mockTransition(
+            chainContractAddress.currentRelease(),
             0,
             0,
-            _releaseAt(1)
+            _releaseAt(0),
+            type(uint256).max
         );
 
-        // The edge above was committed via the legacy cut-taking setter, which registers no
-        // transition — and a v32 chain derives its cut from the committed transition, so the
-        // read fails before the chain's own version check would.
+        vm.expectRevert(abi.encodeWithSelector(ProtocolVersionTooSmall.selector, 0, 0));
+        vm.prank(governor);
+        chainContractAddress.setNewVersionUpgradeFromTransition(transition);
+    }
+
+    /// @dev The edge must depart the CTM's current version.
+    function test_RevertWhen_TheEdgeDepartsAnotherVersion() public {
+        uint256 otherVersion = SemVer.packSemVer(0, 1, 0);
+        ICTMTransition transition = _mockTransition(
+            chainContractAddress.currentRelease(),
+            otherVersion,
+            SemVer.packSemVer(0, 2, 0),
+            _releaseAt(SemVer.packSemVer(0, 2, 0)),
+            type(uint256).max
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(OutdatedProtocolVersion.selector, 0, otherVersion));
+        vm.prank(governor);
+        chainContractAddress.setNewVersionUpgradeFromTransition(transition);
+    }
+
+    // upgradeChainFromVersion
+    /// @dev A chain derives its cut from the transition committed for its version; with none
+    ///      committed the read fails before the chain's own version check would.
+    function test_RevertWhen_UpgradeChainFromVersionWithoutCommittedTransition() public {
+        address chainAddress = createNewChain(getDiamondCutData(diamondInit));
+        _mockGetZKChainFromBridgehub(chainAddress);
+
         vm.expectRevert(abi.encodeWithSelector(NoCommittedUpgradeCutForVersion.selector, 0));
+        vm.prank(governor);
         chainContractAddress.upgradeChainFromVersion(chainId, 0);
     }
 }

@@ -24,8 +24,6 @@ struct RegisterZKChainConfig {
     bytes32 create2Salt;
     // optional - if not set, then equal to 0
     address l1SharedBridgeProxy;
-    bytes diamondCutData;
-    bytes forceDeploymentsData;
 }
 
 /// @title IRegisterZKChain

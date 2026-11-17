@@ -55,7 +55,7 @@ contract DefaultUpgrade is BaseZkSyncUpgrade, IDefaultUpgrade {
     ///         cut names: the version edge and its schedule, the verifier of the TARGET release,
     ///         and the L2 protocol upgrade transaction composed from the object's plan and the
     ///         executing chain's own identity.
-    /// @param _object The `CTMTransition` or `RegistryBootstrapMigration` this cut points at.
+    /// @param _object The `CTMTransition` this cut points at.
     /// @dev The engine takes the whole edge from ONE object rather than from separately supplied
     ///      values, so a version, a schedule, a verifier and an L2 transaction belonging to
     ///      different upgrades cannot be assembled on the way in.

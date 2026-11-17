@@ -3,7 +3,8 @@ pragma solidity 0.8.28;
 
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
-import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {ChainAlreadyLive, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IL1GenesisUpgrade} from "contracts/upgrades/IL1GenesisUpgrade.sol";
@@ -39,6 +40,26 @@ contract CreateNewChainTest is ChainTypeManagerTest {
 
         assertEq(newChainAdmin, admin);
         assertNotEq(newChainAddress, address(0));
+    }
+
+    function test_RevertWhen_ChainIsAlreadyLive() public {
+        address newChainAddress = createNewChain(getDiamondCutData(diamondInit));
+        _mockGetZKChainFromBridgehub(newChainAddress);
+
+        vm.prank(address(bridgehub));
+        vm.expectRevert(ChainAlreadyLive.selector);
+        chainContractAddress.createNewChain({_chainId: chainId, _admin: newChainAdmin});
+    }
+
+    function test_getProtocolVersion_readsTheChain() public {
+        address newChainAddress = createNewChain(getDiamondCutData(diamondInit));
+        _mockGetZKChainFromBridgehub(newChainAddress);
+
+        // Moves the chain off the CTM's version, so the getter can only be reading the chain.
+        uint256 chainVersion = chainContractAddress.protocolVersion() + 1;
+        vm.mockCall(newChainAddress, abi.encodeCall(IGetters.getProtocolVersion, ()), abi.encode(chainVersion));
+
+        assertEq(chainContractAddress.getProtocolVersion(chainId), chainVersion);
     }
 
     function test_SuccessfulCreationOfNewChainAndReturnChainId() public {

@@ -2,7 +2,6 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
@@ -29,27 +28,19 @@ import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common
 import {SEMVER_MINOR_OFFSET} from "contracts/common/libraries/SemVer.sol";
 import {
     AuthoredL2Plan,
-    BootstrapManifest,
     GenesisFacet,
     L2UpgradePlan,
-    ProxyUpgradeRow,
     ReleaseGenesisData,
     ReleaseManifest,
     TransitionManifest
 } from "contracts/upgrades/registry/RegistryTypes.sol";
-import {
-    CTM_CONTRACT_COUNT,
-    CTMContract,
-    L2_ECOSYSTEM_CONTRACT_COUNT
-} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {L2_ECOSYSTEM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {L2PlanFixtures} from "foundry-test/l1/unit/concrete/Upgrades/registry/L2PlanFixtures.sol";
 import {Bytes32MetadataToken, NoMetadataToken} from "./_NonStandardBaseTokens.sol";
 
 /// @notice Real, minimal registry objects for the upgrade-engine unit tests: two releases that
-///         differ in one facet and their verifier, the transition between them, and a bootstrap
-///         manifest toward one of them. Everything an engine reads at execution is a real
-///         write-once object; only the CTM-side authorities a manifest has to name (CTM, admins,
-///         executors) are labelled stand-ins the engine never touches.
+///         differ in one facet and their verifier, and the transition between them. Everything an
+///         engine reads at execution is a real write-once object.
 abstract contract RegistryObjectsFixture is Test {
     // Real self-describing facets — the routing the registry objects read and the engines apply.
     address internal facetShared; // in both releases
@@ -284,47 +275,6 @@ abstract contract RegistryObjectsFixture is Test {
                     l2Plan: _plan
                 })
             );
-    }
-
-    /// @dev A bootstrap manifest toward `_targetRelease` (whose version the edge lands on). The CTM-side
-    ///      authorities are labelled stand-ins: the engine reads only the version edge, the schedule, the release and the
-    ///      L2 plan; the one participating proxy row exists because the object refuses an edge
-    ///      without implementation swaps.
-    function _bootstrapManifest(
-        CTMRelease _targetRelease,
-        uint256 _oldProtocolVersion,
-        uint256 _upgradeTimestamp,
-        address _chainUpgradeEngine,
-        AuthoredL2Plan memory _plan
-    ) internal returns (BootstrapManifest memory) {
-        ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
-        rows[uint256(CTMContract.ChainTypeManager)] = ProxyUpgradeRow({
-            proxy: makeAddr("ctmProxy"),
-            expectedOldImpl: makeAddr("ctmImplOld"),
-            implNew: _deployedStub("ctmImplNew"),
-            callInitializeUpgrade: false
-        });
-        rows[uint256(CTMContract.ServerNotifier)] = ProxyUpgradeRow({
-            proxy: makeAddr("serverNotifierProxy"),
-            expectedOldImpl: makeAddr("serverNotifierImplOld"),
-            implNew: _deployedStub("serverNotifierImplNew"),
-            callInitializeUpgrade: false
-        });
-        return
-            BootstrapManifest({
-                ctm: ctmStub,
-                expectedProtocolVersion: _oldProtocolVersion,
-                ctmProxyAdmin: ProxyAdmin(makeAddr("ctmProxyAdmin")),
-                ctmProxyUpgrades: rows,
-                currentRelease: address(_targetRelease),
-                oldProtocolVersionDeadline: type(uint256).max,
-                chainUpgradeEngine: _chainUpgradeEngine,
-                l2Plan: _plan,
-                upgradeTimestamp: _upgradeTimestamp,
-                ctmExecutor: _deployedStub("ctmExecutor"),
-                coreExecutor: _deployedStub("coreExecutor"),
-                governance: makeAddr("governor")
-            });
     }
 
     // ─────────────────────────────── expectations ───────────────────────────────

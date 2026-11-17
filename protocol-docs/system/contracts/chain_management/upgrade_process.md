@@ -31,8 +31,7 @@ verifier-only release is a patch transition between releases that differ only in
 [Rules enforced at construction](../../../../docs/registry-driven-upgrades.md#rules-enforced-at-construction)).
 Patch, minor, and major components are packed by `SemVer.sol`, and version activity/deadlines are
 enforced by the CTM rather than inferred from deployment time. The cut-taking `setNewVersionUpgrade`
-remains only for the v35 bootstrap edge, whose departing version has no release to derive a cut
-from.
+that served the v35 bootstrap edge was removed in v36, with the rest of that edge.
 
 ## Applying a version to a chain
 
@@ -41,14 +40,9 @@ from.
    the executor's owner may call at any time and the chain's admin for its own chain; anyone else is
    refused. The caller supplies no cut. A validator holding
    the chain's `UPGRADER_ROLE` on the `ValidatorTimelock` may send the same call through it once the
-   chain's ServerNotifier upgrade timestamp has passed; the timelock forwards both this form and the
-   cut-taking one chains below v35 still serve, so it needs no swap when a chain crosses v35.
-   `upgradeChain` cannot cross a chain below v35: such a chain departs from a version committed
-   through the legacy path, which has no transition. Its admin hands it the committed cut through
-   the cut-taking `upgradeChainFromVersion(chainAddress, oldVersion, cut)`, and governance does the
-   same through `ChainTypeManager.upgradeChainFromVersion(chainId, oldVersion, cut)`, sent through
-   `CTMUpgradeExecutor.forward`. The chain refuses a cut whose hash differs from the one its CTM
-   committed.
+   chain's ServerNotifier upgrade timestamp has passed. A chain below v35 cannot cross: its version
+   has no committed transition, and v36 removed the cut-taking path (the CTM's and the timelock's
+   `upgradeChainFromVersion(…, cut)`) that brought pre-v35 chains across.
 2. `AdminFacet` checks the old version, reads the cut from its CTM (`upgradeCutForVersion`) and
    executes it: the engine applies the transition's facet cuts, then installs the target release's
    verifier and the new version.
@@ -60,7 +54,7 @@ from.
 
 Upgrade engines derive from `BaseZkSyncUpgrade`; `DefaultUpgrade` covers the common verifier,
 bootloader, system-contract, fee, and protocol-version changes and is the engine a transition pins
-unless the release overrides it (the v35 bootstrap edge uses `BootstrapUpgrade`). Work a release
+unless the release overrides it. Work a release
 needs outside the chain diamonds is part of the same governance call: proxy rows of the operation,
 or declared external actions.
 

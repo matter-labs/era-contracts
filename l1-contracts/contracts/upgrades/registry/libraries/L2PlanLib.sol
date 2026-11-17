@@ -82,8 +82,8 @@ library L2PlanLib {
     }
 
     /// @notice Reverts unless every factory dependency has been published on `_supplier`.
-    /// @dev Live L1 state, so it belongs where the upgrade COMMITS (the CTM's commit and replace,
-    ///      and the bootstrap's `migrate`), not at construction: publication can legitimately
+    /// @dev Live L1 state, so it belongs where the upgrade COMMITS (the CTM's commit and replace),
+    ///      not at construction: publication can legitimately
     ///      happen after the object is built, and it must hold when the edge is committed or the
     ///      L2 transaction fails on every chain.
     function requirePublished(BytecodesSupplier _supplier, uint256[] memory _hashes) internal view {

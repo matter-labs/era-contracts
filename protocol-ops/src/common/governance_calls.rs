@@ -88,11 +88,6 @@ pub fn merge_call_array_hex(chunks: &[&str]) -> anyhow::Result<String> {
     Ok(format!("0x{}", hex::encode(encode_calls(&merged))))
 }
 
-/// Empty `Call[]` encoded as `0x…`.
-pub fn empty_calls_hex() -> String {
-    format!("0x{}", hex::encode(encode_calls(&[])))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

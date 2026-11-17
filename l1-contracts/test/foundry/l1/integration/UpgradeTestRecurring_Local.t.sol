@@ -680,14 +680,12 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationReleaseFixtur
         assertEq(rows[0].implNew.codehash, rows[0].expectedOldImpl.codehash, "of the same runtime code");
     }
 
-    /// @notice A recurring CTM prepare finds its executor on the CTM (the CTM's owner, bound to it)
-    ///         and ignores the core executor input, which only the bootstrap edge reads; the output
-    ///         names both objects the merge derives the executor call from.
+    /// @notice A recurring CTM prepare finds its executor on the CTM (the CTM's owner, bound to it);
+    ///         the output names both objects the merge derives the executor call from.
     function test_recurringPrepare_findsItsExecutorOnTheCTM() public {
         CoreUpgradeNoEcosystemLeg core = new CoreUpgradeNoEcosystemLeg();
         RecurringCTMUpgradeForTests hop = new CTMUpgradeValidatorTimelockOnly();
         _initHop(core, hop, SAME_VERSION_INPUT, "recurring-found-executor");
-        hop.setCoreUpgradeExecutor(makeAddr("staleCoreExecutorInput"));
         _finishPrepare(core, hop);
 
         address ctmExecutor = IOwnable(inputs.ctm).owner();

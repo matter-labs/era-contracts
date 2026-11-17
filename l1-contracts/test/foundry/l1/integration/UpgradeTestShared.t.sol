@@ -13,12 +13,9 @@ import {UpgradeChainCall} from "deploy-scripts/utils/UpgradeChainCall.sol";
 import {DefaultCoreUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
 import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultChainUpgrade.s.sol";
-import {IOwnableSingleStep, IChainAdminMulticall} from "../../../../deploy-scripts/AdminFunctions.s.sol";
 import {EcosystemUpgradeParams} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
 import {UpgradeUtils} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeUtils.sol";
 
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {GetDiamondCutData} from "../../../../deploy-scripts/utils/GetDiamondCutData.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {LogFinder} from "./utils/LogFinder.sol";
 
@@ -54,12 +51,9 @@ abstract contract UpgradeIntegrationTestBase is Test {
     uint256 internal _expectedNewVersion;
     address internal _upgradedChainDiamond;
     address internal _newChainDiamond;
-    bytes32 internal _expectedUpgradeCutHash;
     address internal _expectedNewVerifier;
     address internal _expectedNewChainAdmin;
     bytes32 internal _expectedBaseTokenAssetId;
-    Call[] internal _ctmAdminCalls;
-    bool internal _ctmAdminCallsPrepared;
 
     function setupUpgrade() public virtual {
         console.log("setupUpgrade: Creating the version-specific core + CTM upgrade scripts");
@@ -103,13 +97,9 @@ abstract contract UpgradeIntegrationTestBase is Test {
         console.log("setupUpgrade: Preparing core + CTM upgrades");
         coreUpgrade.prepareEcosystemUpgrade();
         // What protocol-ops passes through `CTMUpgradeParams` from the core output TOML.
-        ctmUpgrade.setCoreUpgradeExecutor(address(coreUpgrade.getCoreUpgradeExecutor()));
         ctmUpgrade.setCoreTransition(address(coreUpgrade.coreTransition()));
         ctmUpgrade.prepareCTMUpgrade();
 
-        console.log("setupUpgrade: Preparing CTM admin calls");
-        _cacheCTMAdminCalls(ctmUpgrade.prepareDefaultCTMAdminCalls());
-        _ctmAdminCallsPrepared = true;
         _assertSimulationProbes();
 
         console.log("setupUpgrade: Preparing chain for the upgrade");
@@ -144,11 +134,7 @@ abstract contract UpgradeIntegrationTestBase is Test {
         );
         assertEq(
             upgrades[0].data,
-            UpgradeChainCall.encode(
-                upgrades[0].target,
-                ctmUpgrade.getOldProtocolVersion(),
-                abi.decode(ctmUpgrade.getChainUpgradeDiamondCutData(), (Diamond.DiamondCutData))
-            ),
+            UpgradeChainCall.encode(upgrades[0].target, ctmUpgrade.getOldProtocolVersion()),
             "simulation changed chain-upgrade calldata"
         );
         assertEq(creations[0].target, coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub);
@@ -187,11 +173,6 @@ abstract contract UpgradeIntegrationTestBase is Test {
         address chainAssetHandler = IBridgehubBase(bridgehub).chainAssetHandler();
         address ctm = ctmUpgrade.getCTMAddress();
 
-        if (_ctmAdminCalls.length != 0) {
-            console.log("Executing CTM admin calls through the current operational owner");
-            executeCTMAdminCalls();
-        }
-
         console.log("Executing the governance bundle (core + CTM merged)!");
         governanceMulticall(coreUpgrade.getOwnerAddress(), upgradeCalls);
         // The previous release's ChainAssetHandler has no pause to read before the edge.
@@ -205,12 +186,6 @@ abstract contract UpgradeIntegrationTestBase is Test {
         // Capture the bundle's events for assertion below.
         Vm.Log[] memory ecosystemLogs = vm.getRecordedLogs();
 
-        // A v35+ chain reads its cut from its ChainTypeManager, and a registry-driven edge logs none.
-        Diamond.DiamondCutData memory diamondCutData;
-        if (UpgradeChainCall.requiresCut(ctmUpgrade.getOldProtocolVersion())) {
-            diamondCutData = GetDiamondCutData.getDiamondCutDataFromRecordedLogs(ecosystemLogs, ctm);
-        }
-
         // Hook for test-specific setup before chain upgrade
         beforeChainUpgrade();
 
@@ -220,7 +195,7 @@ abstract contract UpgradeIntegrationTestBase is Test {
 
         // Now, the admin of the Era needs to call the upgrade function.
         // TODO: We do not include calls that ensure that the server is ready for the sake of brevity.
-        chainUpgrade.upgradeChain(diamondCutData);
+        chainUpgrade.upgradeChain();
 
         console.log("Creating new chain");
         address admin = ctmUpgrade.getBridgehubAdmin();
@@ -247,33 +222,16 @@ abstract contract UpgradeIntegrationTestBase is Test {
         assertEq(uint256(npv.topics[1]), ctmUpgrade.getOldProtocolVersion(), "CTM old version mismatch");
         assertEq(uint256(npv.topics[2]), ctmUpgrade.getNewProtocolVersion(), "CTM new version mismatch");
 
-        // The commit shape differs per edge: a transition-committed edge writes only the
-        // transition pointer (the deprecated `upgradeCutHash` stays zero); a legacy cut-taking
-        // edge writes the hash and emits `NewUpgradeCutHash` keyed by the OLD (FROM) version.
+        // The edge commits only the transition pointer, keyed by the OLD (FROM) version.
         address committedTransition = IChainTypeManager(ctmUpgrade.getCTMAddress()).upgradeTransition(
             ctmUpgrade.getOldProtocolVersion()
         );
-        if (committedTransition != address(0)) {
-            Vm.Log memory nut = ecosystemLogs.requireOneFrom(
-                "NewUpgradeTransition(uint256,address)",
-                ctmUpgrade.getCTMAddress()
-            );
-            assertEq(uint256(nut.topics[1]), ctmUpgrade.getOldProtocolVersion(), "Transition version mismatch");
-            assertEq(address(uint160(uint256(nut.topics[2]))), committedTransition, "Committed transition mismatch");
-            _expectedUpgradeCutHash = bytes32(0);
-        } else {
-            Vm.Log memory nuch = ecosystemLogs.requireOneFrom(
-                "NewUpgradeCutHash(uint256,bytes32)",
-                ctmUpgrade.getCTMAddress()
-            );
-            assertEq(uint256(nuch.topics[1]), ctmUpgrade.getOldProtocolVersion(), "Cut hash protocol version mismatch");
-            _expectedUpgradeCutHash = nuch.topics[2];
-        }
-        assertEq(
-            IChainTypeManager(ctmUpgrade.getCTMAddress()).upgradeCutHash(ctmUpgrade.getOldProtocolVersion()),
-            _expectedUpgradeCutHash,
-            "Cut hash storage mismatch"
+        Vm.Log memory nut = ecosystemLogs.requireOneFrom(
+            "NewUpgradeTransition(uint256,address)",
+            ctmUpgrade.getCTMAddress()
         );
+        assertEq(uint256(nut.topics[1]), ctmUpgrade.getOldProtocolVersion(), "Transition version mismatch");
+        assertEq(address(uint160(uint256(nut.topics[2]))), committedTransition, "Committed transition mismatch");
 
         // The verifier is no longer keyed by version on the CTM; it is pinned by the release,
         // which `NewCurrentRelease` announces and the state-level asserts check.
@@ -353,45 +311,6 @@ abstract contract UpgradeIntegrationTestBase is Test {
                 data: abi.encodeCall(ICTMUpgradeExecutor.applyCTMUpgrade, (ICTMTransition(transition)))
             });
         }
-    }
-
-    function executeCTMAdminCalls() internal virtual {
-        require(_ctmAdminCallsPrepared, "CTM admin calls not prepared");
-        // Match the generated bundle: the ProxyAdmin's owner executes the whole
-        // batch, including acceptOwnership as the ServerNotifier's pending owner.
-        // Selecting each target's current owner breaks two-step ownership transfers.
-        address chainAdmin = getOwnableOwner(_ctmAdminCalls[0].target);
-        address ownerAdmin = _chainAdminMulticallOwner(chainAdmin);
-        Call[] memory calls = _ctmAdminCalls;
-        vm.startBroadcast(ownerAdmin);
-        IChainAdminMulticall(chainAdmin).multicall(calls, true);
-        vm.stopBroadcast();
-    }
-
-    function _cacheCTMAdminCalls(Call[] memory _calls) private {
-        delete _ctmAdminCalls;
-        for (uint256 i = 0; i < _calls.length; i++) {
-            _ctmAdminCalls.push();
-            Call storage cachedCall = _ctmAdminCalls[_ctmAdminCalls.length - 1];
-            cachedCall.target = _calls[i].target;
-            cachedCall.value = _calls[i].value;
-            cachedCall.data = _calls[i].data;
-        }
-    }
-
-    function getOwnableOwner(address _target) internal view returns (address) {
-        return IOwnableSingleStep(_target).owner();
-    }
-
-    function _chainAdminMulticallOwner(address _owner) private returns (address ownerAdmin) {
-        // This harness exercises the no-wrap production path. Legacy governance owners require explicit wraps.
-        require(
-            _owner != ctmUpgrade.getOwnerAddress() && _owner != coreUpgrade.getOwnerAddress(),
-            "Legacy governance CTM admin owner unsupported"
-        );
-
-        ownerAdmin = getOwnableOwner(_owner);
-        require(ownerAdmin != address(0), "CTM admin owner has zero owner");
     }
 
     /// @notice What protocol-ops passes the core and CTM prepares for the fixture's ecosystem.
