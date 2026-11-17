@@ -561,7 +561,7 @@ name (`uint256,`), and a contract with a payable `fallback` gets a `receive` run
 2. **Run the errors lint**, only if an error declaration changed: `cd l1-contracts && yarn errors-lint --fix`
 3. **Run linting fixes**, one pass: `yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix` (a `.sol` change by `lint:sol --fix` means re-testing, see Order of Work)
 4. **Check solc warnings**: `yarn l1 solc-warnings`
-5. **Review what you're about to push** when it addresses review comments or changes behavior: run `/ai-review` (Codex: `$ai-review`). Fix what it confirms. After two rounds, leave anything still open to a human.
+5. **Review what you're about to push** when it addresses review comments or changes behavior: run `/ai-review` (Codex: `$ai-review`), which also checks the diff against [`REVIEW.md`](REVIEW.md). Fix what it confirms. After two rounds, leave anything still open to a human.
 6. **Verify no uncommitted changes**: `git status`
 7. **Commit and push**: only after all checks pass
 

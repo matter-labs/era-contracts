@@ -43,6 +43,8 @@ State the three SHAs at the top of the report. Every finding cites code at HEAD.
   each comment's author, body and date. Keep the unresolved ones, plus resolved ones with comments newer than SINCE.
 - `AGENTS.md`, plus every `docs/ai-review/docs/*.md` whose `## Relevant files` covers a changed path (`general.md`
   always). Read those in full and skip the rest.
+- `REVIEW.md` at the root: the "every file" section and each section whose path heading covers a changed path. Raise a
+  style-rule break as a `nit` naming the rule, and a "What to check" break as `should-fix` or `blocker`.
 - `git diff --stat BASE..HEAD`. Set generated artifacts aside: `AllContractsHashes.json`, `selectors`, `zkstack-out`,
   chain states and genesis JSON. Check they are consistent with the code, or that a draft regenerates them later
   (`ci-green.md`); don't read them line by line.
