@@ -584,7 +584,7 @@
   },
   {
     "type": "function",
-    "name": "shutdownChainAdmin",
+    "name": "shutdownChainInfo",
     "inputs": [
       {
         "name": "chainId",
@@ -597,21 +597,7 @@
         "name": "chainAdmin",
         "type": "address",
         "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "shutdownDistributor",
-    "inputs": [
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
+      },
       {
         "name": "distributor",
         "type": "address",
@@ -1097,6 +1083,22 @@
     "type": "error",
     "name": "InvalidSettlementLayer",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidShutdownDistributor",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "distributor",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
   },
   {
     "type": "error",

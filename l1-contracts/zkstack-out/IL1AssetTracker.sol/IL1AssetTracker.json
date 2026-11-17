@@ -353,7 +353,7 @@
   },
   {
     "type": "function",
-    "name": "shutdownChainAdmin",
+    "name": "shutdownChainInfo",
     "inputs": [
       {
         "name": "_chainId",
@@ -363,26 +363,12 @@
     ],
     "outputs": [
       {
-        "name": "",
+        "name": "chainAdmin",
         "type": "address",
         "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "shutdownDistributor",
-    "inputs": [
+      },
       {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
+        "name": "distributor",
         "type": "address",
         "internalType": "address"
       }
