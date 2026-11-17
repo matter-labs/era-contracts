@@ -1,7 +1,7 @@
 # Expiry of single-leg flows
 
 A single-leg flow, such as a plain transfer, commits its only leg at send. Once that leg has settled by the deadline,
-it can never be proven absent, so the timeout refund ({protocol-docs/atomicity/recovery.md}) no longer applies to it. If executing the leg on the
+it can never be proven absent, so the [timeout refund](recovery.md) no longer applies to it. If executing the leg on the
 destination always reverts, the value collected at send is never minted there and never returned. Typical causes:
 
 - the destination token refuses the recipient (frozen, no longer allowlisted);
@@ -17,7 +17,7 @@ another may already have executed would break atomicity.
 A flow opts in with preimage version `ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION` (`0x02`). The field set is the same
 as version `0x01`, so the `AtomicFinalityProof` ABI and every selector taking it are unchanged. Version `0x02`
 requires exactly one leg (`ManagerExpirableFlowNotSingleLeg`), checked in `_validateAndComputeFlowId` so that append,
-finalize, expiry and refund agree ({protocol-docs/atomicity/flow.md#the-preimage-version}). Committing such a leg
+finalize, expiry and refund agree ([preimage version](flow.md#the-preimage-version)). Committing such a leg
 also emits `ExpirableFlowCommitted`, so that the feature's use can be counted.
 
 ## Expiry on the destination
@@ -65,12 +65,12 @@ recipient doesn't execute goes back sooner.
 1. a version `0x02` flow whose only leg is `bundle`, `Committed` on this chain (`ManagerLegNotCommitted`);
 2. `expiry` to prove the leg's expiry value in the commitment tree of `bundle.destinationChainId`
    (`ProofSourceChainMismatch` otherwise), which this chain must accept
-   ({protocol-docs/interop-gating.md#receive-filter}). The proof authenticates the tree root exactly like a
-   finality proof ({protocol-docs/atomicity/proofs.md#finality}), without the deadline bound: the expiry always
+   ([receive filter](../interop-gating.md#receive-filter)). The proof authenticates the tree root exactly like a
+   [finality proof](proofs.md#finality), without the deadline bound: the expiry always
    settles after the deadline.
 
 The leg becomes `Revertable` and `FlowExpiryRefundAuthorized` is emitted. The existing `claimRefund` then pays
-out with the same best-effort semantics as a timeout refund ({protocol-docs/atomicity/recovery.md}). If the
+out with the same best-effort semantics as a [timeout refund](recovery.md). If the
 source token refuses the refund, for example because the sender is frozen too, the claim reverts and the leg
 stays `Revertable`.
 

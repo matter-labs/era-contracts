@@ -3,8 +3,8 @@
 Each chain owns one **append-only Indexed Merkle Tree (IMT)**, the `L2InteropCommitmentTree`, a genesis
 built-in at `0x10012`. It is the ledger of every atomic-flow leg that chain has ever committed: one
 `commitValue` leaf per leg, plus one `expiryValue` leaf per incoming leg it expired
-({protocol-docs/atomicity/expiry.md}). Everything the finality and timeout proofs assert reduces to "this
-value is present in / absent from this chain's IMT at this batch" (see {protocol-docs/atomicity/proofs.md}).
+([expiry](expiry.md)). Everything the finality and timeout proofs assert reduces to "this
+value is present in / absent from this chain's IMT at this batch" (see [proofs](proofs.md)).
 
 The **generic** indexed-Merkle-tree data structure — the `{value, nextIndex, nextValue}` leaf, the
 low-nullifier non-membership technique, and the hashing rules — is documented once in
