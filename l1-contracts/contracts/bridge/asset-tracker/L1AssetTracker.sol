@@ -394,8 +394,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     ///    so no deposits or other L1->L2 transactions can be requested.
     /// The governance stays the chain admin afterwards, for any future rescue operations.
     /// @dev The function checks what it can read on-chain: the admin, the timelock validators and that a filterer is set.
-    /// It can not check that the filterer rejects everything, or that the chain has no validators other than the
-    /// ValidatorTimelocks, so these have to be reviewed off-chain before the governance proposal is executed.
+    /// It can not check that the filterer rejects everything, that the chain has no validators other than the
+    /// ValidatorTimelocks, or that the chain never was a settlement layer (it only checks that it is not one now, and a
+    /// Gateway that the governance removed from the settlement layers may still hold the balances of the chains that
+    /// settled on it), so these have to be reviewed off-chain before the governance proposal is executed.
     /// @dev No value can reach the chain after the shutdown, whatever the filterer: every deposit, including the base
     /// token `mintValue` of any L1->L2 transaction, goes through `handleChainBalanceIncreaseOnL1`, which rejects shut
     /// down chains. Service transactions skip the filterer, but they always have zero `mintValue` and `l2Value` and,
