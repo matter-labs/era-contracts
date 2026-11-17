@@ -16,4 +16,11 @@ contract CTMUpgrade_v36 is DefaultCTMUpgrade {
     function authorL2Side() internal virtual override returns (AuthoredL2Side memory) {
         return standardL2Side();
     }
+
+    /// @inheritdoc DefaultCTMUpgrade
+    /// @dev A same-minor patch overrides this too, or it redeploys these members with the same code.
+    function changedReleaseMembers() internal view virtual override returns (string[] memory members) {
+        members = new string[](1);
+        members[0] = "AdminFacet";
+    }
 }

@@ -55,4 +55,9 @@ contract CTMUpgradeForTests_v36_1 is CTMUpgradeForTests_v36 {
     function authorL2Side() internal virtual override returns (AuthoredL2Side memory side) {
         return side;
     }
+
+    /// @dev The patch replaces the verifier only, whatever the release it is built on declares.
+    function changedReleaseMembers() internal view virtual override returns (string[] memory) {
+        return new string[](0);
+    }
 }

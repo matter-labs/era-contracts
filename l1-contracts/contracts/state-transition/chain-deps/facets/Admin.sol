@@ -313,13 +313,9 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
         uint128 _oldDenominator,
         uint128 _newNominator,
         uint128 _newDenominator
-    ) internal view {
+    ) internal pure {
         uint256 oldPrice = _safeDerivedL2GasPrice(_oldFeeParams, _oldNominator, _oldDenominator);
         uint256 newPrice = _safeDerivedL2GasPrice(_newFeeParams, _newNominator, _newDenominator);
-
-        if (oldPrice == 0 && s.priorityTree.getSize() == 0) {
-            return;
-        }
 
         // Note that the allowed range is intentionally computed with the configured ratio and its
         // reciprocal using integer arithmetic. This means the effective bounds are asymmetric:
@@ -488,6 +484,10 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
         }
         // See {protocol-docs/system/contracts/chain_management/stage1.md}.
         if (s.pausedDepositsTimestamp != 0) {
+            revert NotCompatibleWithPriorityMode();
+        }
+        // See {protocol-docs/system/contracts/chain_management/stage1.md}.
+        if (s.baseTokenGasPriceMultiplierDenominator == 0) {
             revert NotCompatibleWithPriorityMode();
         }
         // Ensure that there is at least one priority tx with a non-zero request timestamp.
