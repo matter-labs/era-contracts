@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {AuthoredL2Side, DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
+import {UpgradeHelperLib} from "../default-upgrade/UpgradeHelperLib.sol";
 
 /// @notice The v36 CTM upgrade — the first REGISTRY-DRIVEN edge after the v35 bootstrap, run
 ///         entirely by the base pipeline: a fresh release (facets, DiamondInit, upgrade engine)
@@ -17,8 +18,11 @@ contract CTMUpgrade_v36 is DefaultCTMUpgrade {
     }
 
     /// @inheritdoc DefaultCTMUpgrade
-    /// @dev A same-minor patch overrides this too, or it redeploys these members with the same code.
+    /// @dev Only the v35 -> v36 edge changes these; a same-minor patch reuses them.
     function changedReleaseMembers() internal view virtual override returns (string[] memory members) {
+        if (UpgradeHelperLib.isPatchEdge(getOldProtocolVersion(), getNewProtocolVersion())) {
+            return members;
+        }
         members = new string[](1);
         members[0] = "AdminFacet";
     }
