@@ -605,8 +605,12 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     /// @notice The standard L2 side, which a version opts into from {authorL2Side}: the delegate
     ///         (`L2DefaultUpgrade`), the composer {l2DelegateComposer} for it, and every bytecode the
     ///         composed transaction needs published — the built-ins, the ZKsync OS baselines and the
-    ///         delegate.
+    ///         delegate. On a same-minor patch edge it is the L1-only side, since a patch carries no
+    ///         L2 leg (`PatchCannotCarryL2Upgrade`): the version's patches need no override.
     function standardL2Side() internal returns (AuthoredL2Side memory side) {
+        if (UpgradeHelperLib.isPatchEdge(getOldProtocolVersion(), getNewProtocolVersion())) {
+            return side;
+        }
         // Deployed here rather than in {deployNewCTMContracts}, which a transition replacement never runs.
         if (l2DelegateComposer == address(0)) {
             l2DelegateComposer = deploySimpleContract("L2DefaultDelegateCalldataComposer");

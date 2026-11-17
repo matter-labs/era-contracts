@@ -26,6 +26,14 @@ library UpgradeHelperLib {
         return _patch != 0;
     }
 
+    /// @notice Whether the edge between two packed versions keeps the minor version: a patch, or an edge
+    ///         between equal versions.
+    function isPatchEdge(uint256 _oldProtocolVersion, uint256 _newProtocolVersion) internal pure returns (bool) {
+        (, uint32 oldMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_oldProtocolVersion));
+        (, uint32 newMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_newProtocolVersion));
+        return oldMinor == newMinor;
+    }
+
     function getOldProtocolDeadline() internal pure returns (uint256) {
         return type(uint256).max;
     }

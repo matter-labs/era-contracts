@@ -11,8 +11,7 @@ import {AuthoredL2Side, DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUp
 // solhint-disable-next-line contract-name-capwords
 contract CTMUpgrade_v36 is DefaultCTMUpgrade {
     /// @inheritdoc DefaultCTMUpgrade
-    /// @dev Virtual so a same-minor patch, which may carry no L2 leg (`PatchCannotCarryL2Upgrade`),
-    ///      and bytecode-light test harnesses can substitute an L1-only edge.
+    /// @dev Virtual so bytecode-light test harnesses can substitute an L1-only edge.
     function authorL2Side() internal virtual override returns (AuthoredL2Side memory) {
         return standardL2Side();
     }
