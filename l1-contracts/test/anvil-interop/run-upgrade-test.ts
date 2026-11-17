@@ -28,6 +28,7 @@ runPipelineUpgradeScenario({
       upgradeInputTemplatePath: "test/anvil-interop/config/release-upgrade.toml",
       expectedProtocolVersion: packProtocolVersion(genesis),
       coreScriptPath: "test/foundry/l1/integration/_EcosystemUpgradeForTests_v36.sol:CoreUpgradeForTests_v36",
+      carriesL2Upgrade: true,
     },
     // A same-minor PATCH: one fresh verifier, published as a release that copies the live one except that member.
     // Its routing is identical on both edges, so it must derive no facet cut.

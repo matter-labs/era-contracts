@@ -1624,7 +1624,7 @@ mod tests {
 
     // ───────────────────────── a release the tool has never heard of ─────────────────────────
     //
-    // `CTMUpgrade_v36 is DefaultCTMUpgrade {}` — an empty subclass. A v36 upgrade is an ORDINARY
+    // `CTMUpgrade_v36` only overrides hooks of `DefaultCTMUpgrade`. A v36 upgrade is an ORDINARY
     // registry upgrade, so it must load through the general path with no v36 module, no v36
     // branch and no v36 constant anywhere in this tree. The loader never learns a release name.
 

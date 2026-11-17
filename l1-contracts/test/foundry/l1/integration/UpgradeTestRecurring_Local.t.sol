@@ -53,6 +53,30 @@ abstract contract RecurringCTMUpgradeForTests is DefaultCTMUpgrade {
         return LiveL2Table.shell(newConfig.ctm);
     }
 
+    /// @dev Keeps the live genesis batch with the live table: the genesis config may already describe new L2 code.
+    function initializeConfigFromArgs(
+        address _ctmProxy,
+        address _rollupDAManager,
+        bytes32 _create2FactorySalt,
+        string memory _newConfigPath,
+        address _governance,
+        bytes32 _zkTokenAssetId,
+        bool _testnetVerifier
+    ) internal override {
+        super.initializeConfigFromArgs({
+            ctmProxy: _ctmProxy,
+            rollupDAManager: _rollupDAManager,
+            create2FactorySalt: _create2FactorySalt,
+            newConfigPath: _newConfigPath,
+            governance: _governance,
+            zkTokenAssetId: _zkTokenAssetId,
+            testnetVerifier: _testnetVerifier
+        });
+        (bytes32 batchHash, uint64 leafIndex) = LiveL2Table.genesisBatch(_ctmProxy);
+        config.contracts.chainCreationParams.genesisRoot = batchHash;
+        config.contracts.chainCreationParams.genesisRollupLeafIndex = leafIndex;
+    }
+
     /// @notice The transition this prepare deployed, zero when it deployed none.
     function preparedTransition() external view returns (address) {
         return upgradeAddresses.ctmTransition;

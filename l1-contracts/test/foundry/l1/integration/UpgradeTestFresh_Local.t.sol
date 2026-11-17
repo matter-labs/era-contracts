@@ -34,6 +34,11 @@ library LiveL2Table {
     function shell(address _ctm) internal view returns (bytes memory) {
         return ICTMRelease(IChainTypeManager(_ctm).currentRelease()).l2SystemProxyBytecodeInfo();
     }
+
+    /// @notice The live genesis batch, which an edge re-pinning the live table carries over with it.
+    function genesisBatch(address _ctm) internal view returns (bytes32 batchHash, uint64 leafIndex) {
+        (, batchHash, leafIndex) = ICTMRelease(IChainTypeManager(_ctm).currentRelease()).genesisParams();
+    }
 }
 
 /// @notice The chain-release hop of these tests: a fresh verifier pinned by a new release over the
