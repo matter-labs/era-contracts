@@ -267,15 +267,8 @@ impl<'a> UpgradeInner<'a> {
         let core_output = self
             .contracts_path
             .join(inputs.core_output_path.trim_start_matches('/'));
-        // The bootstrap edge's call sequence covers both domains, so it names the ecosystem
-        // domain's executor and core transition; the CTM prepare also counts a core transition as
-        // a change when deciding whether the package changes anything.
-        // `CTMUpgradeParams.ecosystemUpgradeExecutor` keeps its name: the struct's ABI is stable.
-        let core_upgrade_executor =
-            read_core_registry_address(&core_output, "core_upgrade_executor_addr")?;
-        logger::info(format!(
-            "CoreUpgradeExecutor (core prepare): {core_upgrade_executor:#x}"
-        ));
+        // The CTM prepare counts a core transition as a change when deciding whether the package
+        // changes anything.
         let core_transition = read_core_registry_address(&core_output, "core_transition_addr")?;
         logger::info(format!(
             "Core-domain ProxyUpgradeTransition (core prepare): {core_transition:#x}"
@@ -319,7 +312,6 @@ impl<'a> UpgradeInner<'a> {
                         chainRegistrationSender: chain_registration_sender,
                         zkTokenAssetId: inputs.zk_token_asset_id,
                         testnetVerifier: inputs.testnet_verifier,
-                        ecosystemUpgradeExecutor: core_upgrade_executor,
                         coreTransition: core_transition,
                     },
                 }
@@ -421,9 +413,9 @@ fn read_chain_registration_sender_proxy(core_toml: &Path) -> anyhow::Result<Addr
     })
 }
 
-/// An address the core prepare wrote under `[registry]`: `core_transition_addr` (the Core-domain
-/// `ProxyUpgradeTransition`, zero when the prepare deployed no ecosystem implementation) or
-/// `core_upgrade_executor_addr` (the ecosystem domain's `CoreUpgradeExecutor`).
+/// An address the core prepare wrote under `[registry]`, e.g. `core_transition_addr` (the
+/// Core-domain `ProxyUpgradeTransition`, zero when the prepare deployed no ecosystem
+/// implementation).
 fn read_core_registry_address(core_toml: &Path, key: &str) -> anyhow::Result<Address> {
     let raw =
         fs::read_to_string(core_toml).with_context(|| format!("read {}", core_toml.display()))?;

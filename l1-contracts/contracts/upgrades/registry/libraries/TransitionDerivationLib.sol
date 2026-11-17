@@ -86,8 +86,7 @@ library TransitionDerivationLib {
     ///         ({L2InventoryLib}), behind the target release's shared proxy shell.
     /// @dev Same philosophy as {deriveFacetCuts}: the delta is derived from the pair, never
     ///      authored, and members whose implementation did not change are not touched — a
-    ///      facet-only or verifier-only upgrade derives an empty L2 set. The bootstrap edge has no
-    ///      departing release and installs the target table in full ({deriveL2DeploymentsFromTable}).
+    ///      facet-only or verifier-only upgrade derives an empty L2 set.
     /// @dev A shell change alone derives nothing: `updateZKsyncOSContract` deploys the shell only
     ///      at a system address that has no code yet, so an existing member's proxy is never
     ///      replaced — the new shell reaches exactly the members new to the set, which are derived
@@ -134,8 +133,7 @@ library TransitionDerivationLib {
     }
 
     /// @notice The table form of {deriveL2Deployments}, shared with the deploy tooling so the
-    ///         script-composed bootstrap L2 leg and the on-chain transition path derive from the
-    ///         same function. Every nonempty row becomes one `ZKsyncOSSystemProxyUpgrade` whose
+    ///         scripts and the on-chain transition path derive from the same function. Every nonempty row becomes one `ZKsyncOSSystemProxyUpgrade` whose
     ///         descriptor is the `(implementation, proxy)` pair `updateZKsyncOSContract` decodes:
     ///         the row joined to the release's one shared shell.
     /// @dev Table rows are uniformly ZKsync OS system-proxy upgrades — the registry composes for

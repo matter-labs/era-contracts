@@ -34,7 +34,6 @@ import {Call} from "contracts/governance/Common.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {ZkChainAddresses, CTMDeployedAddresses, CoreDeployedAddresses} from "../utils/Types.sol";
 import {IRegisterZKChain, RegisterZKChainConfig} from "contracts/script-interfaces/IRegisterZKChain.sol";
-import {GetDiamondCutData} from "../utils/GetDiamondCutData.sol";
 
 contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
     using stdToml for string;
@@ -73,15 +72,7 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, inputPath);
         initializeConfig(path, _chainTypeManagerProxy, _chainChainId);
-        loadChainCreationData(_chainTypeManagerProxy);
         runInner(outputPath);
-    }
-
-    function loadChainCreationData(address _ctmAddress) internal {
-        (config.diamondCutData, config.forceDeploymentsData) = GetDiamondCutData.getDiamondCutAndForceDeployment(
-            _ctmAddress,
-            false
-        );
     }
 
     function runForTest(address _chainTypeManagerProxy, uint256 _chainChainId) public {
@@ -99,19 +90,10 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
     function runForTestBatch(address _chainTypeManagerProxy, uint256[] memory _chainIds) public {
         vm.warp(1);
 
-        // Read shared CTM output once
         string memory root = vm.projectRoot();
-        string memory ctmPath = string.concat(root, vm.envString("CTM_OUTPUT"));
-        string memory ctmToml = vm.readFile(ctmPath);
-        bytes memory _forceDeploymentsData = ctmToml.readBytes("$.contracts_config.force_deployments_data");
-        bytes memory _diamondCutData = ctmToml.readBytes("$.contracts_config.diamond_cut_data");
 
         // Read on-chain addresses once (same for all chains)
         initializeConfigFromOnChain(_chainTypeManagerProxy);
-
-        // Set shared config (loop-invariant)
-        config.forceDeploymentsData = _forceDeploymentsData;
-        config.diamondCutData = _diamondCutData;
 
         for (uint256 i = 0; i < _chainIds.length; i++) {
             console.log("Deploying ZKChain", _chainIds[i]);
@@ -213,12 +195,7 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
     }
 
     function initializeConfigTest(address chainTypeManagerProxy, uint256 chainChainId) internal {
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, vm.envString("CTM_OUTPUT"));
-        string memory toml = vm.readFile(path);
-        config.forceDeploymentsData = toml.readBytes("$.contracts_config.force_deployments_data");
-        config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
-        path = string.concat(root, vm.envString("ZK_CHAIN_CONFIG"));
+        string memory path = string.concat(vm.projectRoot(), vm.envString("ZK_CHAIN_CONFIG"));
         initializeConfig(path, chainTypeManagerProxy, chainChainId);
     }
 

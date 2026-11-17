@@ -7,7 +7,7 @@
       "L1MessageRoot": {
         "proxy": "0xAE254862F565A2203E8A372be7AB1F767aEE57B7",
         "expectedOldImpl": "0xC288A893e7608D68cbECC574554Ed084a83aB6CF",
-        "implNew": "0xd9140951d8aE6E5F625a02F5908535e16e3af964"
+        "implNew": "0xf090f16dEc8b6D24082Edd25B1C8D26f2bC86128"
       }
     }
   },
@@ -15,38 +15,38 @@
     {
       "name": "ZKsyncOS",
       "isZKsyncOS": true,
-      "ctmProxy": "0xB1104de50fcFbbB83d0e6Fdb9A0068Dd81e4b572",
+      "ctmProxy": "0xBA94C8a566bFeBBBCC4d5691Fe1bcCA81F324e84",
       "release": {
         "diamondInit": {
-          "address": "0xaC9fCBA56E42d5960f813B9D0387F3D3bC003338"
+          "address": "0xdFdE6B33f13de2CA1A75A6F7169f50541B14f75b"
         },
         "verifier": {
-          "address": "0xf090f16dEc8b6D24082Edd25B1C8D26f2bC86128"
+          "address": "0x54B8d8E2455946f2A5B8982283f2359812e815ce"
         },
         "genesisFacets": [
           {
             "name": "AdminFacet",
-            "address": "0xeF31027350Be2c7439C1b0BE022d49421488b72C",
+            "address": "0xC66AB83418C20A65C3f8e83B3d11c8C3a6097b6F",
             "isFreezable": false
           },
           {
             "name": "GettersFacet",
-            "address": "0x12Bcb546bC60fF39F1Adfc7cE4605d5Bd6a6A876",
+            "address": "0xeF31027350Be2c7439C1b0BE022d49421488b72C",
             "isFreezable": false
           },
           {
             "name": "ExecutorFacet",
-            "address": "0xaC47e91215fb80462139756f43438402998E4A3a",
+            "address": "0x12Bcb546bC60fF39F1Adfc7cE4605d5Bd6a6A876",
             "isFreezable": true
           },
           {
             "name": "MigratorFacet",
-            "address": "0x9BcC604D4381C5b0Ad12Ff3Bf32bEdE063416BC7",
+            "address": "0xaC47e91215fb80462139756f43438402998E4A3a",
             "isFreezable": false
           },
           {
             "name": "CommitterFacet",
-            "address": "0x63fea6E447F120B8Faf85B53cdaD8348e645D80E",
+            "address": "0x9BcC604D4381C5b0Ad12Ff3Bf32bEdE063416BC7",
             "isFreezable": true
           },
           {
@@ -89,7 +89,7 @@
       "transition": {
         "fromRelease": "0xd33F20B09F1145558AE2a3DB521da7Bb38C169CA",
         "chainUpgradeEngine": {
-          "address": "0xdFdE6B33f13de2CA1A75A6F7169f50541B14f75b"
+          "address": "0x63fea6E447F120B8Faf85B53cdaD8348e645D80E"
         },
         "oldProtocolVersionDeadline": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         "upgradeTimestamp": 0,

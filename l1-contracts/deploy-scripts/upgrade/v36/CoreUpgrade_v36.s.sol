@@ -5,8 +5,8 @@ pragma solidity 0.8.28;
 
 import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
 
-/// @notice Core (ecosystem) side of the v36 upgrade — the first REGISTRY-DRIVEN edge after the
-///         v35 bootstrap, and deliberately a small one: `L1MessageRoot` is the one ecosystem
+/// @notice Core (ecosystem) side of the v36 upgrade — a REGISTRY-DRIVEN edge from v35, and
+///         deliberately a small one: `L1MessageRoot` is the one ecosystem
 ///         implementation it changes. The base pipeline deploys it and pins it in a Core-domain
 ///         `ProxyUpgradeTransition`, which the merged bundle applies through
 ///         `CoreUpgradeExecutor.applyL1Upgrade`. This prepare emits no governance call of its own.

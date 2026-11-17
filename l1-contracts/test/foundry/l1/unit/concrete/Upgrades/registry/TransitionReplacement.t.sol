@@ -30,7 +30,6 @@ import {
     TransitionReleaseMismatch
 } from "contracts/common/L1ContractErrors.sol";
 import {
-    LegacyCutForRegistryDrivenVersion,
     TransitionDeadlineMismatch,
     UpgradeTransitionUnchanged
 } from "contracts/state-transition/L1StateTransitionErrors.sol";
@@ -523,26 +522,5 @@ contract TransitionReplacementTest is ChainTypeManagerTest, RegistryDrivenUpgrad
             0,
             abi.encodeWithSelector(L2BytecodeNotPublished.selector, keccak256(UNPUBLISHED_DELEGATE_CODE))
         );
-    }
-
-    // ─────────────────────────────── the legacy cut setter ───────────────────────────────
-
-    /// @dev A registry-committed departure is repaired by replacement, never by a legacy cut.
-    function test_revertWhen_aRegistryCommittedDepartureIsGivenALegacyCut() public {
-        _commitAndComplete(transitionV32);
-        Diamond.DiamondCutData memory cut = CTMUpgradeComposer.buildUpgradeCutData(
-            ICTMTransition(address(transitionV32))
-        );
-        Call[] memory calls = new Call[](1);
-        calls[0] = Call({
-            target: address(chainContractAddress),
-            value: 0,
-            data: abi.encodeCall(IChainTypeManager.setUpgradeDiamondCut, (cut, 0))
-        });
-
-        vm.expectRevert(abi.encodeWithSelector(LegacyCutForRegistryDrivenVersion.selector, 0));
-        vm.prank(governor);
-        ctmExecutor.forward(calls);
-        assertEq(chainContractAddress.upgradeCutHash(0), bytes32(0), "no legacy cut hash is written");
     }
 }

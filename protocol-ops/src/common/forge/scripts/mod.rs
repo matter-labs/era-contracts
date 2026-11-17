@@ -246,7 +246,6 @@ script_calls! {
     AdminFunctionsAbi::governanceAcceptOwnerConditionalCall             => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::governanceAcceptOwnerAggregatedCall              => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::ensureCtmsAndProxyAdminsOwnedByGovernanceWithWrapsCall => ADMIN_FUNCTIONS_INVOCATION,
-    AdminFunctionsAbi::executeOwnableCallsWithWrapsCall                 => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::upgradeChainFromCTMCall                          => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::updateValidatorCall                              => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::executeChainAdminMulticallCall                   => ADMIN_FUNCTIONS_INVOCATION,

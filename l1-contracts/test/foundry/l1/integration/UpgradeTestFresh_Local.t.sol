@@ -120,11 +120,6 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
         uint256 genesisVersion = IChainTypeManager(ctm).protocolVersion();
         address genesisRelease = IChainTypeManager(ctm).currentRelease();
         assertEq(IOwnable(ctm).owner(), upgradeExecutors.ctmExecutor, "born owned by the CTM executor");
-        assertEq(
-            IChainTypeManager(ctm).upgradeCutHash(genesisVersion),
-            bytes32(0),
-            "no legacy (bootstrap) edge was ever committed"
-        );
 
         FreshVerifierReleaseHop hop = _prepareHop();
         assertEq(
@@ -133,7 +128,6 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
             "the prepare finds the born CTM executor"
         );
         assertEq(hop.preparedInfrastructure(), address(0), "a verifier release swaps no CTM-domain implementation");
-        assertEq(hop.bootstrapMigrationAddress(), address(0), "a recurring prepare deploys no migration");
 
         ICTMTransition transition = ICTMTransition(hop.preparedTransition());
         assertEq(transition.fromRelease(), genesisRelease, "the edge departs from the genesis release");
@@ -168,7 +162,6 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
         FreshTransitionReplacement replacement = _initReplacement(REPLACEMENT_SALT, "fresh-replacement");
         replacement.setReplacedTransition(address(replaced));
         replacement.prepareCTMUpgrade();
-        replacement.prepareDefaultCTMAdminCalls();
         Call[] memory bundle = replacement.prepareDefaultGovernanceCalls();
 
         // ── The replacement departs exactly where the replaced edge does, onto the release a chain continues from ──

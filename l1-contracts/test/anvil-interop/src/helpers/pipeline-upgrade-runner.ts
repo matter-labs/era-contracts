@@ -108,6 +108,11 @@ export type RecurringUpgradeHop = {
    */
   expectsEmptyFacetDelta?: boolean;
   /**
+   * Assert the CTM prepare swaps CTM-domain implementations, so the bundle carries the
+   * `applyInfrastructureUpgrade` leg. Unset, assert the hop has no such leg.
+   */
+  expectsCtmInfrastructureLeg?: boolean;
+  /**
    * Run this hop with the previous upgrade's L2 transaction still PENDING, and assert it survives
    * untouched. Only a patch edge may do this: `BaseZkSyncUpgrade` deliberately skips the
    * "previous upgrade finalized" check when the minor version does not change. Before every other
@@ -404,17 +409,12 @@ async function runRecurringHop(
             ctm_transition_addr?: string;
             ctm_infrastructure_transition_addr?: string;
             ctm_upgrade_executor_addr?: string;
-            bootstrap_migration_addr?: string;
           };
         };
       };
     };
     const coreRegistry = merged.core.registry ?? {};
     const ctmRegistry = merged.ctms.zksync_os.registry ?? {};
-    const bootstrapMigration = ctmRegistry.bootstrap_migration_addr ?? ethers.constants.AddressZero;
-    if (bootstrapMigration !== ethers.constants.AddressZero) {
-      throw new Error(`a recurring hop must not deploy a bootstrap migration (got ${bootstrapMigration})`);
-    }
     const reportedLegs = upgradeLegsOf({
       coreTransition: coreRegistry.core_transition_addr,
       coreExecutor: coreRegistry.core_upgrade_executor_addr,
@@ -422,6 +422,13 @@ async function runRecurringHop(
       ctmTransition: ctmRegistry.ctm_transition_addr,
       ctmExecutor: ctmRegistry.ctm_upgrade_executor_addr,
     });
+    const reportsInfrastructureLeg = reportedLegs.some((leg) => leg.kind === "ctmInfrastructure");
+    if (reportsInfrastructureLeg !== Boolean(hop.expectsCtmInfrastructureLeg)) {
+      throw new Error(
+        `hop ${hop.label} expects ${hop.expectsCtmInfrastructureLeg ? "a" : "no"} CTM-domain transition, ` +
+          `but the CTM prepare reported ${reportsInfrastructureLeg ? "one" : "none"}`
+      );
+    }
     const transitionLeg = reportedLegs.find((leg) => leg.kind === "ctmTransition");
     if (!transitionLeg) {
       throw new Error(`hop ${hop.label} moves the protocol version, but the CTM prepare reported no transition`);

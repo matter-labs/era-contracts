@@ -4,11 +4,12 @@
 add scheduling prerequisites by registering an `IUpgradePreconditionChecker` for the protocol
 version the chain upgrades **from**.
 
-The notifier owner — after the registry bootstrap, the CTM's `CTMUpgradeExecutor`, so governance
-goes through its `forward` — calls `setUpgradePreconditionChecker(oldProtocolVersion, checker)`. Setting zero
+The notifier owner — the CTM's `CTMUpgradeExecutor`, so governance goes through its `forward` —
+calls `setUpgradePreconditionChecker(oldProtocolVersion, checker)`. Setting zero
 removes the checker; versions without a checker retain their existing scheduling behavior.
 
-Scheduling validates the caller, non-zero timestamp and upgrade cut, then calls the checker's
+Scheduling validates the caller, a non-zero timestamp and that the CTM has committed a transition
+for the chain's current version (the only proof an upgrade is available), then calls the checker's
 `checkUpgradePreconditions(chainId, zkChain)`. The checker is selected using the chain's current
 version, and its DiamondProxy address comes from the CTM. The typed view call must succeed before the notifier
 stores the timestamp and emits `UpgradeTimestampUpdated`. Checker reverts propagate to the caller.

@@ -10,6 +10,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {
     L2DACommitmentScheme,
     PRIORITY_TX_MAX_GAS_LIMIT,
@@ -84,6 +85,7 @@ contract GettersFacetTest is Test {
         address bridgehub = makeAddr("bridgehub");
         address chainTypeManager = makeAddr("chainTypeManager");
         address verifier = makeAddr("verifier");
+        address transactionFilterer = makeAddr("transactionFilterer");
         bytes32 baseTokenAssetId = keccak256("baseTokenAssetId");
 
         getters.util_setAdmin(admin);
@@ -91,6 +93,7 @@ contract GettersFacetTest is Test {
         getters.util_setBridgehub(bridgehub);
         getters.util_setChainTypeManager(chainTypeManager);
         getters.util_setVerifier(IVerifier(verifier));
+        getters.util_setTransactionFilterer(transactionFilterer);
         getters.util_setBaseToken(baseTokenAssetId);
 
         assertEq(getters.getAdmin(), admin);
@@ -98,6 +101,7 @@ contract GettersFacetTest is Test {
         assertEq(getters.getBridgehub(), bridgehub);
         assertEq(getters.getChainTypeManager(), chainTypeManager);
         assertEq(getters.getVerifier(), verifier);
+        assertEq(getters.getTransactionFilterer(), transactionFilterer);
         assertEq(getters.getBaseTokenAssetId(), baseTokenAssetId);
     }
 
@@ -135,7 +139,7 @@ contract GettersFacetTest is Test {
     }
 
     function test_protocolVersionAndUpgradeState() public {
-        uint256 protocolVersion = 765456;
+        uint256 protocolVersion = SemVer.packSemVer(1, 36, 2);
         bytes32 upgradeTxHash = keccak256("l2SystemContractsUpgradeTxHash");
         uint256 upgradeBatchNumber = 56432;
         VerifierParams memory verifierParams = VerifierParams({
@@ -150,6 +154,10 @@ contract GettersFacetTest is Test {
         getters.util_setVerifierParams(verifierParams);
 
         assertEq(getters.getProtocolVersion(), protocolVersion);
+        (uint32 major, uint32 minor, uint32 patch) = getters.getSemverProtocolVersion();
+        assertEq(major, 1);
+        assertEq(minor, 36);
+        assertEq(patch, 2);
         assertEq(getters.getL2SystemContractsUpgradeTxHash(), upgradeTxHash);
         assertEq(getters.getL2SystemContractsUpgradeBatchNumber(), upgradeBatchNumber);
         assertEq(abi.encode(getters.getVerifierParams()), abi.encode(verifierParams));
@@ -217,19 +225,23 @@ contract GettersFacetTest is Test {
         getters.util_setZKsyncOS(true);
         getters.util_setIsFrozen(true);
         getters.util_setIsEthWithdrawalFinalized(l2BatchNumber, l2MessageIndex, true);
+        getters.util_setBaseTokenHasTotalSupply(true);
         assertTrue(getters.isValidator(validator));
         assertTrue(getters.getZKsyncOS());
         assertTrue(getters.isDiamondStorageFrozen());
         assertTrue(getters.isEthWithdrawalFinalized(l2BatchNumber, l2MessageIndex));
+        assertTrue(getters.baseTokenSupportsTotalSupply());
 
         getters.util_setValidator(validator, false);
         getters.util_setZKsyncOS(false);
         getters.util_setIsFrozen(false);
         getters.util_setIsEthWithdrawalFinalized(l2BatchNumber, l2MessageIndex, false);
+        getters.util_setBaseTokenHasTotalSupply(false);
         assertFalse(getters.isValidator(validator));
         assertFalse(getters.getZKsyncOS());
         assertFalse(getters.isDiamondStorageFrozen());
         assertFalse(getters.isEthWithdrawalFinalized(l2BatchNumber, l2MessageIndex));
+        assertFalse(getters.baseTokenSupportsTotalSupply());
     }
 
     function test_getPubdataPricingMode() public {
