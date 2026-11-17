@@ -47,8 +47,9 @@ import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {TransactionNotAllowed, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {EmptyBytes32, TransactionNotAllowed, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {IERC1967} from "@openzeppelin/contracts-v4/interfaces/IERC1967.sol";
+import {NotChainAdmin} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {
     ChainAdminNotOwner,
     ChainIsShutdown,
@@ -448,6 +449,27 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     /// @dev The installer must be for this chain and this asset tracker, otherwise the chain admin could never
     /// install the distributor.
     function test_shutdownChain_requiresInstallerForTheChain() public {
+        // Deployed before the governance takes over the chain admin role, like the real distributor proxy.
+        address[2] memory wrongInstallers = [
+            address(
+                new ShutdownDistributorInstaller(
+                    assetTracker,
+                    zkChainIds[0],
+                    IZKChain(getZKChainAddress(zkChainIds[0])).getAdmin(),
+                    distributorImplementation
+                )
+            ),
+            // Any other contract that exposes the bridgehub stands in for another asset tracker.
+            address(
+                new ShutdownDistributorInstaller(
+                    IL1AssetTracker(address(addresses.l1Nullifier)),
+                    chainId,
+                    chainAdmin,
+                    distributorImplementation
+                )
+            )
+        ];
+
         _handOverAdminToGovernance();
         vm.prank(governance);
         IZKChain(chain).acceptAdmin();
@@ -456,17 +478,6 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.prank(governance);
         IZKChain(chain).setTransactionFilterer(denyAllFilterer);
 
-        address[2] memory wrongInstallers = [
-            address(new ShutdownDistributorInstaller(assetTracker, chainId + 1, chainAdmin, distributorImplementation)),
-            address(
-                new ShutdownDistributorInstaller(
-                    IL1AssetTracker(makeAddr("otherAssetTracker")),
-                    chainId,
-                    chainAdmin,
-                    distributorImplementation
-                )
-            )
-        ];
         for (uint256 i = 0; i < wrongInstallers.length; ++i) {
             address wrongProxy = address(new TransparentUpgradeableProxy(wrongInstallers[i], governance, ""));
             vm.prank(governance);
@@ -700,8 +711,11 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.expectRevert(bytes(""));
         assetTracker.sendShutdownChainFunds(chainId, ethAssetId);
 
-        // A distributor initialized without a root is not accepted either.
-        _installDistributor(bytes32(0), block.timestamp);
+        // `install` rejects a zero root, but the governance can set a distributor initialized without one, which is
+        // not accepted either.
+        address distributor = address(_deployDistributor(bytes32(0), block.timestamp));
+        vm.prank(governance);
+        assetTracker.setShutdownDistributor(chainId, distributor);
         vm.expectRevert(abi.encodeWithSelector(ShutdownDistributorNotInitialized.selector, chainId));
         assetTracker.sendShutdownChainFunds(chainId, ethAssetId);
     }
@@ -989,6 +1003,10 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.expectRevert("TransparentUpgradeableProxy: admin cannot fallback to proxy target");
         installer.install(root, block.timestamp, distributorOwner);
 
+        vm.prank(chainAdmin);
+        vm.expectRevert(EmptyBytes32.selector);
+        installer.install(bytes32(0), block.timestamp, distributorOwner);
+
         vm.expectEmit(true, false, false, false, distributorProxy);
         emit IERC1967.Upgraded(distributorImplementation);
         vm.prank(chainAdmin);
@@ -1038,6 +1056,12 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         new ShutdownDistributorInstaller(assetTracker, chainId, address(0), distributorImplementation);
         vm.expectRevert(ZeroAddress.selector);
         new ShutdownDistributorInstaller(assetTracker, chainId, chainAdmin, address(0));
+    }
+
+    /// @dev The chain admin trusted with the claims and the native mint must be the admin the chain had.
+    function test_installer_requiresChainAdmin() public {
+        vm.expectRevert(abi.encodeWithSelector(NotChainAdmin.selector, bob, chainAdmin));
+        new ShutdownDistributorInstaller(assetTracker, chainId, bob, distributorImplementation);
     }
 
     /*//////////////////////////////////////////////////////////////

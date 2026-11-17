@@ -4,9 +4,11 @@ pragma solidity 0.8.28;
 
 import {ERC1967Upgrade} from "@openzeppelin/contracts-v4/proxy/ERC1967/ERC1967Upgrade.sol";
 
-import {Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {EmptyBytes32, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {InvalidShutdownDistributor} from "../asset-tracker/AssetTrackerErrors.sol";
 import {IL1AssetTracker} from "../asset-tracker/IL1AssetTracker.sol";
+import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
+import {NotChainAdmin} from "../../state-transition/L1StateTransitionErrors.sol";
 
 import {IShutdownClaimDistributor} from "./IShutdownClaimDistributor.sol";
 
@@ -41,7 +43,7 @@ contract ShutdownDistributorInstaller is ERC1967Upgrade {
 
     /// @param _l1AssetTracker The asset tracker that records the shutdown of the chain.
     /// @param _chainId The id of the chain being shut down.
-    /// @param _chainAdmin The admin of the chain being shut down.
+    /// @param _chainAdmin The admin of the chain being shut down, which must be its admin at deployment.
     /// @param _distributorImplementation The deployed implementation of the audited distributor.
     constructor(
         IL1AssetTracker _l1AssetTracker,
@@ -55,6 +57,10 @@ contract ShutdownDistributorInstaller is ERC1967Upgrade {
                 _distributorImplementation != address(0),
             ZeroAddress()
         );
+        // The installer is deployed before the governance takes over the chain admin role, so the chain admin that
+        // provides the claims and mints the chain's native tokens is the one the chain really had.
+        address admin = IGetters(_l1AssetTracker.BRIDGE_HUB().getZKChain(_chainId)).getAdmin();
+        require(_chainAdmin == admin, NotChainAdmin(_chainAdmin, admin));
         L1_ASSET_TRACKER = _l1AssetTracker;
         CHAIN_ID = _chainId;
         CHAIN_ADMIN = _chainAdmin;
@@ -71,6 +77,8 @@ contract ShutdownDistributorInstaller is ERC1967Upgrade {
     /// @param _distributorOwner The owner of the distributor, who can pause it.
     function install(bytes32 _merkleRoot, uint256 _windowStart, address _distributorOwner) external {
         require(msg.sender == CHAIN_ADMIN, Unauthorized(msg.sender));
+        // The distributor does not check the root, and with a zero root `L1AssetTracker` never sends it any funds.
+        require(_merkleRoot != bytes32(0), EmptyBytes32());
         // `address(this)` is the proxy, which delegatecalls into this contract.
         // slither-disable-next-line unused-return
         (, address distributor) = L1_ASSET_TRACKER.shutdownChainInfo(CHAIN_ID);

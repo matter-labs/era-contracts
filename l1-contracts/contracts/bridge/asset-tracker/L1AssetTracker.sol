@@ -305,7 +305,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _amount
     ) external onlyNativeTokenVault {
         // Once a chain is shut down, its users can only get their funds via the shutdown distributor,
-        // whose snapshot is expected to include all unfinalized withdrawals and unclaimed failed deposits.
+        // whose snapshot is expected to include all unfinalized withdrawals, unclaimed failed deposits and unprocessed
+        // priority operations (deposits included).
         require(!isChainShutdown(_chainId), ChainIsShutdown());
         uint256 chainToUpdate = _getWithdrawalChain(_chainId);
         _requireRegistered(_assetId);
@@ -390,14 +391,16 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     ///    it is ready for the shutdown. Until then `acceptAdmin` reverts, and with it the whole multicall;
     /// 2. the ValidatorTimelocks are removed from the chain's validators (`ChainTypeManager.setValidator`),
     ///    so no batches can be committed, proven or executed;
-    /// 3. a transaction filterer that rejects all transactions (`DenyAllTransactionFilterer`) is installed,
-    ///    so no deposits or other L1->L2 transactions can be requested.
+    /// 3. a transaction filterer that rejects all transactions (`DenyAllTransactionFilterer`) is installed, replacing
+    ///    the chain's filterer if it had one, so no deposits or other L1->L2 transactions can be requested.
     /// The governance stays the chain admin afterwards, for any future rescue operations.
     /// @dev The function checks what it can read on-chain: the admin, the timelock validators and that a filterer is set.
     /// It can not check that the filterer rejects everything, that the chain has no validators other than the
-    /// ValidatorTimelocks, or that the chain never was a settlement layer (it only checks that it is not one now, and a
-    /// Gateway that the governance removed from the settlement layers may still hold the balances of the chains that
-    /// settled on it), so these have to be reviewed off-chain before the governance proposal is executed.
+    /// ValidatorTimelocks, that the admin that handed the chain over is still the installer's `CHAIN_ADMIN` (the
+    /// installer only checks it when deployed), or that the chain never was a settlement layer (it only checks that it
+    /// is not one now, and a Gateway that the governance removed from the settlement layers may still hold the balances
+    /// of the chains that settled on it) or never settled on one (the chain migration number does not count every past
+    /// migration), so these have to be reviewed off-chain before the governance proposal is executed.
     /// @dev No value can reach the chain after the shutdown, whatever the filterer: every deposit, including the base
     /// token `mintValue` of any L1->L2 transaction, goes through `handleChainBalanceIncreaseOnL1`, which rejects shut
     /// down chains. Service transactions skip the filterer, but they always have zero `mintValue` and `l2Value` and,
@@ -426,6 +429,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         require(!BRIDGE_HUB.whitelistedSettlementLayers(_chainId), SettlementLayerCannotBeShutdown(_chainId));
         // A chain that settled on Gateway, even if it is back on L1, may have balances recorded under the Gateway, which
         // its shutdown could not send. Its funds would be stuck after the irreversible shutdown, so it is rejected.
+        // This does not catch every such chain: on mainnet, Era settled on Gateway and its migration number is 0.
         uint256 chainMigrationNumber = _getChainMigrationNumber(_chainId);
         require(chainMigrationNumber == 0, InvalidChainMigrationNumber(chainMigrationNumber, 0));
 
@@ -468,6 +472,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @dev Only callable by the chain admin recorded at shutdown (`shutdownChainInfo`), which is responsible for it,
     /// once per asset.
     /// The amount comes on top of what has already been withdrawn to L1, which its owners already hold.
+    /// @dev Only the assets that L1 knows are native to the chain can be minted: a token is registered on L1 with the
+    /// first withdrawal of it that is finalized there. To include a token that was never withdrawn to L1, a withdrawal
+    /// of it has to be finalized before the shutdown.
     /// @param _chainId The id of the shut down chain.
     /// @param _assetId The asset native to the chain.
     /// @param _amount The amount of the asset held on the chain at shutdown.
