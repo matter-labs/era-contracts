@@ -1381,12 +1381,12 @@
   },
   {
     "contractName": "l1-contracts/L1AssetTracker",
-    "zkBytecodeHash": "0x0100096d7d5fb6f2c7aac27763db8a629db6172b4a30c99166f7b1f1c0b890bf",
+    "zkBytecodeHash": "0x0100096d8da61c439b5b705a175940a9f3357616fb258d420d2260bc754356e6",
     "zkBytecodePath": "/l1-contracts/zkout/L1AssetTracker.sol/L1AssetTracker.json",
-    "evmBytecodeHash": "0x765c5419b5aa66f2cd1e97c1a0e0e1c3e5b8cd016519c6aa125c3b04f2765c2c",
+    "evmBytecodeHash": "0x22c103dbf7b77653e9419707946d4879bc93d60e8281309b3b798ebd35fafd54",
     "evmBytecodePath": "/l1-contracts/out/L1AssetTracker.sol/L1AssetTracker.json",
-    "evmDeployedBytecodeHash": "0x92122666fb73fce05a78c748c64a7f9341e863556428aa76d3d7fc0675c4f22d",
-    "evmDeployedBytecodeBlakeHash": "0xbde4f9dcac4b6f9febac3bc5855f007f3ee10aa54ae97e4151ccce2d281ede3d",
+    "evmDeployedBytecodeHash": "0x4a5a9a8caf411fcfce00d0bb0a36f005ea313f713602d65a7838905eb288865a",
+    "evmDeployedBytecodeBlakeHash": "0xa9b2a6aa6f5225f493ed74f6b920cc48a3163d77a683894618b4ea1fa3129fdf",
     "evmDeployedBytecodeLength": 22370
   },
   {
@@ -1991,13 +1991,13 @@
   },
   {
     "contractName": "l1-contracts/ShutdownDistributorInstaller",
-    "zkBytecodeHash": "0x010000d912a6e97983c66e5745db330e4d2dedb0026d5fd40fe6fb8ea645596b",
+    "zkBytecodeHash": "0x010001179de73df55ae8c4ddabfdd614040ec09791deda4c159b753d07334559",
     "zkBytecodePath": "/l1-contracts/zkout/ShutdownDistributorInstaller.sol/ShutdownDistributorInstaller.json",
-    "evmBytecodeHash": "0xeda35fac6a4ab951317328fc1d76711aff34b22aee9e70e635f464927d33dc7a",
+    "evmBytecodeHash": "0xbaa663a0097c89715f3978dd8c7a49c9119d92505874297955fe5890f7af3b14",
     "evmBytecodePath": "/l1-contracts/out/ShutdownDistributorInstaller.sol/ShutdownDistributorInstaller.json",
-    "evmDeployedBytecodeHash": "0x75bc8cdf6f8c9b9e8a022880df87c0a1bf8843812acd510ad5161154bdc959f1",
-    "evmDeployedBytecodeBlakeHash": "0x836fa7178b616f86c3cf2a2b8268f2b900d185b29dd7741bc77dedcfee25ec8b",
-    "evmDeployedBytecodeLength": 2186
+    "evmDeployedBytecodeHash": "0x156912334e8cb6859400f74a260953925777de04daff56080e14f486f766267c",
+    "evmDeployedBytecodeBlakeHash": "0x40fe1201df1553853402fa579d0aee37ffe960daa7f111e1757a2d29bfef60aa",
+    "evmDeployedBytecodeLength": 2241
   },
   {
     "contractName": "l1-contracts/SignatureCheckerUpgradeable",
