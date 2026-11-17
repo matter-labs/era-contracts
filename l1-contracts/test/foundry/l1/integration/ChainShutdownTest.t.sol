@@ -56,6 +56,7 @@ import {
     ChainValidatorNotRemoved,
     InvalidChainMigrationNumber,
     InvalidSettlementLayer,
+    InvalidShutdownDistributor,
     NoChainBalanceToSend,
     NotShutdownChainNativeAsset,
     SettlementLayerCannotBeShutdown,
@@ -145,7 +146,7 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         distributorImplementation = deployCode(DISTRIBUTOR_ARTIFACT);
         distributorProxy = address(
             new TransparentUpgradeableProxy(
-                address(new ShutdownDistributorInstaller(chainAdmin, distributorImplementation)),
+                address(new ShutdownDistributorInstaller(assetTracker, chainId, chainAdmin, distributorImplementation)),
                 governance,
                 ""
             )
@@ -344,8 +345,9 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.stopPrank();
 
         assertTrue(assetTracker.isChainShutdown(chainId));
-        assertEq(assetTracker.shutdownChainAdmin(chainId), chainAdmin);
-        assertEq(assetTracker.shutdownDistributor(chainId), distributorProxy);
+        (address recordedChainAdmin, address recordedDistributor) = assetTracker.shutdownChainInfo(chainId);
+        assertEq(recordedChainAdmin, chainAdmin);
+        assertEq(recordedDistributor, distributorProxy);
         // The governance keeps the chain admin role, for future rescue operations.
         assertEq(IZKChain(chain).getAdmin(), governance);
         assertFalse(IZKChain(chain).isValidator(validatorTimelock));
@@ -436,11 +438,41 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.expectRevert(bytes(""));
         assetTracker.shutdownChain(chainId, address(0));
 
-        // Once installed, the distributor has no `CHAIN_ADMIN()`.
-        _installDistributor(keccak256("root"), block.timestamp);
+        // An installed distributor has no `CHAIN_ADMIN()`.
+        address installedDistributor = address(_deployDistributor(keccak256("root"), block.timestamp));
         vm.prank(governance);
         vm.expectRevert(bytes(""));
-        assetTracker.shutdownChain(chainId, distributorProxy);
+        assetTracker.shutdownChain(chainId, installedDistributor);
+    }
+
+    /// @dev The installer must be for this chain and this asset tracker, otherwise the chain admin could never
+    /// install the distributor.
+    function test_shutdownChain_requiresInstallerForTheChain() public {
+        _handOverAdminToGovernance();
+        vm.prank(governance);
+        IZKChain(chain).acceptAdmin();
+        vm.prank(ctmOwner);
+        addresses.chainTypeManager.setValidator(chainId, validatorTimelock, false);
+        vm.prank(governance);
+        IZKChain(chain).setTransactionFilterer(denyAllFilterer);
+
+        address[2] memory wrongInstallers = [
+            address(new ShutdownDistributorInstaller(assetTracker, chainId + 1, chainAdmin, distributorImplementation)),
+            address(
+                new ShutdownDistributorInstaller(
+                    IL1AssetTracker(makeAddr("otherAssetTracker")),
+                    chainId,
+                    chainAdmin,
+                    distributorImplementation
+                )
+            )
+        ];
+        for (uint256 i = 0; i < wrongInstallers.length; ++i) {
+            address wrongProxy = address(new TransparentUpgradeableProxy(wrongInstallers[i], governance, ""));
+            vm.prank(governance);
+            vm.expectRevert(abi.encodeWithSelector(InvalidShutdownDistributor.selector, chainId, wrongProxy));
+            assetTracker.shutdownChain(chainId, wrongProxy);
+        }
     }
 
     /// @dev The installer rejects a zero chain admin in its constructor, so a distributor reporting one is mocked:
@@ -544,9 +576,30 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         this.requestDirectExternal(mintValue);
     }
 
-    /// @dev External wrapper, so that `vm.expectRevert` applies to the whole request.
+    /// @dev The asset tracker rejects any value sent to a shut down chain by itself, so no deposit of the base token
+    /// or of an ERC20 goes through even if the governance later removes the filterer.
+    function test_shutdown_blocksDepositsWithoutFilterer() public {
+        _shutdown();
+        vm.prank(governance);
+        IZKChain(chain).setTransactionFilterer(address(0));
+
+        vm.expectRevert(ChainIsShutdown.selector);
+        this.depositEthExternal(alice);
+        vm.expectRevert(ChainIsShutdown.selector);
+        this.depositTokenExternal(bob, TOKEN_DEPOSIT);
+    }
+
+    /// @dev External wrappers, so that `vm.expectRevert` applies to the whole request.
     function requestDirectExternal(uint256 _mintValue) external {
         _requestDirect(_mintValue);
+    }
+
+    function depositEthExternal(address _user) external {
+        _depositEth(_user);
+    }
+
+    function depositTokenExternal(address _user, uint256 _amount) external {
+        _depositToken(_user, _amount);
     }
 
     function test_shutdown_blocksBatches() public {
@@ -633,7 +686,9 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         emit IL1AssetTracker.ShutdownDistributorSet(chainId, distributor);
         vm.prank(governance);
         assetTracker.setShutdownDistributor(chainId, distributor);
-        assertEq(assetTracker.shutdownDistributor(chainId), distributor);
+        (address recordedChainAdmin, address recordedDistributor) = assetTracker.shutdownChainInfo(chainId);
+        assertEq(recordedChainAdmin, chainAdmin);
+        assertEq(recordedDistributor, distributor);
     }
 
     function test_sendShutdownChainFunds_reverts() public {
@@ -908,13 +963,22 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
                         Distributor installer
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Only the chain admin can install the distributor, only once and only the pinned implementation. After
-    /// that, only the governance (the proxy admin) can upgrade the distributor.
+    /// @dev Only the chain admin can install the distributor, only after the shutdown, only once and only the pinned
+    /// implementation. After that, only the governance (the proxy admin) can upgrade the distributor.
     function test_installer_installOnceByChainAdmin() public {
         bytes32 root = keccak256("root");
         ShutdownDistributorInstaller installer = ShutdownDistributorInstaller(distributorProxy);
+        assertEq(address(installer.L1_ASSET_TRACKER()), address(assetTracker));
+        assertEq(installer.CHAIN_ID(), chainId);
         assertEq(installer.CHAIN_ADMIN(), chainAdmin);
         assertEq(installer.DISTRIBUTOR_IMPLEMENTATION(), distributorImplementation);
+
+        // The root must commit to the final state of the chain, which only exists after the shutdown.
+        vm.prank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(InvalidShutdownDistributor.selector, chainId, distributorProxy));
+        installer.install(root, block.timestamp, distributorOwner);
+
+        _shutdown();
 
         vm.prank(bob);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, bob));
@@ -956,11 +1020,24 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         assertEq(ITransparentUpgradeableProxy(distributorProxy).implementation(), newImpl);
     }
 
+    /// @dev Once the governance replaces the distributor, the old proxy can no longer be installed.
+    function test_installer_rejectsReplacedDistributor() public {
+        _shutdown();
+        vm.prank(governance);
+        assetTracker.setShutdownDistributor(chainId, makeAddr("newDistributor"));
+
+        vm.prank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(InvalidShutdownDistributor.selector, chainId, distributorProxy));
+        ShutdownDistributorInstaller(distributorProxy).install(keccak256("root"), block.timestamp, distributorOwner);
+    }
+
     function test_installer_zeroAddressesRevert() public {
         vm.expectRevert(ZeroAddress.selector);
-        new ShutdownDistributorInstaller(address(0), distributorImplementation);
+        new ShutdownDistributorInstaller(IL1AssetTracker(address(0)), chainId, chainAdmin, distributorImplementation);
         vm.expectRevert(ZeroAddress.selector);
-        new ShutdownDistributorInstaller(chainAdmin, address(0));
+        new ShutdownDistributorInstaller(assetTracker, chainId, address(0), distributorImplementation);
+        vm.expectRevert(ZeroAddress.selector);
+        new ShutdownDistributorInstaller(assetTracker, chainId, chainAdmin, address(0));
     }
 
     /*//////////////////////////////////////////////////////////////

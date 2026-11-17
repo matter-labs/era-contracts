@@ -27,6 +27,18 @@ interface IL1AssetTracker {
         uint256 totalClaimedOnL1;
     }
 
+    /// @notice The shutdown state of a chain.
+    /// @param chainAdmin The admin of the chain at the moment the governance approved its shutdown. The governance
+    /// becomes the chain's admin at shutdown, so this address is recorded separately. It is responsible for installing
+    /// the distributor and for minting the tokens native to the chain.
+    /// @param distributor The claim distributor to which the L1 funds of the chain are sent. It is expected to be the
+    /// Merkle distributor used for the ZKsync Lite sunset (`ZkSyncLiteSunsetClaimDistributorL1`), whose root commits to
+    /// the final balances of the users of the chain.
+    struct ShutdownChainInfo {
+        address chainAdmin;
+        address distributor;
+    }
+
     event PauseDepositsForChainRequested(uint256 indexed chainId, uint256 indexed settlementLayer);
 
     /// @notice Emitted when the governance irreversibly shuts down a chain.
@@ -75,9 +87,7 @@ interface IL1AssetTracker {
 
     function isChainShutdown(uint256 _chainId) external view returns (bool);
 
-    function shutdownDistributor(uint256 _chainId) external view returns (address);
-
-    function shutdownChainAdmin(uint256 _chainId) external view returns (address);
+    function shutdownChainInfo(uint256 _chainId) external view returns (address chainAdmin, address distributor);
 
     function shutdownChain(uint256 _chainId, address _distributor) external;
 

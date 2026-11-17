@@ -17,12 +17,12 @@ error BaseTokenTotalSupplyBackfillNotNeeded();
 error BaseTokenTotalSupplyBackfillRequired();
 // 0x14aecab6
 error CanNotSendInteropToL1(uint256 destinationChainId);
-// 0xcf3c13e1
-error ChainIsShutdown();
 // 0xe1b625d4
 error ChainAdminNotOwner(uint256 chainId, address chainAdmin);
 // 0xd054a77e
 error ChainBalanceMustBeZeroBeforeMigration(uint256 _chainId, bytes32 _assetId, uint256 _chainBalance);
+// 0xcf3c13e1
+error ChainIsShutdown();
 // 0x7165f465
 error ChainNotShutdown(uint256 chainId);
 // 0xa0d39c49
@@ -61,6 +61,8 @@ error InvalidSender();
 error InvalidServiceLog();
 // 0xd0f0bff7
 error InvalidSettlementLayer();
+// 0xc31005bd
+error InvalidShutdownDistributor(uint256 chainId, address distributor);
 // 0xa9146eeb
 error InvalidVersion();
 // 0xf76b228a
