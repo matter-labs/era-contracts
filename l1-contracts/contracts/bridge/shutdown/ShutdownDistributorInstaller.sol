@@ -72,9 +72,11 @@ contract ShutdownDistributorInstaller is ERC1967Upgrade {
     /// @dev Only possible once the chain is shut down with this proxy as its distributor: the root must be computed
     /// from the final state of the chain, which only exists after the shutdown. If the governance has replaced the
     /// distributor, this proxy can no longer be installed.
-    /// @param _merkleRoot The root of the Merkle tree of the claims, computed from the snapshot.
+    /// @param _merkleRoot The root of the Merkle tree of the claims, computed from the snapshot. Its leaves use the
+    /// distributor's format, where ETH is `address(0)`, not the vault's `ETH_TOKEN_ADDRESS`.
     /// @param _windowStart The timestamp from which claims are accepted.
-    /// @param _distributorOwner The owner of the distributor, who can pause it.
+    /// @param _distributorOwner The owner of the distributor, who can pause it. It must not be the proxy admin, which
+    /// a TransparentUpgradeableProxy does not let call the distributor.
     function install(bytes32 _merkleRoot, uint256 _windowStart, address _distributorOwner) external {
         require(msg.sender == CHAIN_ADMIN, Unauthorized(msg.sender));
         // The distributor does not check the root, and with a zero root `L1AssetTracker` never sends it any funds.

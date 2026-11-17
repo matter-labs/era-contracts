@@ -397,16 +397,22 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @dev The function checks what it can read on-chain: the admin, the timelock validators and that a filterer is set.
     /// It can not check that the filterer rejects everything, that the chain has no validators other than the
     /// ValidatorTimelocks, that the admin that handed the chain over is still the installer's `CHAIN_ADMIN` (the
-    /// installer only checks it when deployed), or that the chain never was a settlement layer (it only checks that it
-    /// is not one now, and a Gateway that the governance removed from the settlement layers may still hold the balances
-    /// of the chains that settled on it) or never settled on one (the chain migration number does not count every past
-    /// migration), so these have to be reviewed off-chain before the governance proposal is executed.
+    /// installer only checks it when deployed), that the distributor is a proxy administered by the governance whose
+    /// implementation is a `ShutdownDistributorInstaller` pinned to the audited distributor, that no custom bridge
+    /// holds funds of the chain outside the native token vault (see below), or that the chain never was a settlement
+    /// layer (it only checks that it is not one now, and a Gateway that the governance removed from the settlement
+    /// layers may still hold the balances of the chains that settled on it) or never settled on one (the chain
+    /// migration number does not count every past migration), so these have to be reviewed off-chain before the
+    /// governance proposal is executed.
     /// @dev No value can reach the chain after the shutdown, whatever the filterer: every deposit, including the base
     /// token `mintValue` of any L1->L2 transaction, goes through `handleChainBalanceIncreaseOnL1`, which rejects shut
     /// down chains. Service transactions skip the filterer, but they always have zero `mintValue` and `l2Value` and,
     /// with no validators, can never be processed.
-    /// @dev From this point on, no deposits, withdrawals or failed deposit claims can be processed for the chain,
-    /// and its funds can only be sent to the shutdown distributor.
+    /// @dev From this point on, no deposits, withdrawals or failed deposit claims can be processed for the chain
+    /// through the native token vault, and the funds it holds for the chain can only be sent to the shutdown
+    /// distributor. A custom bridge that holds funds of the chain outside the native token vault (e.g. Sophon's USDC
+    /// bridge) is not covered: its balance can not be sent to the distributor, and it can still process withdrawals
+    /// and failed deposit claims, so it has to be handled separately before the chain is shut down.
     /// @param _chainId The id of the chain to shut down.
     /// @param _distributor The claim distributor: a proxy whose admin is the governance, with the
     /// `ShutdownDistributorInstaller` implementation for this chain and this asset tracker, until the chain admin
@@ -467,8 +473,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         emit ShutdownDistributorSet(_chainId, _distributor);
     }
 
-    /// @notice Mints the amount of a token native to the shut down chain that its users still held on the chain at
-    /// shutdown, for the distributor.
+    /// @notice Mints the amount of a token native to the shut down chain that its users can no longer get otherwise,
+    /// for the distributor: what they held on the chain at shutdown plus their unfinalized withdrawals, unclaimed
+    /// failed deposits and unprocessed deposits of it.
     /// @dev Only callable by the chain admin recorded at shutdown (`shutdownChainInfo`), which is responsible for it,
     /// once per asset.
     /// The amount comes on top of what has already been withdrawn to L1, which its owners already hold.
@@ -477,7 +484,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// of it has to be finalized before the shutdown.
     /// @param _chainId The id of the shut down chain.
     /// @param _assetId The asset native to the chain.
-    /// @param _amount The amount of the asset held on the chain at shutdown.
+    /// @param _amount The amount of the asset to mint.
     function mintShutdownChainNativeAsset(uint256 _chainId, bytes32 _assetId, uint256 _amount) external nonReentrant {
         // The chain admin is only recorded when the chain is shut down, so this also requires the shutdown.
         require(msg.sender == shutdownChainInfo[_chainId].chainAdmin, Unauthorized(msg.sender));
@@ -497,6 +504,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @dev Permissionless: anyone can trigger it once the distributor is installed.
     /// @dev Tokens native to the chain have no funds locked on L1: the part of the supply that has been withdrawn
     /// is already held by users on L1, and the chain admin mints the rest via `mintShutdownChainNativeAsset`.
+    /// @dev The distributor pays the exact amounts in its Merkle tree and is installed before the funds are sent, so
+    /// for a token that takes a fee on transfer it receives less than `amount`: the claims of such a token have to be
+    /// computed from the amount the distributor will receive, or left out of the tree.
     /// @param _chainId The id of the shut down chain.
     /// @param _assetId The asset to send.
     /// @return amount The amount sent to the distributor.
