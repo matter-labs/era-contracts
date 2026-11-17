@@ -341,8 +341,8 @@ contract UpgradeBundleExecutionTest is CTMUpgradeExecutorFixture {
         _assertNothingApplied();
     }
 
-    /// @dev An executor that does not (yet) own its CTM cannot commit on it — the pre-bootstrap
-    ///      state — and the legs applied before the commit are rolled back with it.
+    /// @dev An executor that does not own its CTM cannot commit on it, and the legs applied before
+    ///      the commit are rolled back with it.
     function test_revertWhen_theExecutorDoesNotOwnItsCTM() public {
         Call[] memory giveAway = new Call[](1);
         giveAway[0] = Call({

@@ -9,7 +9,6 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
@@ -277,61 +276,6 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
         ChainTypeManager ctm = new ChainTypeManager(L2_BRIDGEHUB_ADDR, address(0), address(0), address(0));
         assertEq(ctm.BRIDGE_HUB(), L2_BRIDGEHUB_ADDR);
         assertEq(ctm.PERMISSIONLESS_VALIDATOR(), address(0));
-    }
-
-    // ============================================================
-    // setNewVersionUpgrade tests
-    // ============================================================
-
-    function test_successful_setNewVersionUpgrade() public {
-        _mockGenesisParams(address(genesisUpgradeContract), bytes32(uint256(0x01)), 0x01);
-        chainContractAddress = _deployChainTypeManager();
-
-        // Mock migration paused check
-        vm.mockCall(
-            address(chainAssetHandler),
-            abi.encodeWithSignature("migrationPausedFor(address)"),
-            abi.encode(true)
-        );
-
-        Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
-            facetCuts: new Diamond.FacetCut[](0),
-            initAddress: diamondInit,
-            initCalldata: ""
-        });
-        uint256 oldProtocolVersion = 0;
-        uint256 oldProtocolVersionDeadline = block.timestamp + 100;
-        uint256 newProtocolVersion = 1;
-        address newRelease = _releaseAt(newProtocolVersion);
-
-        vm.prank(governor);
-        chainContractAddress.setNewVersionUpgrade(cutData, oldProtocolVersion, oldProtocolVersionDeadline, newRelease);
-        assertEq(chainContractAddress.currentRelease(), newRelease, "the edge installs the release of its version");
-
-        // Verify that the protocol version deadline was set
-        assertEq(chainContractAddress.protocolVersionDeadline(oldProtocolVersion), oldProtocolVersionDeadline);
-        // Verify that the new protocol version is set
-        assertEq(chainContractAddress.protocolVersion(), newProtocolVersion);
-        // Verify that the verifier is set for the new protocol version
-    }
-
-    function test_RevertWhen_setNewVersionUpgradeNotOwner() public {
-        _mockGenesisParams(address(genesisUpgradeContract), bytes32(uint256(0x01)), 0x01);
-        chainContractAddress = _deployChainTypeManager();
-
-        Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
-            facetCuts: new Diamond.FacetCut[](0),
-            initAddress: diamondInit,
-            initCalldata: ""
-        });
-        uint256 oldProtocolVersion = 0;
-        uint256 oldProtocolVersionDeadline = block.timestamp + 100;
-        address newRelease = _releaseAt(1);
-
-        address notOwner = makeAddr("notOwner");
-        vm.prank(notOwner);
-        vm.expectRevert("Ownable: caller is not the owner");
-        chainContractAddress.setNewVersionUpgrade(cutData, oldProtocolVersion, oldProtocolVersionDeadline, newRelease);
     }
 
     // ============================================================

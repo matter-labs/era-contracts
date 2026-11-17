@@ -105,9 +105,7 @@ library DeployCTML1OrGateway {
             return CTMContract.TestnetVerifier;
         } else if (_compareStrings(_contractName, "ZKsyncOSVerifier")) {
             return CTMContract.DualVerifier;
-        } else if (
-            _compareStrings(_contractName, "DefaultUpgrade") || _compareStrings(_contractName, "BootstrapUpgrade")
-        ) {
+        } else if (_compareStrings(_contractName, "DefaultUpgrade")) {
             return CTMContract.DefaultUpgrade;
         } else if (_compareStrings(_contractName, "L1GenesisUpgrade")) {
             return CTMContract.L1GenesisUpgrade;

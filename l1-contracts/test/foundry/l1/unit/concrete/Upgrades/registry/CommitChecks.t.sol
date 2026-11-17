@@ -128,8 +128,7 @@ contract CommitChecksTest is CTMUpgradeExecutorFixture {
     }
 
     /// @dev A non-increasing edge: no transition can pin one (`VersionEdgeLib`, which therefore also
-    ///      covers every replacement), and the legacy cut-taking commit refuses one in
-    ///      `_commitVersionEdge` (objlib-28).
+    ///      covers every replacement).
     function test_revertWhen_anEdgeDoesNotMoveTheVersionForward() public {
         TransitionManifest memory manifest = _transitionManifest(
             777,
@@ -139,21 +138,6 @@ contract CommitChecksTest is CTMUpgradeExecutorFixture {
         manifest.newRelease = address(fromRelease);
         vm.expectRevert(abi.encodeWithSelector(ProtocolVersionTooSmall.selector, 0, 0));
         new CTMTransition(manifest);
-
-        CTMRelease sameVersion = _deployRelease(3, 0);
-        Call[] memory calls = new Call[](1);
-        calls[0] = Call({
-            target: address(chainContractAddress),
-            value: 0,
-            data: abi.encodeCall(
-                IChainTypeManager.setNewVersionUpgrade,
-                (getDiamondCutData(diamondInit), 0, type(uint256).max, address(sameVersion))
-            )
-        });
-        vm.expectRevert(abi.encodeWithSelector(ProtocolVersionTooSmall.selector, 0, 0));
-        vm.prank(governor);
-        ctmExecutor.forward(calls);
-        _assertNothingCommitted();
     }
 
     /// @dev A chain crosses only an edge departing its own version, and no committed edge departs a

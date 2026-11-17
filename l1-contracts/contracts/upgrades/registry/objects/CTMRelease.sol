@@ -116,14 +116,14 @@ contract CTMRelease is ICTMRelease, ManifestStorage {
             // read with an empty revert instead of a usable failure.
             ObjectAnchorLib.requireCode(facet);
             routing[i] = ISelfDescribingFacet(facet).selectors();
-            // A selector-less row would reach the installing paths (`DiamondInit`, the bootstrap
-            // engine) as an empty `Add` cut, which `Diamond.diamondCut` rejects on every chain.
+            // A selector-less row would reach the installing paths (`DiamondInit`) as an empty
+            // `Add` cut, which `Diamond.diamondCut` rejects on every chain.
             if (routing[i].length == 0) {
                 revert RegistryEmptySelectors(facet);
             }
         }
         // Same reason: the installing paths add every facet's routing, and `Diamond.diamondCut`
-        // rejects a selector added twice. The bootstrap and `ChainTypeManager.initialize` install
+        // rejects a selector added twice. `ChainTypeManager.initialize` and a version edge install
         // a release without cutting a diamond, so this is where a collision has to be caught.
         _requireNoDuplicateSelectors(routing);
     }

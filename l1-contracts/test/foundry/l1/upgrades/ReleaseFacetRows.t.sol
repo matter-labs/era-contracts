@@ -82,6 +82,18 @@ contract ReleaseFacetRowsTest is Test {
         release.validate();
     }
 
+    /// Zero-address rows are left to `validate()`'s code check, so construction does not report
+    /// two of them as a repeated facet.
+    function test_validateRejectsZeroAddressFacetRowsTheConstructorSkips() public {
+        GenesisFacet[] memory rows = new GenesisFacet[](2);
+        rows[0] = GenesisFacet({facet: address(0), isFreezable: false});
+        rows[1] = GenesisFacet({facet: address(0), isFreezable: true});
+        CTMRelease release = new CTMRelease(_manifest(rows));
+
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, address(0)));
+        release.validate();
+    }
+
     /// Two distinct facets describing one selector: construction does not read routing, so the
     /// release pins, and `validate()` refuses it.
     function test_validateRejectsASelectorTwoFacetsRoute() public {

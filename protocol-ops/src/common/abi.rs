@@ -72,16 +72,6 @@ pub mod i_chain_asset_handler {
 }
 pub use i_chain_asset_handler::IChainAssetHandlerAbi;
 
-// Using IChainTypeManager for the upgradeChainFromVersion function
-pub mod chain_type_manager_upgrade_fn {
-    alloy::sol!(
-        #[sol(rpc)]
-        ChainTypeManagerUpgradeFnAbi,
-        "../l1-contracts/zkstack-out/IChainTypeManager.sol/IChainTypeManager.json"
-    );
-}
-pub use chain_type_manager_upgrade_fn::ChainTypeManagerUpgradeFnAbi;
-
 pub mod admin {
     alloy::sol!(
         #[sol(rpc)]
