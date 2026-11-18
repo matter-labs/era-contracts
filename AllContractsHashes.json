@@ -1381,12 +1381,12 @@
   },
   {
     "contractName": "l1-contracts/L1AssetTracker",
-    "zkBytecodeHash": "0x0100096db849f4c6609bc632aa0e69dbef73a0928d8f2d638c551a8b18cd6d07",
+    "zkBytecodeHash": "0x0100096d6d85eb01468faa7cee0ea128b08d49e35535e6571ab00d5e8c474f4e",
     "zkBytecodePath": "/l1-contracts/zkout/L1AssetTracker.sol/L1AssetTracker.json",
-    "evmBytecodeHash": "0xb7682b820c14de4a640d0247ec2b9aec204ce98229d9e237a58976bae022b929",
+    "evmBytecodeHash": "0x8d089e8eb3d50103f7e83deed9a9d1f2fb4c8c7a79c71829721aab1c32732230",
     "evmBytecodePath": "/l1-contracts/out/L1AssetTracker.sol/L1AssetTracker.json",
-    "evmDeployedBytecodeHash": "0x75fca246c52ee8e3a4f48750205f726833650310eafeae2e25ba383a0d48f6f1",
-    "evmDeployedBytecodeBlakeHash": "0x9befb3944b7e96f32af3061e496724846e8f714a31abb7cc6d6bec1da7de68b2",
+    "evmDeployedBytecodeHash": "0x2a3c410a11b563fe838cf78a56dc8f131cd5a1bd56d649a22ba7afb57c4a6015",
+    "evmDeployedBytecodeBlakeHash": "0xb738563c04ea42c345a79eb86487c66c5ff30fc7d00f47a60bc893a316e55f74",
     "evmDeployedBytecodeLength": 22370
   },
   {
