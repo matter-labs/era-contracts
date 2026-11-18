@@ -77,6 +77,11 @@ pub struct ForkTest {
     /// can't pass, e.g. a production verifier.
     #[serde(default)]
     pub envs: Option<Vec<String>>,
+    /// Reads `CHECKS_DIR/last_execute_input.hex`, the input of the reference chain's last
+    /// execute tx. The replay looks that tx up only for such a test: the lookup fails on a chain
+    /// that executed nothing in the week before the fork block.
+    #[serde(default)]
+    pub needs_last_execute_input: bool,
 }
 
 impl ForkTest {
@@ -292,6 +297,13 @@ impl ForgeScriptUpgrade {
                 .as_ref()
                 .is_none_or(|envs| envs.iter().any(|listed| listed == env))
         })
+    }
+
+    /// Whether a fork test that runs in `env` reads the last execute input.
+    pub fn needs_last_execute_input(&self, env: &str) -> bool {
+        self.fork_tests
+            .iter()
+            .any(|test| test.runs_in(env) && test.needs_last_execute_input)
     }
 
     /// ABI-encoded call of the entry point for `env`.
@@ -539,6 +551,7 @@ output = "emergency-upgrade-board.json"
             [ForkTest {
                 path: "test/foundry/fork/X.t.sol".to_string(),
                 envs: None,
+                needs_last_execute_input: false,
             }]
         );
         // `may_skip_in` is gone: no fork test may skip.
@@ -565,6 +578,7 @@ output = "emergency-upgrade-board.json"
         let unscoped = ForkTest {
             path: "x".to_string(),
             envs: None,
+            needs_last_execute_input: false,
         };
         assert!(["stage", "testnet", "mainnet"]
             .iter()
@@ -572,6 +586,23 @@ output = "emergency-upgrade-board.json"
         for bad in ["[]", r#"["mainnet"]"#, r#"["../permanent-values/stage"]"#] {
             assert!(parse(&with_fork_test_envs(bad)).is_err(), "{bad} accepted");
         }
+    }
+
+    #[test]
+    fn the_last_execute_input_is_needed_only_where_a_test_reading_it_runs() {
+        let upgrade = forge_script(&format!(
+            "builtin_checks = true\nfork_tests = [{{ path = \"a\" }}, \
+             {{ path = \"b\", envs = [\"stage\"], needs_last_execute_input = true }}]\n{FORGE_SCRIPT}"
+        ));
+        assert!(upgrade.needs_last_execute_input("stage"));
+        assert!(!upgrade.needs_last_execute_input("testnet"));
+
+        // v34: only testnet3 runs V34EraFirstBatch.t.sol, so mainnet's replay skips the lookup.
+        let Ok(UpgradeDescriptor::ForgeScript(v34)) = UpgradeDescriptor::load("v0.34.0-era") else {
+            return; // no checkout around the test binary
+        };
+        assert!(v34.needs_last_execute_input("testnet3"));
+        assert!(!v34.needs_last_execute_input("mainnet"));
     }
 
     /// Every committed `upgrade-envs/<upgrade>/upgrade.toml` parses.

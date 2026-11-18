@@ -936,7 +936,11 @@ async fn builtin_fork_checks(
     };
     failures.record("provenance", provenance.await);
     logger::step("built-in replay");
-    let replay = forge_checks::replay(rpc_url, env_cfg, output, fork_block, &paths.work_dir).await;
+    let last_execute_input_dir = upgrade
+        .needs_last_execute_input(&env_cfg.env)
+        .then_some(paths.work_dir.as_path());
+    let replay =
+        forge_checks::replay(rpc_url, env_cfg, output, fork_block, last_execute_input_dir).await;
     match replay {
         Ok(chains) if !upgrade.fork_tests.is_empty() => {
             logger::step("fork_tests");

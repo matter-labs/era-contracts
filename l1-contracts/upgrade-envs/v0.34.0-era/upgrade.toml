@@ -14,5 +14,5 @@ builtin_checks = true
 fork_tests = [
   { path = "test/foundry/fork/V34EraUpgrade.t.sol" },
   # Its synthetic batches need a testnet verifier.
-  { path = "test/foundry/fork/V34EraFirstBatch.t.sol", envs = ["testnet3"] },
+  { path = "test/foundry/fork/V34EraFirstBatch.t.sol", envs = ["testnet3"], needs_last_execute_input = true },
 ]

@@ -15,7 +15,7 @@
 //!   checked after each, with anyone's `PUH.reinforceUnfreeze()` before stage 1, which must still
 //!   pass; the reference chain's timestamp and upgrade as `chain
 //!   set-upgrade-timestamp` and `chain upgrade` send them, around a drain; a test chain; the
-//!   reference chain's last execute tx;
+//!   reference chain's last execute tx, if a fork test reads it;
 //! - `fork_tests`: the upgrade's Foundry files, on the replayed fork.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -460,7 +460,7 @@ fn identify_deployments(
 
 // ─── The replay ──────────────────────────────────────────────────────────────────
 
-/// For the first-batch fork test.
+/// For a fork test with `needs_last_execute_input`.
 const LAST_EXECUTE_INPUT_FILE: &str = "last_execute_input.hex";
 /// Blocks per `eth_getLogs`: thirdweb's Sepolia RPC caps it at 1,000.
 const EXECUTE_LOG_WINDOW: u64 = 1_000;
@@ -654,13 +654,14 @@ pub(crate) struct ReplayedChains {
     pub test: u64,
 }
 
-/// Stops at the first failure, as later steps need the state.
+/// Stops at the first failure, as later steps need the state. Writes the last execute input
+/// into `last_execute_input_dir`, if given.
 pub(crate) async fn replay(
     rpc_url: &str,
     env_cfg: &EnvConfig,
     output: &UpgradeOutput,
     fork_block: u64,
-    work_dir: &Path,
+    last_execute_input_dir: Option<&Path>,
 ) -> anyhow::Result<ReplayedChains> {
     let fork = Fork {
         rpc_url: rpc_url.to_string(),
@@ -681,9 +682,11 @@ pub(crate) async fn replay(
     let test = create_test_chain(&fork, output, &facts)
         .await
         .context("the test chain")?;
-    write_last_execute_input(&fork, &facts, fork_block, work_dir)
-        .await
-        .context("the reference chain's last execute transaction")?;
+    if let Some(dir) = last_execute_input_dir {
+        write_last_execute_input(&fork, &facts, fork_block, dir)
+            .await
+            .context("the reference chain's last execute transaction")?;
+    }
     Ok(ReplayedChains {
         reference: facts.chain_id,
         test,
@@ -1913,6 +1916,7 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
         let test = |path: &str| ForkTest {
             path: path.to_string(),
             envs: Some(vec!["mainnet".to_string()]),
+            needs_last_execute_input: false,
         };
         let tests = [test("test/A.t.sol"), test("test/B.t.sol"), test("test")];
         // Whatever its envs; a directory is no file.

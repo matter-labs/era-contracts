@@ -125,11 +125,12 @@ the fork and checks the result instead of PUVT: with protocol-ops' built-in chec
 the CREATE2 provenance and a replay of the stages and of the reference chain's upgrade, with the calls
 `chain set-upgrade-timestamp` and `chain upgrade` emit. Before stage 1 the replay calls the PUH's public
 `reinforceUnfreeze()` from an arbitrary address, which unpauses migrations, and stage 1 must still pass. The replay
-fails while the reference chain has a pending L2 upgrade, and when its last execute tx isn't found in the ~50,000
-blocks before the fork block (none executed there, or an RPC error). Each `fork_tests` file then runs as `forge test`
-on the replayed fork, with `L1_RPC_URL`, `FORK_URL` (the RPC the fork was taken from, for reads at
-`FORK_BLOCK`), `FORK_BLOCK`, `UPGRADE_ENV`, `REFERENCE_CHAIN_ID`, `TEST_CHAIN_ID` and `CHECKS_DIR` (`ecosystem.toml`,
-and the input of the reference chain's last execute tx in `last_execute_input.hex`) exported. Every listed file must
+fails while the reference chain has a pending L2 upgrade. If a fork test that runs in the env sets
+`needs_last_execute_input = true`, the replay also looks up the reference chain's last execute tx and fails when it
+isn't in the ~50,000 blocks before the fork block (none executed there, or an RPC error). Each `fork_tests` file then
+runs as `forge test` on the replayed fork, with `L1_RPC_URL`, `FORK_URL` (the RPC the fork was taken from, for reads
+at `FORK_BLOCK`), `FORK_BLOCK`, `UPGRADE_ENV`, `REFERENCE_CHAIN_ID`, `TEST_CHAIN_ID` and `CHECKS_DIR` (`ecosystem.toml`,
+and, for such a test, that tx's input in `last_execute_input.hex`) exported. Every listed file must
 exist; each runs in the envs its `envs` lists (absent: every env) and passes when forge exits 0 and all its tests, at
 least one, passed. None may skip: leave an env out of `envs` where the file can't pass.
 Pass `--upgrade <upgrade>` (in CI, `-f upgrade=<upgrade>`); the rest is as above:
