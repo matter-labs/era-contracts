@@ -741,6 +741,7 @@ contract InteropCenter is
         // recomputes `flowId` from the out-of-band preimage and requires `bundleHash` to be one of its legs.
         IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).append({
             _bundleHash: bundleHash,
+            _destinationChainId: _bundle.destinationChainId,
             _lowNullifierIndex: _atomicSend.lowNullifierIndex,
             _flowPreimage: _atomicSend.flowPreimage
         });

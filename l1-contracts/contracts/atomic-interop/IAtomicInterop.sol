@@ -40,19 +40,22 @@ struct ImtProof {
 /// sender in the `atomicBundle` ERC-7786 attribute; {AtomicFlowManager.append} recomputes `flowId`
 /// from it and verifies the committing bundle is one of the legs, so a wrong or stale preimage
 /// reverts the send. See {protocol-docs/atomicity/flow.md#1-atomic-send-append}.
-/// @param version Preimage format version (see {ATOMIC_FLOW_PREIMAGE_VERSION}).
+/// @param version Preimage format version ({ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY} or
+/// {ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED}).
 /// @param deadline The flow deadline (a settlement-layer timestamp).
 /// @param settlementLayerChainId The single settlement layer every leg must settle on.
 /// @param legBundleHashes All legs' bundle hashes, strictly ascending (canonical order + dedup).
-/// @param legSourceChainIds Each leg's source chain id, aligned 1:1 with `legBundleHashes` (may
-/// repeat, need not be ascending). Every entry must be the sending chain itself or a
-/// Bridgehub-registered interop chain.
+/// @param legChainIds The chain whose IMT holds each of the flow's commitments (may repeat, need not
+/// be ascending). Source-only flows: `n` entries, leg `i`'s source chain. Accepted flows: `2n`
+/// entries, the `n` source chains followed by the `n` destination chains, both aligned with
+/// `legBundleHashes`. Every entry must be the sending chain itself or a Bridgehub-registered interop
+/// chain. See {protocol-docs/atomicity/acceptance.md}.
 struct AtomicFlowPreimage {
     bytes1 version;
     uint64 deadline;
     uint256 settlementLayerChainId;
     bytes32[] legBundleHashes;
-    uint256[] legSourceChainIds;
+    uint256[] legChainIds;
 }
 
 /// @notice An atomic flow definition, consumed by the finalize and refund paths; the supplied
@@ -67,10 +70,11 @@ struct AtomicFlow {
 }
 
 /// @notice The full atomicity proof a destination needs to execute an atomic bundle: the flow definition
-/// plus one IMT inclusion proof per leg. Passed as one calldata reference to
+/// plus one IMT inclusion proof per commitment. Passed as one calldata reference to
 /// `L2InteropHandler.executeAtomicBundle` / `AtomicFlowManager.requireFlowFinalized`.
 /// @param flow The flow definition (see {AtomicFlow}).
-/// @param proofs One inclusion proof per leg, in `flow.preimage.legBundleHashes` order.
+/// @param proofs One inclusion proof per entry of `flow.preimage.legChainIds`, in the same order: the
+/// legs' commit values, followed (accepted flows only) by the legs' accept values.
 struct AtomicFinalityProof {
     AtomicFlow flow;
     ImtProof[] proofs;
@@ -81,18 +85,26 @@ struct AtomicFinalityProof {
 /// `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
 bytes4 constant ATOMIC_COMMIT_LEAF_TAG = bytes4(keccak256("AtomicInterop.commit.v1"));
 
-/// @dev The current {AtomicFlowPreimage.version} (same versioning convention as {INTEROP_BUNDLE_VERSION}
-/// / {INTEROP_CALL_VERSION}), and today the only accepted one. A new value is introduced whenever the
-/// {AtomicFlowPreimage} field set or its canonicalization changes; each version is validated under its
-/// own rules, so a preimage of one version can never be accepted — or hash to the same `flowId` — under
-/// the rules of another. Introducing a new version does not retire the old one: the {AtomicFlowManager}
-/// accepts both on every path (append/finalize/refund) so in-flight prior-version flows stay finalizable
-/// and refundable.
-bytes1 constant ATOMIC_FLOW_PREIMAGE_VERSION = 0x01;
+/// @dev Domain tag of the value a destination chain inserts into its own IMT when it accepts a leg of an
+/// accepted flow. Distinct from {ATOMIC_COMMIT_LEAF_TAG}, so an acceptance can never stand in for a commit.
+/// `acceptValue = uint256(keccak256(abi.encode(ATOMIC_ACCEPT_LEAF_TAG, flowId, bundleHash)))`.
+bytes4 constant ATOMIC_ACCEPT_LEAF_TAG = bytes4(keccak256("AtomicInterop.accept.v1"));
+
+/// @dev {AtomicFlowPreimage.version} values (same versioning convention as {INTEROP_BUNDLE_VERSION} /
+/// {INTEROP_CALL_VERSION}). Each version is validated under its own rules, so a preimage of one version can
+/// never be accepted — or hash to the same `flowId` — under the rules of another. Introducing a new version
+/// does not retire the old one: the {AtomicFlowManager} accepts both on every path (append/finalize/refund)
+/// so in-flight prior-version flows stay finalizable and refundable.
+/// @dev Source-only flow: only the legs' source chains commit.
+bytes1 constant ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY = 0x01;
+/// @dev Accepted flow: every leg's destination chain must also accept it in time. See
+/// {protocol-docs/atomicity/acceptance.md}.
+bytes1 constant ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED = 0x02;
 
 /// @dev The maximum number of legs in an atomic flow. Committing a leg is cheap (one IMT insert), but
 /// finalizing ANY leg requires verifying one full inclusion proof — a settlement-layer Merkle proof
-/// plus an IMT membership proof — per leg of the flow ({AtomicFlowManager.requireFlowFinalized}), so
+/// plus an IMT membership proof — per commitment of the flow, i.e. one per leg or two for an accepted
+/// flow ({AtomicFlowManager.requireFlowFinalized}), so
 /// an unbounded leg count would make destination-side execution arbitrarily expensive. The cap is
 /// part of preimage validation ({AtomicFlowManager._validateAndComputeFlowId}), so an oversized flow
 /// is rejected identically on the append, finalize and refund paths and can never commit a leg.

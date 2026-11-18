@@ -49,7 +49,7 @@ import type { AtomicFlowPreimage } from "../../src/helpers/interop-helpers";
 import {
   DEFAULT_SL_CHAIN_ID,
   atomicFinalityProofTuple,
-  ATOMIC_FLOW_PREIMAGE_VERSION,
+  ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY,
   atomicFlowTuple,
   buildInclusionProof,
   buildNonInclusionProof,
@@ -284,11 +284,11 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
    */
   function flowPreimageOf(legHashesAsc: string[], chainIdsAsc: number[], deadline: number): AtomicFlowPreimage {
     return {
-      version: ATOMIC_FLOW_PREIMAGE_VERSION,
+      version: ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY,
       deadline,
       settlementLayerChainId: DEFAULT_SL_CHAIN_ID,
       legBundleHashes: legHashesAsc,
-      legSourceChainIds: chainIdsAsc,
+      legChainIds: chainIdsAsc,
     };
   }
 
@@ -769,7 +769,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
         )
       ),
       "atomic send with unregistered co-leg source chain",
-      customError("AtomicFlowManager", "ManagerLegSourceChainNotRegistered(uint256)", [unregisteredChainId])
+      customError("AtomicFlowManager", "ManagerLegChainNotRegistered(uint256)", [unregisteredChainId])
     );
 
     // 4. The exact same bundle with a well-formed preimage still sends fine (control for 1/2/3: proves

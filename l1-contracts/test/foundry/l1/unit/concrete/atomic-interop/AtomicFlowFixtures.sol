@@ -8,7 +8,7 @@ import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitm
 import {
     AtomicFlowPreimage,
     ATOMIC_COMMIT_LEAF_TAG,
-    ATOMIC_FLOW_PREIMAGE_VERSION
+    ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY
 } from "contracts/atomic-interop/IAtomicInterop.sol";
 import {BundleAttributes} from "contracts/common/Messaging.sol";
 import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
@@ -25,6 +25,9 @@ import {
 /// `testFuzz_commitValue_matchesSpec` deliberately keeps its own restatement — it is the spec
 /// assertion, and routing it here would compare {commitValue} against itself.
 library AtomicFlowFixtures {
+    /// @dev `append`'s destination argument for a source-only flow, where it is not checked.
+    uint256 internal constant UNCHECKED_DESTINATION = 0;
+
     function commitValue(bytes32 _flowId, bytes32 _bundleHash) internal pure returns (uint256) {
         return uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, _flowId, _bundleHash)));
     }
@@ -57,15 +60,15 @@ library AtomicFlowFixtures {
     /// @dev Caller owns the leg ordering: the negative shape tests start from here and then break it.
     function nLegPreimage(
         bytes32[] memory _legBundleHashes,
-        uint256[] memory _legSourceChainIds,
+        uint256[] memory _legChainIds,
         uint64 _deadline,
         uint256 _settlementLayerChainId
     ) internal pure returns (AtomicFlowPreimage memory preimage) {
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY;
         preimage.deadline = _deadline;
         preimage.settlementLayerChainId = _settlementLayerChainId;
         preimage.legBundleHashes = _legBundleHashes;
-        preimage.legSourceChainIds = _legSourceChainIds;
+        preimage.legChainIds = _legChainIds;
     }
 
     function noBundleAttributes() internal pure returns (BundleAttributes memory) {

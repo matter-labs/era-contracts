@@ -14,9 +14,9 @@ export const ATOMIC_COMMIT_LEAF_TAG: string = utils
   .keccak256(utils.toUtf8Bytes("AtomicInterop.commit.v1"))
   .slice(0, 10);
 
-/** The current AtomicFlowPreimage.version — mirrors ATOMIC_FLOW_PREIMAGE_VERSION in IAtomicInterop.sol (the
+/** The current AtomicFlowPreimage.version — mirrors ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY in IAtomicInterop.sol (the
  *  only version accepted today; a bump adds the new version alongside the old on all manager paths). */
-export const ATOMIC_FLOW_PREIMAGE_VERSION = "0x01";
+export const ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY = "0x01";
 
 /** Indexed-tree leaf, fields as uint256 decimal strings, in the on-chain field order. */
 export interface IMTLeaf {
@@ -61,7 +61,7 @@ export function indexedLeafHash(leaf: IMTLeaf): string {
 
 /**
  * Mirror of the Solidity `AtomicFlowPreimage` struct. `version` must be manager-supported (currently
- * ATOMIC_FLOW_PREIMAGE_VERSION); `legBundleHashes` must be strictly ascending with `legSourceChainIds`
+ * ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY); `legBundleHashes` must be strictly ascending with `legChainIds`
  * positionally aligned; `deadline` is a settlement-layer timestamp.
  */
 export interface AtomicFlowPreimage {
@@ -69,7 +69,7 @@ export interface AtomicFlowPreimage {
   deadline: number;
   settlementLayerChainId: BigNumber | number | string;
   legBundleHashes: string[];
-  legSourceChainIds: (BigNumber | number | string)[];
+  legChainIds: (BigNumber | number | string)[];
 }
 
 /** The Solidity tuple type of `AtomicFlowPreimage`, in struct field order. */
@@ -83,14 +83,14 @@ export function computeFlowId(preimage: AtomicFlowPreimage): string {
   return utils.keccak256(utils.defaultAbiCoder.encode([FLOW_PREIMAGE_TUPLE_TYPE], [flowPreimageTuple(preimage)]));
 }
 
-/** Encode an {AtomicFlowPreimage} as its Solidity tuple: (version, deadline, settlementLayerChainId, legBundleHashes, legSourceChainIds). */
+/** Encode an {AtomicFlowPreimage} as its Solidity tuple: (version, deadline, settlementLayerChainId, legBundleHashes, legChainIds). */
 export function flowPreimageTuple(preimage: AtomicFlowPreimage): unknown[] {
   return [
     preimage.version,
     preimage.deadline,
     BigNumber.from(preimage.settlementLayerChainId),
     preimage.legBundleHashes,
-    preimage.legSourceChainIds.map((c) => BigNumber.from(c)),
+    preimage.legChainIds.map((c) => BigNumber.from(c)),
   ];
 }
 

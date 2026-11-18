@@ -179,7 +179,7 @@ withdrawn or claimed back while the chain stays disabled (see [Other limitations
 ## Receive filter
 
 A source chain S is **allowed** for a chain C if S is C, or if C's `L2Bridgehub.isPeerAllowed(S)` holds. C's
-`AtomicFlowManager` reverts with `ManagerLegSourceChainNotAllowed` otherwise:
+`AtomicFlowManager` reverts with `ManagerLegChainNotAllowed` otherwise:
 
 - **Finality** (`requireFlowFinalized`, {protocol-docs/atomicity/flow.md#3-finalize--requireflowfinalized}) needs
   every leg's source to be allowed.

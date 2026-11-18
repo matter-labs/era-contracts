@@ -5,7 +5,7 @@ transfers a different asset from chain C to chain A. Each source creates its own
 bundle belongs to one `AtomicFlowPreimage`:
 
 - `legBundleHashes` contains all previewed bundle hashes in strictly ascending order;
-- `legSourceChainIds` contains the corresponding source chain for each hash;
+- `legChainIds` contains the corresponding source chain for each hash;
 - `deadline` is the latest L1 settlement timestamp at which every commitment may enter its source
   chain's settled tree;
 - `settlementLayerChainId` is the L1 chain ID in this release.
