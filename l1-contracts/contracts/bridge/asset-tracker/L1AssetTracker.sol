@@ -401,18 +401,16 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// implementation is a `ShutdownDistributorInstaller` pinned to the audited distributor, that no custom bridge
     /// holds funds of the chain outside the native token vault (see below), or that the chain never was a settlement
     /// layer (it only checks that it is not one now, and a Gateway that the governance removed from the settlement
-    /// layers may still hold the balances of the chains that settled on it) or never settled on one (the chain
-    /// migration number does not count every past migration), so these have to be reviewed off-chain before the
-    /// governance proposal is executed.
+    /// layers may still hold the balances of the chains that settled on it), so these have to be reviewed off-chain
+    /// before the governance proposal is executed.
     /// @dev No value can reach the chain after the shutdown, whatever the filterer: every deposit, including the base
     /// token `mintValue` of any L1->L2 transaction, goes through `handleChainBalanceIncreaseOnL1`, which rejects shut
     /// down chains. Service transactions skip the filterer, but they always have zero `mintValue` and `l2Value` and,
     /// with no validators, can never be processed.
     /// @dev From this point on, no deposits, withdrawals or failed deposit claims can be processed for the chain
     /// through the native token vault, and the funds it holds for the chain can only be sent to the shutdown
-    /// distributor. A custom bridge that holds funds of the chain outside the native token vault (e.g. Sophon's USDC
-    /// bridge) is not covered: its balance can not be sent to the distributor, and it can still process withdrawals
-    /// and failed deposit claims, so it has to be handled separately before the chain is shut down.
+    /// distributor. Any custom bridge that holds funds of the chain outside the native token vault (e.g. Sophon's USDC
+    /// bridge) is not covered here and has to be handled separately before the chain is shut down.
     /// @param _chainId The id of the chain to shut down.
     /// @param _distributor The claim distributor: a proxy whose admin is the governance, with the
     /// `ShutdownDistributorInstaller` implementation for this chain and this asset tracker, until the chain admin
@@ -433,9 +431,12 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         require(BRIDGE_HUB.settlementLayer(_chainId) == block.chainid, InvalidSettlementLayer());
         // Settlement layers hold balances of the chains settling on top of them, shutting them down is not supported.
         require(!BRIDGE_HUB.whitelistedSettlementLayers(_chainId), SettlementLayerCannotBeShutdown(_chainId));
-        // A chain that settled on Gateway, even if it is back on L1, may have balances recorded under the Gateway, which
-        // its shutdown could not send. Its funds would be stuck after the irreversible shutdown, so it is rejected.
-        // This does not catch every such chain: on mainnet, Era settled on Gateway and its migration number is 0.
+        // `sendShutdownChainFunds` sends the chain's `chainBalance` in this contract, which has to represent its whole
+        // balance: what its users hold on the chain plus their unfinalized withdrawals, unclaimed failed deposits and
+        // unprocessed deposits. A chain that migrated to a settlement layer since v31, even if it is back on L1, may
+        // have part of it recorded under the settlement layer instead, so it is rejected. Earlier migrations (e.g.
+        // Era's to Gateway and back) are not counted by the migration number and do not matter: until v31, the
+        // balances were always recorded under the chain itself.
         uint256 chainMigrationNumber = _getChainMigrationNumber(_chainId);
         require(chainMigrationNumber == 0, InvalidChainMigrationNumber(chainMigrationNumber, 0));
 
@@ -531,8 +532,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         );
         _requireRegistered(_assetId);
 
-        // Shutdown is only supported for chains that never settled on Gateway, so no balance of the asset is held
-        // by a settlement layer.
+        // Shutdown is only supported for chains that did not migrate to a settlement layer since v31, so no balance of
+        // the asset is held by a settlement layer.
         require(assetMigrationNumber[_chainId][_assetId] == 0, AssetBalanceNotOnL1(_chainId, _assetId));
         require(_amount != 0, NoChainBalanceToSend(_chainId, _assetId));
 

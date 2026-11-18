@@ -523,8 +523,8 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     }
 
     /// @dev This test is isolated from Gateway, which this deployment doesn't have: the chain asset handler is mocked to
-    /// report the migration number of a chain that migrated to Gateway and back to L1.
-    function test_shutdownChain_requiresNeverMigratedToGateway() public {
+    /// report the migration number of a chain that migrated to Gateway and back to L1 since v31.
+    function test_shutdownChain_rejectsChainMigratedSinceV31() public {
         vm.mockCall(
             address(L1AssetTracker(address(assetTracker)).chainAssetHandler()),
             abi.encodeCall(IChainAssetHandlerBase.migrationNumber, (chainId)),
