@@ -86,6 +86,28 @@ Limits of this rule:
 - **No extra round.** Destinations can accept as soon as the bundle is sequenced on the source, in parallel with
   the other legs' commits.
 
+## Retiring a format
+
+Once a flow's deadline has passed, its outcome is fixed and each leg needs at most one more step, on one chain:
+
+- **Timed out:** the leg is `Committed` on its source and refundable there (`authorizeRefund`, then `claimRefund`).
+- **Finalized:** the leg is accepted on its destination, which holds the bundle (it is in the acceptance
+  transaction) and the acceptance record. Only execution is left.
+
+Both steps are permissionless, and each needs only the chain's own state plus commitments settled on L1. A chain can
+therefore retire an accepted-flow format without the other chains' help:
+
+1. Stop sending the format.
+2. Wait until the last deadline of a flow in that format has passed and settled.
+3. Sources refund their timed-out legs; destinations execute their pending accepted legs. Either can instead publish
+   a claim root of what is left, which returns the value but does not run the leg's calls.
+4. Remove the old paths.
+
+A destination's claim must check that the flow finalized, or a leg could be paid out on the destination and also
+refunded on its source. Legs restricted by `executionAddress` can only be executed by their executor. Deadlines are
+not capped, so step 2 waits for the latest deadline any sender chose. Source-only flows (`0x01`) do not have this
+property: a destination cannot list the legs addressed to it, and their bundles live only on the source.
+
 ## Cost
 
 - One more IMT insert, with its L2->L1 log, per leg on the destination.
