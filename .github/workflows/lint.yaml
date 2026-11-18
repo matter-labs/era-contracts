@@ -61,6 +61,19 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
         working-directory: protocol-ops
 
+  protocol-ops-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.91.1
+
+      - name: Run tests
+        run: cargo test
+        working-directory: protocol-ops
+
   typos:
     runs-on: ubuntu-latest
     steps:

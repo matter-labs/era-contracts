@@ -15,6 +15,7 @@ use crate::{
     common::env_config::{ChainInterval, EnvConfig},
     upgrade_verification::{
         artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
+        constants::EIP1967_IMPLEMENTATION_SLOT,
         versions::v31::utils::{
             address_verifier::AddressVerifier,
             apply_l2_to_l1_alias,
@@ -532,10 +533,8 @@ impl VerificationResult {
         expected_impl_constructor_params: impl AsRef<[u8]>,
         expected_file: &str,
     ) {
-        let transparent_proxy_key = FixedBytes::from_hex(
-            "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc",
-        )
-        .expect("Invalid transparent proxy key hex literal");
+        let transparent_proxy_key = FixedBytes::from_hex(EIP1967_IMPLEMENTATION_SLOT)
+            .expect("Invalid transparent proxy key hex literal");
 
         let storage = verifiers
             .network_verifier

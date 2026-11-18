@@ -15,19 +15,21 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {CommitBatchInfo, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {IEraMultiProofVerifier} from "contracts/state-transition/chain-interfaces/IEraMultiProofVerifier.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {PubdataSource} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
+import {Bytes} from "contracts/vendor/Bytes.sol";
 
 /// @title V34EraFirstBatchForkTest
 /// @notice The boundary between a chain's last v33 batch and its first v34 ones, on its real L1 state: the upgrade
 /// batch commits on the last v33 batch, proves and executes, and the next batch chains on it.
-/// @dev Forks a fork on which the chain was upgraded to v34 (`upgrade-envs/v0.34.0-era/rehearse.sh`). Inputs:
-/// `BRIDGEHUB`, `CHAIN_ID` and `V34_PREV_BATCH`, the last v33 batch's stored info decoded from its execute
-/// transaction; everything else is read from the chain. The batches are synthetic: nothing runs on L2, and the
-/// testnet verifier accepts the empty proof, so this does not exercise public inputs or verification keys.
+/// @dev Runs on protocol-ops' replayed fork (`fork_tests`). The last v33 batch's stored info comes from its execute
+/// tx input in `CHECKS_DIR/last_execute_input.hex`, or in a local run from `V34_PREV_BATCH`. The batches are
+/// synthetic: nothing runs on L2, and the testnet verifier accepts the empty proof, so public inputs and verification
+/// keys go untested. A production verifier rejects them: `upgrade.toml` runs this on testnet3 only.
 contract V34EraFirstBatchForkTest is Test {
     // Synthetic batch contents: L1 only needs them to be non-zero and consistent.
     bytes32 internal constant STATE_DIFF_HASH = keccak256("v34 fork test: state diff hash");
@@ -38,6 +40,8 @@ contract V34EraFirstBatchForkTest is Test {
     bytes32 internal constant AIRBENDER_HEAP_HASH = keccak256("v34 fork test: Airbender bootloader heap hash");
     /// @dev Calldata DA always declares one blob: its linear hash and commitment, with the pubdata (empty here).
     uint8 internal constant CALLDATA_BLOBS = 1;
+    /// @dev v33's execute data encoding version (`BatchDecoder.SUPPORTED_ENCODING_VERSION` before v34).
+    uint8 internal constant V33_EXECUTE_ENCODING_VERSION = 1;
 
     IZKChain internal chain;
     ValidatorTimelock internal validatorTimelock;
@@ -56,30 +60,41 @@ contract V34EraFirstBatchForkTest is Test {
     uint256 internal upgradeBatchNumber;
 
     function setUp() public {
-        bytes memory prevBatch = vm.envOr("V34_PREV_BATCH", bytes(""));
-        if (prevBatch.length == 0) {
-            vm.skip(true, "run from rehearse.sh");
+        string memory env = vm.envOr("UPGRADE_ENV", string(""));
+        chainId = vm.envOr("REFERENCE_CHAIN_ID", uint256(0));
+        if (bytes(env).length == 0 || chainId == 0) {
+            vm.skip(true, "no UPGRADE_ENV or REFERENCE_CHAIN_ID: protocol-ops' fork_tests run this on its fork");
         }
-        IBridgehubBase bridgehub = IBridgehubBase(vm.envAddress("BRIDGEHUB"));
-        chainId = vm.envUint("CHAIN_ID");
+        string memory permanent = vm.readFile(
+            string.concat(vm.projectRoot(), "/upgrade-envs/permanent-values/", env, ".toml")
+        );
+        IBridgehubBase bridgehub = IBridgehubBase(
+            vm.parseTomlAddress(permanent, "$.core_contracts.bridgehub_proxy_addr")
+        );
         chain = IZKChain(bridgehub.getZKChain(chainId));
         IChainTypeManager ctm = IChainTypeManager(bridgehub.chainTypeManager(chainId));
         validatorTimelock = ValidatorTimelock(ctm.validatorTimelockPostV29());
         messageRoot = bridgehub.messageRoot();
         uint256 newProtocolVersion = ctm.protocolVersion();
+        // Before reading the verifier: a production v33 one has no `IS_TESTNET_VERIFIER()`.
+        assertEq(chain.getProtocolVersion(), newProtocolVersion, "chain protocol version");
+        assertTrue(IEraMultiProofVerifier(chain.getVerifier()).IS_TESTNET_VERIFIER(), "a testnet verifier");
 
-        // V34_PREV_BATCH is the 9-field pre-Airbender encoding; a zero word appended makes it v34's layout
-        // with `airbenderCommitment = 0`, the form the chain accepts for its last v33 batch.
+        bytes memory prevBatch = vm.envOr("V34_PREV_BATCH", bytes(""));
+        if (prevBatch.length == 0) {
+            prevBatch = _lastV33Batch(vm.envString("CHECKS_DIR"));
+        }
+        // The 9-field pre-Airbender encoding; a zero word appended makes it v34's layout with
+        // `airbenderCommitment = 0`, the form the chain accepts for its last v33 batch.
         lastV33Batch = abi.decode(bytes.concat(prevBatch, bytes32(0)), (IExecutor.StoredBatchInfo));
         uint256 lastV33BatchNumber = lastV33Batch.batchNumber;
         upgradeBatchNumber = lastV33BatchNumber + 1;
 
         assertEq(chain.getChainId(), chainId, "chain id");
-        assertEq(chain.storedBatchHash(lastV33BatchNumber), keccak256(prevBatch), "V34_PREV_BATCH stored hash");
+        assertEq(chain.storedBatchHash(lastV33BatchNumber), keccak256(prevBatch), "the last v33 batch's stored hash");
         assertEq(chain.getTotalBatchesCommitted(), lastV33BatchNumber, "committed batches");
         assertEq(chain.getTotalBatchesVerified(), lastV33BatchNumber, "verified batches");
         assertEq(chain.getTotalBatchesExecuted(), lastV33BatchNumber, "executed batches");
-        assertEq(chain.getProtocolVersion(), newProtocolVersion, "chain protocol version");
         assertTrue(ctm.protocolVersionIsActive(newProtocolVersion), "v0.34.0 active on the CTM");
         upgradeTxHash = chain.getL2SystemContractsUpgradeTxHash();
         assertTrue(upgradeTxHash != bytes32(0), "pending L2 upgrade tx");
@@ -148,6 +163,34 @@ contract V34EraFirstBatchForkTest is Test {
             abi.encodeWithSelector(BatchHashMismatch.selector, storedHash, keccak256(abi.encode(upgradeBatch)))
         );
         _sendCommit(upgradeBatch, nextBatch);
+    }
+
+    /// @dev The last executed batch's stored info, from its execute tx's input: `executeBatchesSharedBridge` with
+    /// v33's execute data, which starts with the batches.
+    function _lastV33Batch(string memory _checksDir) internal view returns (bytes memory) {
+        bytes memory input = vm.parseBytes(vm.readFile(string.concat(_checksDir, "/last_execute_input.hex")));
+        assertEq(bytes4(input), ValidatorTimelock.executeBatchesSharedBridge.selector, "an execute transaction");
+        (address chainAddress, , , bytes memory executeData) = abi.decode(
+            Bytes.slice(input, 4),
+            (address, uint256, uint256, bytes)
+        );
+        assertEq(chainAddress, address(chain), "the execute transaction's chain");
+        assertEq(uint8(executeData[0]), V33_EXECUTE_ENCODING_VERSION, "v33's execute data");
+        IExecutor.PreAirbenderStoredBatchInfo[] memory batches = abi.decode(
+            Bytes.slice(executeData, 1),
+            (IExecutor.PreAirbenderStoredBatchInfo[])
+        );
+        uint256 lastExecuted = chain.getTotalBatchesExecuted();
+        uint256 found = 0;
+        uint256 at = 0;
+        for (uint256 i = 0; i < batches.length; ++i) {
+            if (batches[i].batchNumber == lastExecuted) {
+                ++found;
+                at = i;
+            }
+        }
+        assertEq(found, 1, "the execute transaction holds the last executed batch once");
+        return abi.encode(batches[at]);
     }
 
     /// @dev A synthetic batch on top of `_prev`: no transactions, calldata DA with empty pubdata.
