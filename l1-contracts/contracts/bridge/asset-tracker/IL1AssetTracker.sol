@@ -27,7 +27,37 @@ interface IL1AssetTracker {
         uint256 totalClaimedOnL1;
     }
 
+    /// @notice The shutdown state of a chain.
+    /// @param chainAdmin The admin of the chain at the moment the governance approved its shutdown. The governance
+    /// becomes the chain's admin at shutdown, so this address is recorded separately. It is responsible for installing
+    /// the distributor and for minting the tokens native to the chain.
+    /// @param distributor The claim distributor to which the L1 funds of the chain are sent. It is expected to be the
+    /// Merkle distributor used for the ZKsync Lite sunset (`ZkSyncLiteSunsetClaimDistributorL1`), whose root commits to
+    /// the final balances of the users of the chain.
+    struct ShutdownChainInfo {
+        address chainAdmin;
+        address distributor;
+    }
+
     event PauseDepositsForChainRequested(uint256 indexed chainId, uint256 indexed settlementLayer);
+
+    /// @notice Emitted when the governance irreversibly shuts down a chain.
+    /// @param batchNumber The number of executed batches of the chain at shutdown. The distributor's Merkle snapshot
+    /// must be taken from the state after this batch, the final state of the chain.
+    /// @param chainAdmin The admin of the chain before the governance took over.
+    event ChainShutdown(uint256 indexed chainId, uint256 batchNumber, address chainAdmin);
+
+    /// @notice Emitted when the governance sets the distributor for a shut down chain.
+    event ShutdownDistributorSet(uint256 indexed chainId, address indexed distributor);
+
+    /// @notice Emitted when the L1 funds of a shut down chain are sent to its distributor, or tokens native to the chain
+    /// are minted for it.
+    event ShutdownChainFundsSent(
+        uint256 indexed chainId,
+        bytes32 indexed assetId,
+        address indexed distributor,
+        uint256 amount
+    );
 
     function BRIDGE_HUB() external view returns (IBridgehubBase);
 
@@ -54,4 +84,18 @@ interface IL1AssetTracker {
     function setAddresses() external;
 
     function requestPauseDepositsForChainOnGateway(uint256 _chainId) external;
+
+    function isChainShutdown(uint256 _chainId) external view returns (bool);
+
+    function shutdownChainInfo(uint256 _chainId) external view returns (address chainAdmin, address distributor);
+
+    function shutdownChain(uint256 _chainId, address _distributor) external;
+
+    function setShutdownDistributor(uint256 _chainId, address _distributor) external;
+
+    function isShutdownChainNativeAssetMinted(uint256 _chainId, bytes32 _assetId) external view returns (bool);
+
+    function mintShutdownChainNativeAsset(uint256 _chainId, bytes32 _assetId, uint256 _amount) external;
+
+    function sendShutdownChainFunds(uint256 _chainId, bytes32 _assetId) external returns (uint256 amount);
 }
