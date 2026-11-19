@@ -528,8 +528,8 @@
     "inputs": [
       {
         "name": "feature",
-        "type": "uint8",
-        "internalType": "enum ChainFeature"
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [
@@ -779,8 +779,8 @@
     "inputs": [
       {
         "name": "_feature",
-        "type": "uint8",
-        "internalType": "enum ChainFeature"
+        "type": "bytes32",
+        "internalType": "bytes32"
       },
       {
         "name": "_enabled",
