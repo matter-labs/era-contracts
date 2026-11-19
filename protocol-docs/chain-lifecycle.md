@@ -87,7 +87,7 @@ interop-registration time instead (next section).
 (`allowInteropPeer`) for the pairs the chain admins whitelisted. Who may whitelist which pair, and
 how a registration is re-sent, is in
 {protocol-docs/interop-gating.md#interop-peer-whitelist}. It also pushes each chain's features to the
-chain's own `L2Bridgehub` ({protocol-docs/interop-gating.md#chain-features}). Chains settling on L1 participate in interop
+chain's own `L2Bridgehub` ([chain features](interop-gating.md#chain-features)). Chains settling on L1 participate in interop
 without a gateway: L1 itself builds interop roots (`MessageRootBase.addChainBatchRootV32`) and serves
 the corresponding inclusion proofs.
 

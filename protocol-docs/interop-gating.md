@@ -200,21 +200,23 @@ flow while another refunds it, and a leg is paid twice.
 
 Some protocol features are opt-in per chain, so that the ecosystem knows which chains use them and can change or
 remove a feature that turns out not to be needed. `ChainRegistrationSender` keeps `isChainFeatureEnabled` per chain
-and per `ChainFeature`. Only the owner or the Bridgehub admin sets it, with `setChainFeatureEnabled`; a chain that
-wants a feature asks for it offchain, as for enabling interop.
+and per feature id, a `bytes32` the feature's consumer defines. Only the owner or the Bridgehub admin sets it, with
+`setChainFeatureEnabled`; a chain that wants a feature asks for it offchain, as for enabling interop.
 
 Each change of `isChainFeatureEnabled` is also sent to the chain's own `L2Bridgehub` as a service transaction
 (`setChainFeatureEnabled`), where the chain's contracts read it with `L2Bridgehub.isChainFeatureEnabled`. A chain
 only ever reads its own features, so nothing is sent to other chains. A feature gates only what the chain itself
 does; a chain never has to know whether its peers enabled one.
 
-The service transaction fails on a chain whose L2 doesn't have `setChainFeatureEnabled` yet, leaving the feature
-off on L2 while L1 shows it enabled. So enable a feature only once the chain's upgrade to a protocol version that
-supports it has executed; this is checked offchain. Calling `setChainFeatureEnabled` again sends the value again.
+The service transaction would fail on a chain whose L2 doesn't have `setChainFeatureEnabled` yet, leaving the
+feature off on L2 while L1 shows it enabled. So `setChainFeatureEnabled` reverts with `ChainFeaturesNotSupported`
+while the chain's diamond reports an older protocol version than `CHAIN_FEATURES_MIN_PROTOCOL_VERSION`. Once it
+reports that version, the chain's L2 runs the upgrade transaction before any later service transaction. Calling
+`setChainFeatureEnabled` again sends the value again.
 
-| Feature              | Gates                                      |
-| -------------------- | ------------------------------------------ |
-| `ExpirableTransfers` | Sending a single-leg flow that can expire. |
+No feature is gated yet: no contract reads an id. A feature brings its id, by convention the `keccak256` of its name,
+and the check that reads it with the upgrade that ships it, without changing `ChainRegistrationSender` or
+`L2Bridgehub`. Neither checks the id, so setting one that nothing reads has no effect.
 
 ## Governance procedure
 

@@ -15,9 +15,11 @@ import {IL1MessageRoot} from "../message-root/IL1MessageRoot.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
+import {SEMVER_MINOR_OFFSET} from "../../common/libraries/SemVer.sol";
 
 import {Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
 import {
+    ChainFeaturesNotSupported,
     ChainHasNoBatchesInMessageRoot,
     InteropNotEnabled,
     InteropPeerAlreadyAllowed,
@@ -26,11 +28,14 @@ import {
     NoEthAllowed,
     ZKChainNotRegistered
 } from "../bridgehub/L1BridgehubErrors.sol";
-import {ChainFeature, IL2Bridgehub} from "../bridgehub/IL2Bridgehub.sol";
+import {IL2Bridgehub} from "../bridgehub/IL2Bridgehub.sol";
 
 /// @dev The encoding version of `bridgehubDeposit` data that re-sends the registration of an allowed pair.
 /// The retired version `0x01` registered any pair without consent.
 bytes1 constant CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION = 0x02;
+
+/// @dev The first protocol version, v0.36.0, whose `L2Bridgehub` has `setChainFeatureEnabled`.
+uint256 constant CHAIN_FEATURES_MIN_PROTOCOL_VERSION = 36 << SEMVER_MINOR_OFFSET;
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -53,7 +58,7 @@ contract ChainRegistrationSender is
     mapping(uint256 chainId => mapping(uint256 peerChainId => bool allowed)) public interopPeerAllowed;
 
     /// @inheritdoc IChainRegistrationSender
-    mapping(uint256 chainId => mapping(ChainFeature feature => bool enabled)) public isChainFeatureEnabled;
+    mapping(uint256 chainId => mapping(bytes32 feature => bool enabled)) public isChainFeatureEnabled;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
@@ -97,10 +102,17 @@ contract ChainRegistrationSender is
     }
 
     /// @inheritdoc IChainRegistrationSender
-    function setChainFeatureEnabled(uint256 _chainId, ChainFeature _feature, bool _enabled) external nonReentrant {
+    function setChainFeatureEnabled(uint256 _chainId, bytes32 _feature, bool _enabled) external nonReentrant {
         require(msg.sender == owner() || msg.sender == BRIDGE_HUB.admin(), Unauthorized(msg.sender));
         address zkChain = BRIDGE_HUB.getZKChain(_chainId);
         require(zkChain != address(0), ZKChainNotRegistered());
+        // The chain's L2 runs its upgrade transaction before this service transaction, so a chain that
+        // reports the version already has the setter on L2.
+        uint256 protocolVersion = IGetters(zkChain).getProtocolVersion();
+        require(
+            protocolVersion >= CHAIN_FEATURES_MIN_PROTOCOL_VERSION,
+            ChainFeaturesNotSupported(_chainId, protocolVersion)
+        );
 
         isChainFeatureEnabled[_chainId][_feature] = _enabled;
         emit ChainFeatureSet(_chainId, _feature, _enabled);

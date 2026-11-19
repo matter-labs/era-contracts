@@ -8,7 +8,7 @@ import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/Enumerable
 import {ETH_TOKEN_ADDRESS, SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 import {EmptyAssetId, Unauthorized} from "../../common/L1ContractErrors.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
-import {ChainFeature, IL2Bridgehub} from "./IL2Bridgehub.sol";
+import {IL2Bridgehub} from "./IL2Bridgehub.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
@@ -43,7 +43,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     mapping(uint256 chainId => bool) public isPeerAllowed;
 
     /// @inheritdoc IL2Bridgehub
-    mapping(ChainFeature feature => bool enabled) public isChainFeatureEnabled;
+    mapping(bytes32 feature => bool enabled) public isChainFeatureEnabled;
 
     modifier onlyChainRegistrationSender() {
         if (
@@ -108,7 +108,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     }
 
     /// @inheritdoc IL2Bridgehub
-    function setChainFeatureEnabled(ChainFeature _feature, bool _enabled) external onlyChainRegistrationSender {
+    function setChainFeatureEnabled(bytes32 _feature, bool _enabled) external onlyChainRegistrationSender {
         isChainFeatureEnabled[_feature] = _enabled;
     }
 

@@ -2,8 +2,6 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {ChainFeature} from "../bridgehub/IL2Bridgehub.sol";
-
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IChainRegistrationSender {
@@ -14,7 +12,7 @@ interface IChainRegistrationSender {
     event InteropPairDeregistered(uint256 indexed chainRegisteredOn, uint256 indexed chainId);
 
     /// @notice `feature` was enabled or disabled for `chainId`.
-    event ChainFeatureSet(uint256 indexed chainId, ChainFeature indexed feature, bool enabled);
+    event ChainFeatureSet(uint256 indexed chainId, bytes32 indexed feature, bool enabled);
 
     function initialize(address _owner) external;
 
@@ -23,14 +21,15 @@ interface IChainRegistrationSender {
     function interopPeerAllowed(uint256 _chainId, uint256 _peerChainId) external view returns (bool);
 
     /// @notice Whether `_feature` is enabled for `_chainId`. See {protocol-docs/interop-gating.md#chain-features}.
-    function isChainFeatureEnabled(uint256 _chainId, ChainFeature _feature) external view returns (bool);
+    function isChainFeatureEnabled(uint256 _chainId, bytes32 _feature) external view returns (bool);
 
     /// @notice Enables or disables `_feature` for `_chainId`, on L1 and on the chain's L2 Bridgehub.
-    /// Callable by the owner and by the Bridgehub admin. See {protocol-docs/interop-gating.md#chain-features}.
+    /// Callable by the owner and by the Bridgehub admin, once the chain runs a protocol version whose L2 Bridgehub
+    /// has the setter. See {protocol-docs/interop-gating.md#chain-features}.
     /// @param _chainId The chain.
-    /// @param _feature The feature.
+    /// @param _feature The feature id.
     /// @param _enabled Whether the feature is enabled.
-    function setChainFeatureEnabled(uint256 _chainId, ChainFeature _feature, bool _enabled) external;
+    function setChainFeatureEnabled(uint256 _chainId, bytes32 _feature, bool _enabled) external;
 
     /// @notice Allows interop between `_chainId` and `_peerChainId` on `_chainId`'s side, on L1 and on
     /// `_chainId`'s L2 Bridgehub. `deregisterInteropPairs` revokes it.

@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
-import {ChainFeature} from "contracts/core/bridgehub/IL2Bridgehub.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {EmptyAssetId, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
@@ -16,6 +15,9 @@ import {SharedL2ContractL1Deployer} from "./_SharedL2ContractL1Deployer.sol";
 /// @dev Tests that the modifier correctly compares msg.sender directly against chainRegistrationSender
 ///      instead of applying undoL1ToL2Alias to chainRegistrationSender
 contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer {
+    /// @dev No production feature exists yet; the gate takes any id.
+    bytes32 internal constant TEST_FEATURE = keccak256("testFeature");
+
     // The L1 address that will be the chain registration sender
     address internal l1ChainRegistrationSender;
     // The aliased version (as it appears on L2)
@@ -193,24 +195,24 @@ contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer {
     /// ({protocol-docs/interop-gating.md#chain-features}); the aliased sender can set them and turn them off again.
     function test_setChainFeatureEnabled_byAliasedSender() public {
         L2Bridgehub l2Bridgehub = L2Bridgehub(L2_BRIDGEHUB_ADDR);
-        assertFalse(l2Bridgehub.isChainFeatureEnabled(ChainFeature.ExpirableTransfers), "features start disabled");
+        assertFalse(l2Bridgehub.isChainFeatureEnabled(TEST_FEATURE), "features start disabled");
 
         vm.prank(aliasedChainRegistrationSender);
-        l2Bridgehub.setChainFeatureEnabled(ChainFeature.ExpirableTransfers, true);
-        assertTrue(l2Bridgehub.isChainFeatureEnabled(ChainFeature.ExpirableTransfers));
+        l2Bridgehub.setChainFeatureEnabled(TEST_FEATURE, true);
+        assertTrue(l2Bridgehub.isChainFeatureEnabled(TEST_FEATURE));
 
         vm.prank(aliasedChainRegistrationSender);
-        l2Bridgehub.setChainFeatureEnabled(ChainFeature.ExpirableTransfers, false);
-        assertFalse(l2Bridgehub.isChainFeatureEnabled(ChainFeature.ExpirableTransfers));
+        l2Bridgehub.setChainFeatureEnabled(TEST_FEATURE, false);
+        assertFalse(l2Bridgehub.isChainFeatureEnabled(TEST_FEATURE));
     }
 
     /// @notice The service transaction `ChainRegistrationSender` requests arrives from `SERVICE_TRANSACTION_SENDER`.
     function test_setChainFeatureEnabled_byServiceTransactionSender() public {
         vm.prank(SERVICE_TRANSACTION_SENDER);
-        L2Bridgehub(L2_BRIDGEHUB_ADDR).setChainFeatureEnabled(ChainFeature.ExpirableTransfers, true);
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).setChainFeatureEnabled(TEST_FEATURE, true);
 
         assertTrue(
-            L2Bridgehub(L2_BRIDGEHUB_ADDR).isChainFeatureEnabled(ChainFeature.ExpirableTransfers),
+            L2Bridgehub(L2_BRIDGEHUB_ADDR).isChainFeatureEnabled(TEST_FEATURE),
             "service sender must enable the feature"
         );
     }
@@ -218,6 +220,6 @@ contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer {
     function test_setChainFeatureEnabled_revertWhen_notChainRegistrationSender() public {
         vm.prank(l1ChainRegistrationSender);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, l1ChainRegistrationSender));
-        L2Bridgehub(L2_BRIDGEHUB_ADDR).setChainFeatureEnabled(ChainFeature.ExpirableTransfers, true);
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).setChainFeatureEnabled(TEST_FEATURE, true);
     }
 }
