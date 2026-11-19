@@ -27,7 +27,7 @@
 # `configs/genesis/zksync-os/latest.json`.
 #
 # Before executing: run the `L2InteropHandler` storage pre-check in
-# `protocol-docs/interop/architecture.md` (mainnet's v31 handler uses different slots).
+# `docs/interop/architecture.md` (mainnet's v31 handler uses different slots).
 
 era_chain_id = 324
 testnet_verifier = false

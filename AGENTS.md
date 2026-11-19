@@ -112,17 +112,18 @@ const contract = new Contract(addr, someAbi, provider);
 
 AI-generated code tends to over-explain: huge doc comments that restate the protocol, repeat themselves, and carry a high noise-to-signal ratio. The rules below exist to keep every piece of information described **exactly once**, in the right place.
 
-### Single source of truth: `protocol-docs/`
+### Single source of truth: `docs/`
 
-- The protocol (flows, motivations, security arguments, design trade-offs) is described in markdown files under `protocol-docs/`.
-- Every piece of information must be described once if possible. If the motivation for a function's behavior is already described in the protocol docs, reference it as `{protocol-docs/<path>.md}` instead of restating it.
-- When adding a feature whose design/motivation is not yet in `protocol-docs/`, add it there — do not write it into contract comments instead.
+- The protocol (flows, motivations, security arguments, design trade-offs) is described in markdown files under `docs/`.
+- Every piece of information must be described once if possible. If the motivation for a function's behavior is already described in the protocol docs, reference it as `{docs/<path>.md}` instead of restating it.
+- `{protocol-docs/<path>.md}` is the same pointer under the folder's old name and resolves to `docs/` too. Leave it as is in contract sources: rewriting a comment changes the contract's metadata hash, and so its bytecode.
+- When adding a feature whose design/motivation is not yet in `docs/`, add it there — do not write it into contract comments instead.
 
 ### Doc comments (natspec)
 
 - Contract and function doc comments consist of a `@notice` with a high-level summary plus `@param` descriptions (and `@return` where useful). That's it.
 - Anything inherited from an interface **MUST** use `/// @inheritdoc` — never copy the interface docs into the implementation.
-- `@dev` comments and inline comments are allowed, but they must only describe implementation or UX gotchas (things a reader of _this code_ would trip over) — never protocol motivation or behavior descriptions that belong in `protocol-docs/` or in the function's own `@notice`.
+- `@dev` comments and inline comments are allowed, but they must only describe implementation or UX gotchas (things a reader of _this code_ would trip over) — never protocol motivation or behavior descriptions that belong in `docs/` or in the function's own `@notice`.
 
 ### Never re-describe a function at its call sites
 
@@ -137,7 +138,7 @@ Do not write comments that explain how Solidity works, or that preempt a misread
 
 ### SDKs, tests, scripts
 
-- Test files, dev tooling, deploy scripts, and SDK code follow the same rules: point to `protocol-docs/` for protocol context instead of restating it in comments.
+- Test files, dev tooling, deploy scripts, and SDK code follow the same rules: point to `docs/` for protocol context instead of restating it in comments.
 
 ## Protocol Versions That Ship Out of Order (Server Side)
 

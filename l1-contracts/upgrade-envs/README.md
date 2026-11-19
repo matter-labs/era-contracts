@@ -2,7 +2,7 @@
 
 This directory holds the inputs and the committed outputs of ecosystem upgrades, per release and
 per environment. The pipeline that consumes them is described in
-[protocol-docs/ecosystem-upgrade.md](../../protocol-docs/ecosystem-upgrade.md).
+[docs/ecosystem-upgrade.md](../../docs/ecosystem-upgrade.md).
 
 ## Layout
 
