@@ -96,7 +96,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         // The remote missing-leg source must look interop-registered to the send-side `append` and
         // allowed to the refund's receive filter (Bridgehub lookups, orthogonal to the atomic proof machinery).
         _registerRemoteLegSource(MISSING_LEG_CHAIN);
-        _setLegSourceAllowed(MISSING_LEG_CHAIN, true);
+        _setLegChainAllowed(MISSING_LEG_CHAIN, true);
 
         // Commit the real leg through the production send-side path.
         vm.prank(L2_INTEROP_CENTER_ADDR);
@@ -355,7 +355,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
     /// the chain doesn't allow leaves the committed leg `Committed`.
     function test_RevertWhen_MissingLegSourceNotAllowed() public {
         ImtProof memory absence = _validAbsence();
-        _setLegSourceAllowed(MISSING_LEG_CHAIN, false);
+        _setLegChainAllowed(MISSING_LEG_CHAIN, false);
 
         vm.expectRevert(abi.encodeWithSelector(ManagerLegChainNotAllowed.selector, MISSING_LEG_CHAIN));
         manager.authorizeRefund(_flow(), missingLegIndex, absence);

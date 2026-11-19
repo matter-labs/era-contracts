@@ -74,8 +74,8 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
         legFirstIndex = _insertCommit(AtomicFlowFixtures.commitValue(flowId, legFirst));
         legSecondIndex = _insertCommit(AtomicFlowFixtures.commitValue(flowId, legSecond));
 
-        _setLegSourceAllowed(CHAIN_A, true);
-        _setLegSourceAllowed(CHAIN_B, true);
+        _setLegChainAllowed(CHAIN_A, true);
+        _setLegChainAllowed(CHAIN_B, true);
     }
 
     /// @dev A finality proof with a genuine in-time inclusion proof per leg; `_tsFirst`/`_tsSecond` are
@@ -181,7 +181,7 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
     /// fails the gate even with a genuine in-time inclusion proof.
     function test_RevertWhen_LegSourceNotAllowed() public {
         AtomicFinalityProof memory finality = _validFinality();
-        _setLegSourceAllowed(CHAIN_B, false);
+        _setLegChainAllowed(CHAIN_B, false);
 
         vm.expectRevert(abi.encodeWithSelector(ManagerLegChainNotAllowed.selector, CHAIN_B));
         _requireFinalizedAsHandler(legFirst, finality);

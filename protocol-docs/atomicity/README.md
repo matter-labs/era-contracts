@@ -28,7 +28,7 @@ with an engineer-facing summary and defers the rigorous arguments to clearly-mar
 | [flow.md](./flow.md)             | End-to-end lifecycle, the shared data structures, and the `AtomicFlowManager` state machine              | engineers             |
 | [proofs.md](./proofs.md)         | The proof system: the two authenticated clocks, finality, the timeout branches, soundness & completeness | auditors              |
 | [recovery.md](./recovery.md)     | The timeout/refund path and its best-effort recovery semantics                                           | engineers + auditors  |
-| [acceptance.md](./acceptance.md) | Accepted flows (`0x02`): destinations accept each leg in their IMT; the operator's state rule            | engineers + auditors  |
+| [acceptance.md](./acceptance.md) | Accepted flows (`0x02`): receipt of each leg on its destination and timeout refunds for missing receipts | engineers + auditors  |
 | [security.md](./security.md)     | Guarantees, non-guarantees, on-chain preconditions, trust assumptions, edge cases                        | auditors              |
 
 The atomic protocol's **integration** with the surrounding stack is documented where that stack lives,

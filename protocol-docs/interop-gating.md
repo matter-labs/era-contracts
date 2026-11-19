@@ -178,18 +178,18 @@ withdrawn or claimed back while the chain stays disabled (see [Other limitations
 
 ## Receive filter
 
-A source chain S is **allowed** for a chain C if S is C, or if C's `L2Bridgehub.isPeerAllowed(S)` holds. C's
+A chain S is **allowed** for a chain C if S is C, or if C's `L2Bridgehub.isPeerAllowed(S)` holds. C's
 `AtomicFlowManager` reverts with `ManagerLegChainNotAllowed` otherwise:
 
-- **Finality** (`requireFlowFinalized`, {protocol-docs/atomicity/flow.md#3-finalize--requireflowfinalized}) needs
-  every leg's source to be allowed.
-- **Refunds** (`authorizeRefund`, {protocol-docs/atomicity/recovery.md#authorizerefund--claimrefund}) need the
-  missing leg's source to be allowed.
+- **Finality** ([`requireFlowFinalized`](./atomicity/flow.md#3-finalize--requireflowfinalized)) needs every
+  commitment's chain to be allowed: all sources, plus all destinations for [accepted flows](./atomicity/acceptance.md).
+- **Refunds** ([`authorizeRefund`](./atomicity/recovery.md#authorizerefund--claimrefund)) need the chain of the
+  missing commitment to be allowed: the source for a missing commit or the destination for a missing acceptance.
 
 The filter reads the whitelist when the bundle is verified, or executed if it wasn't verified first, not when it was
 sent. A bundle from a peer that is removed stays unreceived, and executes once the admin allows the peer again; one
-verified before the removal still executes. `append` doesn't apply the filter: it only needs the other legs' sources
-to be registered ({protocol-docs/atomicity/security.md#timeout-protocol-preconditions}).
+verified before the removal still executes. `accept` also checks the whitelist on its own chain when recording a
+receipt. `append` checks registration for the chains in the preimage without applying the receive filter.
 
 The message root can't tell enabled chains apart: L1 aggregates every L1-settled chain's batch roots, so a disabled
 chain's batches are as provable as any other. The filter has to cover refunds too. Otherwise a disabled chain's

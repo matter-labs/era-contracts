@@ -67,7 +67,7 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         uint256[4] memory remotes = [CHAIN_A, CHAIN_B, CHAIN_C, CHAIN_D];
         for (uint256 i = 0; i < remotes.length; ++i) {
             _setLegChainRegistered(remotes[i], true);
-            _setLegSourceAllowed(remotes[i], true);
+            _setLegChainAllowed(remotes[i], true);
         }
         _setLegChainRegistered(UNREGISTERED_CHAIN, false);
     }
@@ -247,7 +247,7 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
     function test_accept_RevertWhen_LegChainNotAllowed() public {
         bytes32 leg = keccak256("incoming leg");
         AtomicFlowPreimage memory preimage = _singleLegPreimage(leg, CHAIN_A, block.chainid);
-        _setLegSourceAllowed(CHAIN_A, false);
+        _setLegChainAllowed(CHAIN_A, false);
 
         vm.expectRevert(abi.encodeWithSelector(ManagerLegChainNotAllowed.selector, CHAIN_A));
         _acceptAsHandler(leg, preimage);
@@ -279,6 +279,17 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
             )
         );
         manager.append(leg, CHAIN_B, 0, preimage);
+    }
+
+    /// @notice The registration gate scans all `2n` entries of an accepted flow: an unregistered declared
+    /// destination (`legChainIds[n]` here) is rejected at send, as its acceptance could never be proven.
+    function test_append_AcceptedFlow_RevertWhen_DestinationChainNotRegistered() public {
+        bytes32 leg = keccak256("outgoing leg");
+        AtomicFlowPreimage memory preimage = _singleLegPreimage(leg, block.chainid, UNREGISTERED_CHAIN);
+
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegChainNotRegistered.selector, UNREGISTERED_CHAIN));
+        manager.append(leg, UNREGISTERED_CHAIN, 0, preimage);
     }
 
     function test_append_AcceptedFlow_CommitsWithMatchingDestination() public {

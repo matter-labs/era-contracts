@@ -106,7 +106,7 @@ abstract contract AtomicPredeployFixture is Test {
 
     /// @dev Stubs the L2 Bridgehub's peer whitelist, which the manager's receive filter reads: these suites
     /// isolate the manager from the whitelist, which `L2Bridgehub` and `ChainRegistrationSender` own.
-    function _setLegSourceAllowed(uint256 _chainId, bool _allowed) internal {
+    function _setLegChainAllowed(uint256 _chainId, bool _allowed) internal {
         vm.mockCall(L2_BRIDGEHUB_ADDR, abi.encodeCall(IL2Bridgehub.isPeerAllowed, (_chainId)), abi.encode(_allowed));
     }
 }
