@@ -328,8 +328,9 @@ successful prepare from the output alone.
 A release whose L2 built-ins change must also author the L2
 side (`authorL2Side`: delegate/extra bytecode infos, the pinned composer and the bytecode
 artifacts needed to publish the constructed plan’s factory dependencies) because the release-pair derivation puts the
-changed built-ins in the L2 leg. Any governance or admin call the version needs beyond the
-executor legs is a `declareExternalAction`.
+changed built-ins in the L2 leg. `standardL2Side()` is the stock one: `L2DefaultUpgrade` through
+`L2DefaultDelegateCalldataComposer`, and the L1-only side on a patch edge. Any governance or
+admin call the version needs beyond the executor legs is a `declareExternalAction`.
 
 Register new L2 built-ins in `SystemContractsProcessing.s.sol` and, for the genesis path, in the
 genesis generator, so that upgraded and freshly created chains match

@@ -61,8 +61,33 @@ contract CTMUpgradeForLocalTest is CTMUpgrade_v36 {
         return LiveL2Table.shell(newConfig.ctm);
     }
 
+    /// @dev Keeps the live genesis batch with the live table: the genesis config may already describe new L2 code.
+    function initializeConfigFromArgs(
+        address _ctmProxy,
+        address _rollupDAManager,
+        bytes32 _create2FactorySalt,
+        string memory _newConfigPath,
+        address _governance,
+        bytes32 _zkTokenAssetId,
+        bool _testnetVerifier
+    ) internal override {
+        super.initializeConfigFromArgs({
+            ctmProxy: _ctmProxy,
+            rollupDAManager: _rollupDAManager,
+            create2FactorySalt: _create2FactorySalt,
+            newConfigPath: _newConfigPath,
+            governance: _governance,
+            zkTokenAssetId: _zkTokenAssetId,
+            testnetVerifier: _testnetVerifier
+        });
+        (bytes32 batchHash, uint64 leafIndex) = LiveL2Table.genesisBatch(_ctmProxy);
+        config.contracts.chainCreationParams.genesisRoot = batchHash;
+        config.contracts.chainCreationParams.genesisRollupLeafIndex = leafIndex;
+    }
+
     /// @dev No L2 leg is relayed here, so the edge is L1-only: the base's empty plan, under which the transition
-    ///      composes the all-zero L2 transaction. The anvil upgrade test covers the real L2 side.
+    ///      composes the all-zero L2 transaction. The anvil upgrade test prepares the real L2 leg, but only checks
+    ///      that each chain recorded an L2 upgrade transaction; it does not execute it.
     function authorL2Side() internal override returns (AuthoredL2Side memory) {
         return DefaultCTMUpgrade.authorL2Side();
     }
