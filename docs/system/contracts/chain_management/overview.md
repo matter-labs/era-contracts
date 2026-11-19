@@ -14,7 +14,7 @@ Chain management is split between the ecosystem-wide L1 Bridgehub, one or more c
 - **ValidatorTimelock** holds per-chain operator roles and delays batch execution. Its per-chain
   default role administrator is the chain admin reported by that chain's diamond.
 
-The current release creates supported chains on L1. See {protocol-docs/chain-lifecycle.md} for the
+The current release creates supported chains on L1. See {docs/chain-lifecycle.md} for the
 complete creation, genesis, interop-registration, and upgrade-onboarding flow.
 
 ## Detailed pages

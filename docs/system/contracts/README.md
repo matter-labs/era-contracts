@@ -11,7 +11,7 @@ each contract domain.
   - [Upgrade process](./chain_management/upgrade_process.md)
   - [Creating upgrades](./chain_management/creating_upgrades.md)
 - [Bridging background](./bridging/overview.md)
-  - Normative current flow: {protocol-docs/bridging.md}
+  - Normative current flow: {docs/bridging.md}
 - [Settlement](./settlement_contracts/zkchain_basics.md)
   - [Priority operations and L1 <-> L2 communication](./settlement_contracts/priority_queue/README.md)
   - [Data availability](./settlement_contracts/data_availability/README.md)
@@ -19,10 +19,10 @@ each contract domain.
 - [ZKsync OS system hooks](../system-hooks.md)
 - [ZKsync OS genesis and built-ins](../../chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins)
 
-The current interop pages live at the protocol-docs root because they cross the L1 coordination,
+The current interop pages live at the docs root because they cross the L1 coordination,
 settlement, and bridge domains:
 
-- {protocol-docs/interop.md}
-- {protocol-docs/interop/README.md}
-- {protocol-docs/atomicity/README.md}
-- {protocol-docs/message-root.md}
+- {docs/interop.md}
+- {docs/interop/README.md}
+- {docs/atomicity/README.md}
+- {docs/message-root.md}

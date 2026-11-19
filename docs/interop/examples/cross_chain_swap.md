@@ -29,4 +29,4 @@ This guarantee is about permission, not synchronous execution: a finalized bundl
 unexecuted if nobody submits it, and a verified multi-call bundle may be partially executed or have
 individual calls cancelled through unbundling. Applications requiring all destination-side effects to
 happen must add their own liveness/incentive mechanism and account for the protocol's best-effort
-recovery limits. See {protocol-docs/atomicity/security.md#guarantees}.
+recovery limits. See {docs/atomicity/security.md#guarantees}.

@@ -3,11 +3,11 @@
 Each chain owns one **append-only Indexed Merkle Tree (IMT)**, the `L2InteropCommitmentTree`, a genesis
 built-in at `0x10012`. It is the ledger of every atomic-flow leg that chain has ever committed: one
 `commitValue` leaf per leg. Everything the finality and timeout proofs assert reduces to "this value is
-present in / absent from this chain's IMT at this batch" (see {protocol-docs/atomicity/proofs.md}).
+present in / absent from this chain's IMT at this batch" (see {docs/atomicity/proofs.md}).
 
 The **generic** indexed-Merkle-tree data structure — the `{value, nextIndex, nextValue}` leaf, the
 low-nullifier non-membership technique, and the hashing rules — is documented once in
-{protocol-docs/message-root.md#indexed-merkle-tree-indexedmerkletree} and implemented in
+{docs/message-root.md#indexed-merkle-tree-indexedmerkletree} and implemented in
 `l1-contracts/contracts/common/libraries/IndexedMerkleTree.sol`. This page covers only what is specific
 to the atomic-interop use of it.
 
@@ -31,7 +31,7 @@ changed. Two consequences the proofs lean on:
 
 - **`begin(N) == end(N-1)`** — the tree root at the start of batch `N` equals its root at the end of
   batch `N-1`. The bootloader snapshots both (see below), and the timeout argument in
-  {protocol-docs/atomicity/proofs.md#soundness} uses this identity to chain batches together.
+  {docs/atomicity/proofs.md#soundness} uses this identity to chain batches together.
 - **Monotonic membership** — once a value is in the tree it stays in; a value absent at some batch
   boundary was absent at every earlier one. This is what makes a single well-chosen absence proof
   conclusive for "never committed in time."
@@ -56,7 +56,7 @@ A thin, access-controlled wrapper over one `IMT` in storage:
   index-0 sentinel too.
 - `initL2()` — **upgrader-gated**, one-shot: calls `IMT.setup`, reserving index 0 for the sentinel
   `{0,0,0}` leaf. Run during ZKsync OS genesis force-deployment (see
-  {protocol-docs/atomicity/README.md#zksync-os-genesis}).
+  {docs/atomicity/README.md#zksync-os-genesis}).
 
 The contract has no constructor and no immutables (it is an L2 built-in); its appender is a constant
 getter resolved to a fixed genesis address. Its `fallback` is a self-only reverting sink, used solely
@@ -68,7 +68,7 @@ The tree never publishes its **root**: no L2->L1 message carries it, and the `Ro
 root)` event exists for off-chain indexing only. Instead the ZKsync OS bootloader reads the root
 **directly from the contract's storage** at every batch boundary and commits two snapshots into the
 batch's chain batch root: leaf 2 = the root at batch **begin**, leaf 3 = the root at batch **end** (see
-{protocol-docs/message-root.md#chain-batch-root-zksync-os}). Those snapshots are what settle to the
+{docs/message-root.md#chain-batch-root-zksync-os}). Those snapshots are what settle to the
 settlement layer and get re-imported everywhere, and they are what the proofs authenticate against.
 
 The tree's storage is therefore **consensus-critical**: the bootloader derives the root slot from the
@@ -83,7 +83,7 @@ records as an L2->L1 log; a rejecting hook reverts the insert with `InteropCommi
 Only the values are logged, one per insert in insertion order — the `nextIndex`/`nextValue` links are
 re-derivable from the sorted set, so the whole tree can be rebuilt from the log stream alone. Because
 the mandatory L2->L1 log region is always committed to L1, this holds whatever DA configuration the
-chain runs; the argument is in {protocol-docs/atomicity/security.md#data-availability}.
+chain runs; the argument is in {docs/atomicity/security.md#data-availability}.
 
 Ahead of the hook call the contract burns the EVM-gas equivalent of recording one log
 (`L1MessageGasLib.estimateLogGas`, mirroring `L1Messenger.sendToL1`) by forwarding it to the self-only

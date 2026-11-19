@@ -32,7 +32,7 @@ L1 -> L2 requests are hashed into a priority structure and must be processed by 
 current protocol uses the priority tree, with a legacy queue compatibility path only for operations
 created before tree activation. L2 -> L1 logs
 and messages become actionable only after their batch is executed and a caller supplies the appropriate
-Merkle proof. See [priority operations](./priority_queue/README.md) and {protocol-docs/message-root.md}.
+Merkle proof. See [priority operations](./priority_queue/README.md) and {docs/message-root.md}.
 
 ## Data availability
 

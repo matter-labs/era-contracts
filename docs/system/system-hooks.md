@@ -59,5 +59,5 @@ operations. These live at their EVM precompile addresses rather than in the `0x7
   operations such as emitting an L2 -> L1 log, while the hook charges the corresponding native resource
   work performed by ZKsync OS.
 
-For the contract-level flows that consume hook output, see {protocol-docs/message-root.md},
-{protocol-docs/atomicity/imt.md}, and {protocol-docs/chain-lifecycle.md}.
+For the contract-level flows that consume hook output, see {docs/message-root.md},
+{docs/atomicity/imt.md}, and {docs/chain-lifecycle.md}.

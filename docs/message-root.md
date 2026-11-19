@@ -2,7 +2,7 @@
 
 This document is the single source of truth for the message-root subsystem: how chain batch roots are aggregated into a global interop root, what a v33 chain batch root and batch leaf contain, the Indexed Merkle Tree (IMT) data structure, how multichain roots are imported into chains and re-verified at batch execution, and how inclusion proofs traverse the whole structure.
 
-For how atomic interop _consumes_ these primitives (commit values, finalize/timeout branches, soundness and completeness arguments), see {protocol-docs/atomicity/proofs.md}. That flow is documented there, not here.
+For how atomic interop _consumes_ these primitives (commit values, finalize/timeout branches, soundness and completeness arguments), see {docs/atomicity/proofs.md}. That flow is documented there, not here.
 
 Relevant contracts and libraries:
 
@@ -73,7 +73,7 @@ For a ZKsync OS chain, the chain batch root — the value committed as the batch
 
 Internal nodes are `keccak256(left || right)`; leaves are used directly (no leaf-hashing step). The all-zero right subtree is the constant `RESERVED_SUBTREE_NODE`, so the root is computable from the four live leaves in 3 keccaks, and the reserved leaves can later be populated in place without changing the tree shape.
 
-The IMT snapshots (leaves 2 and 3) are what make a chain's interop-commitment-tree root provable on other chains: an authenticated chain batch root proves either leaf with a 3-sibling path. The bootloader reads both snapshots directly from `L2InteropCommitmentTree` storage — the tree contract never publishes the root itself (it does log each inserted leaf for DA; see {protocol-docs/atomicity/imt.md}). How these snapshots drive finalize/timeout verification is covered in {protocol-docs/atomicity/proofs.md}.
+The IMT snapshots (leaves 2 and 3) are what make a chain's interop-commitment-tree root provable on other chains: an authenticated chain batch root proves either leaf with a 3-sibling path. The bootloader reads both snapshots directly from `L2InteropCommitmentTree` storage — the tree contract never publishes the root itself (it does log each inserted leaf for DA; see {docs/atomicity/imt.md}). How these snapshots drive finalize/timeout verification is covered in {docs/atomicity/proofs.md}.
 
 ### Genesis root and `seedGenesisRoot`
 
@@ -98,7 +98,7 @@ The IMT is the shared engine for membership **and non-membership** proofs; `L2In
 - `verifyInclusion(root, value, leaf, leafIndex, proof)` — membership: check `leaf.value == value` and the Merkle path.
 - `verifyNonInclusion(root, value, lowLeaf, lowLeafIndex, lowLeafProof)` — non-membership via the **low-nullifier** technique: prove a leaf with `lowLeaf.value < value` and (`lowLeaf.nextValue == 0` or `lowLeaf.nextValue > value`) is in the tree; the sorted-linked-list invariant then implies `value` is absent.
 
-Because the tree is append-only and the bootloader snapshots its root at every batch boundary, `begin(N) == end(N-1)`, and non-membership at a later snapshot implies non-membership at all earlier ones — the property the atomic-interop timeout branches build on ({protocol-docs/atomicity/proofs.md#timeout}).
+Because the tree is append-only and the bootloader snapshots its root at every batch boundary, `begin(N) == end(N-1)`, and non-membership at a later snapshot implies non-membership at all earlier ones — the property the atomic-interop timeout branches build on ({docs/atomicity/proofs.md#timeout}).
 
 ## Interop-root import and the batch-execution double check
 
@@ -135,4 +135,4 @@ L2 log leaf
 
 ![Message root structure and inclusion proof path](./img/message_root_structure.png)
 
-The same multichain-root anchoring, with `l1BatchTimestamp` read from the verified proof words and the chain-batch-root tree opened at IMT leaves 2/3, is how atomic interop authenticates IMT roots and settlement times — see {protocol-docs/atomicity/proofs.md}.
+The same multichain-root anchoring, with `l1BatchTimestamp` read from the verified proof words and the chain-batch-root tree opened at IMT leaves 2/3, is how atomic interop authenticates IMT roots and settlement times — see {docs/atomicity/proofs.md}.

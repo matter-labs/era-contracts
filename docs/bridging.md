@@ -2,7 +2,7 @@
 
 This document is the single source of truth for the protocol-level behavior of the bridge contracts
 (`l1-contracts/contracts/bridge/`). Contract doc comments reference this file instead of repeating the
-narrative. For the atomic interop flow itself, see {protocol-docs/atomicity/README.md}.
+narrative. For the atomic interop flow itself, see {docs/atomicity/README.md}.
 
 ## Contract map
 
@@ -308,7 +308,7 @@ to preserve the deployed storage layout.
 ## Atomic-recovery hook
 
 `L2AssetRouter` implements `IAtomicRecoverable.recoverAtomicCall`, the timeout-refund hook of the atomic
-interop (IMT) flow — see {protocol-docs/atomicity/flow.md} for the full flow. Summary:
+interop (IMT) flow — see {docs/atomicity/flow.md} for the full flow. Summary:
 
 - Callable only by the canonical `AtomicFlowManager`, a genesis built-in at a fixed address
   (`L2_ATOMIC_FLOW_MANAGER_ADDR`); on chains without the atomic-flow stack nothing is deployed there, so
@@ -318,7 +318,7 @@ interop (IMT) flow — see {protocol-docs/atomicity/flow.md} for the full flow. 
   (rather than reverting) is what keeps an unrecognized call from failing the whole refund — but a
   _recognized_ call can still revert: on malformed `finalizeDeposit` payload (the `abi.decode` throws) or
   if the downstream `bridgeRecoverFailedTransfer` fails. Such a revert takes the entire `claimRefund`
-  with it; see {protocol-docs/atomicity/recovery.md#the-walk-is-all-or-nothing-not-per-call-isolated}.
+  with it; see {docs/atomicity/recovery.md#the-walk-is-all-or-nothing-not-per-call-isolated}.
 - For a recognized burn it calls `IL2AssetHandler.bridgeRecoverFailedTransfer(destChainId, assetId,
 mintData)` on the asset handler registered for the asset (`assetHandlerAddress[assetId]` — the same
   lookup the burn used; the NTV for standard tokens, a custom handler otherwise), forwarding the
@@ -327,9 +327,9 @@ mintData)` on the asset handler registered for the asset (`assetHandlerAddress[a
   `initiateIndirectCall`. `_chainId` must be the burn-time destination chain so the accounting reverses
   correctly. Two caveats: every calldata format the router has ever produced must stay recognized
   forever (see the `IMPORTANT` note in `recoverAtomicCall` and
-  {protocol-docs/atomicity/security.md#known-issues-to-be-fixed-in-this-release}), and overwriting a
+  {docs/atomicity/security.md#known-issues-to-be-fixed-in-this-release}), and overwriting a
   registered handler misroutes in-flight recoveries
-  ({protocol-docs/atomicity/security.md#known-issues-and-accepted-limitations}).
+  ({docs/atomicity/security.md#known-issues-and-accepted-limitations}).
 - Recovery to L1 is rejected (`RecoverToL1NotSupported`), see below.
 
 ## Security notes
