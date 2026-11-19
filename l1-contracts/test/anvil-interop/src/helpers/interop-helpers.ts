@@ -140,7 +140,7 @@ export function useFixedFeeAttr(useFixedFee: boolean): string {
 /**
  * Encode the ERC-7786 `atomicBundle(AtomicFlowPreimage flowPreimage, uint256 lowNullifierIndex)`
  * bundle attribute. All L2->L2 interop is atomic (public L1 publication was removed).
- * See {protocol-docs/atomicity/README.md#key-values}.
+ * See {docs/atomicity/README.md#key-values}.
  */
 export function atomicBundleAttr(flowPreimage: AtomicFlowPreimage, lowNullifierIndex: number): string {
   return erc7786Iface.encodeFunctionData("atomicBundle", [flowPreimageTuple(flowPreimage), lowNullifierIndex]);

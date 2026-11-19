@@ -3,11 +3,6 @@
 Everything written about these contracts lives in this folder: the protocol specification, the developer guides, and
 the operational guides for deploying and upgrading an ecosystem.
 
-Code comments stay minimal and reference these files as `{docs/<name>.md}` instead of restating them (see the
-"Documentation and Comments" section of `AGENTS.md`). Older code writes the same pointer as `{protocol-docs/<name>.md}`,
-from when the protocol docs had their own folder; both forms resolve to this folder, and `yarn docs-anchor-lint` checks
-that every pointer does.
-
 ## Protocol
 
 The protocol — flows, motivations, security arguments, design trade-offs — is described here, once.
@@ -53,3 +48,10 @@ instead of carrying its own prose.
 ## Internal
 
 [ai-review/](./ai-review/README.md) holds the team's AI code-review prompts and the shared review notes they read.
+
+## Pointers from code
+
+Code comments stay minimal and reference these files as `{docs/<name>.md}` instead of restating them (see the
+"Documentation and Comments" section of `AGENTS.md`). Contract sources write the same pointer as
+`{protocol-docs/<name>.md}`, from when the protocol docs had their own folder; both forms resolve to this folder, and
+`yarn docs-anchor-lint` checks that every pointer does.
