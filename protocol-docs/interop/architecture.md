@@ -191,7 +191,7 @@ needs L1 unbundling must set an explicit L1 or wildcard `unbundlerAddress` when 
 Interop charges per call, not per bundle byte or destination gas unit:
 
 - dynamic mode collects the operator-set `interopProtocolFee` in the source base token;
-- fixed mode pulls the protocol-defined `ZK_INTEROP_FEE` in bridged ZK ERC-20;
+- fixed mode pulls the protocol-defined `ZK_INTEROP_FEE` in bridged ZK ERC-20 (wrapped ZK on a chain whose base token is ZK);
 - L2 -> L1 withdrawals pay neither interop fee.
 
 Fees accrue to `block.coinbase` in pull balances. The coinbase later claims to a chosen receiver. This

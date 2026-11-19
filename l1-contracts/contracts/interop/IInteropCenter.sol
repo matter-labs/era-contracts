@@ -77,7 +77,7 @@ interface IInteropCenter {
     /// @notice Returns the ZK token asset ID.
     function ZK_TOKEN_ASSET_ID() external view returns (bytes32);
 
-    /// @notice Returns the cached ZK token contract address.
+    /// @notice Returns the cached address of the token the fixed ZK fee is charged in.
     function zkToken() external view returns (IERC20);
 
     /// @notice Returns whether the given sender has already used the given salt for an interop bundle.
@@ -85,9 +85,10 @@ interface IInteropCenter {
     /// @param salt The user-provided salt.
     function isInteropBundleSaltUsed(address user, bytes32 salt) external view returns (bool);
 
-    /// @notice Returns ZK token address if available, zero address otherwise.
+    /// @notice Returns the token the fixed ZK fee is charged in: the ZK token, or the wrapped base token
+    ///         on a chain whose base token is ZK. Zero address if the ZK token is not available.
     /// @dev View function to check ZK token availability without modifying state.
-    /// @return The ZK token address or zero address if not available.
+    /// @return The fee token address or zero address if not available.
     function getZKTokenAddress() external view returns (address);
 
     /// @notice Returns the accumulated protocol fees (base token) for a coinbase.

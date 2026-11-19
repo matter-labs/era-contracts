@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {AuthoredL2Side, DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
+import {UpgradeHelperLib} from "../default-upgrade/UpgradeHelperLib.sol";
 import {ProtocolVersionFeatures} from "../../utils/ProtocolVersionFeatures.sol";
 
 /// @notice The v36 CTM upgrade — a REGISTRY-DRIVEN edge from v35, run
@@ -31,5 +32,15 @@ contract CTMUpgrade_v36 is DefaultCTMUpgrade {
     /// @dev Virtual so bytecode-light test harnesses can substitute an L1-only edge.
     function authorL2Side() internal virtual override returns (AuthoredL2Side memory) {
         return standardL2Side();
+    }
+
+    /// @inheritdoc DefaultCTMUpgrade
+    /// @dev Only the v35 -> v36 edge changes these; a same-minor patch reuses them.
+    function changedReleaseMembers() internal view virtual override returns (string[] memory members) {
+        if (UpgradeHelperLib.isPatchEdge(getOldProtocolVersion(), getNewProtocolVersion())) {
+            return members;
+        }
+        members = new string[](1);
+        members[0] = "AdminFacet";
     }
 }
