@@ -25,7 +25,6 @@ import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/Priorit
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 import {Utils as TestUtils} from "../../unit/concrete/Utils/Utils.sol";
 
@@ -35,6 +34,13 @@ import {
     BATCH_COMMIT_ENCODING_V5,
     BATCH_COMMIT_ENCODING_V6_FIRST_MINOR
 } from "../../../TestConstants.sol";
+
+/// @notice A contract's code hashes as `AllContractsHashes.json` records them.
+struct ContractHash {
+    string contractName;
+    bytes32 evmBytecodeHash;
+    bytes32 evmDeployedBytecodeHash;
+}
 
 /// @notice `CommitBatchInfoZKsyncOS` as commit encoding 5 (releases before v0.35) has it: without the trailing
 ///         `interopFeeUnits`.
@@ -75,7 +81,11 @@ abstract contract PreviousReleaseFixture is Test {
         address nullifier;
         address governance;
         address chainTypeManager;
-        address ctmChainAdmin;
+        /// @dev The asset id the release's fixed force deployments carry.
+        bytes32 zkTokenAssetId;
+        /// @dev The CTM's EIP-7702 checker, which `addresses.json` does not record. A prepare must carry it forward,
+        ///      as the Mailbox pins it as an immutable.
+        address eip7702Checker;
     }
 
     struct FixtureChain {
@@ -116,34 +126,72 @@ abstract contract PreviousReleaseFixture is Test {
         release.nullifier = addresses.readAddress(".l1Addresses.l1NullifierProxy");
         release.governance = addresses.readAddress(".l1Addresses.governance");
         release.chainTypeManager = addresses.readAddress(".ctmAddresses.chainTypeManager");
-        release.ctmChainAdmin = addresses.readAddress(".ctmAddresses.chainAdmin");
+        release.zkTokenAssetId = addresses.readBytes32(".zkToken.assetId");
+
+        // Argument-less, so CREATE2 places it from the deployment's salt and the release's creation code alone. That
+        // code is the release's build, not this one: a later release may change the checker, and coverage builds
+        // unoptimized.
+        string memory permanentValues = vm.readFile(
+            string.concat(root, ANVIL_INTEROP_DIR, "/config/permanent-values.toml")
+        );
+        string memory hashesPath = string.concat(
+            root,
+            ANVIL_INTEROP_DIR,
+            "/chain-states/",
+            release.stateVersion,
+            "/AllContractsHashes.json"
+        );
+        (bool built, ContractHash memory checker) = _findContractHash(
+            _readContractHashes(hashesPath),
+            "EIP7702Checker"
+        );
+        require(built, string.concat("EIP7702Checker is not in ", hashesPath));
+        release.eip7702Checker = vm.computeCreate2Address(
+            vm.parseTomlBytes32(permanentValues, "$.permanent_contracts.create2_factory_salt"),
+            checker.evmBytecodeHash,
+            Utils.DETERMINISTIC_CREATE2_ADDRESS
+        );
+        require(release.eip7702Checker.code.length != 0, "no EIP-7702 checker where the fixture deployed it");
+    }
+
+    /// @notice Reads an `AllContractsHashes.json`: this build's, or a previous release's, frozen next to its chain
+    ///         states by `yarn new-release`.
+    function _readContractHashes(string memory _path) internal view returns (ContractHash[] memory) {
+        return
+            abi.decode(
+                vm.parseJsonTypeArray(
+                    vm.readFile(_path),
+                    "$",
+                    "ContractHash(string contractName,bytes32 evmBytecodeHash,bytes32 evmDeployedBytecodeHash)"
+                ),
+                (ContractHash[])
+            );
+    }
+
+    /// @param _name An `l1-contracts` contract's name.
+    /// @return built Whether the build has `_name`.
+    function _findContractHash(
+        ContractHash[] memory _hashes,
+        string memory _name
+    ) internal pure returns (bool built, ContractHash memory hash) {
+        bytes32 contractName = keccak256(bytes(string.concat("l1-contracts/", _name)));
+        for (uint256 i = 0; i < _hashes.length; ++i) {
+            if (keccak256(bytes(_hashes[i].contractName)) == contractName) {
+                return (true, _hashes[i]);
+            }
+        }
     }
 
     /// @notice Gives the loaded ecosystem a production ecosystem's authority, which the anvil fixtures partly leave
-    ///         with their deployer: governance owns the core contracts, the CTM and the CTM's ProxyAdmin, and the CTM's
-    ///         ChainAdmin owns the ServerNotifier.
+    ///         with their deployer: governance owns the core contracts and both upgrade executors, the owner of the
+    ///         ecosystem ProxyAdmin and the owner of the CTM.
     function _handAuthorityToGovernance(PreviousRelease memory _release) internal {
         _transferTwoStep(_release.bridgehub, _release.governance);
         _transferTwoStep(_release.sharedBridge, _release.governance);
         _transferTwoStep(_release.nativeTokenVault, _release.governance);
         _transferTwoStep(_release.nullifier, _release.governance);
-        _transferTwoStep(_release.chainTypeManager, _release.governance);
-
-        ProxyAdmin ctmProxyAdmin = ProxyAdmin(Utils.getProxyAdminAddress(_release.chainTypeManager));
-        vm.prank(ctmProxyAdmin.owner());
-        ctmProxyAdmin.transferOwnership(_release.governance);
-
-        address notifier = IChainTypeManager(_release.chainTypeManager).serverNotifierAddress();
-        vm.prank(IOwnable(notifier).owner());
-        IOwnable(notifier).transferOwnership(_release.ctmChainAdmin);
-        IChainAdminOwnable.Call[] memory accept = new IChainAdminOwnable.Call[](1);
-        accept[0] = IChainAdminOwnable.Call({
-            target: notifier,
-            value: 0,
-            data: abi.encodeCall(IOwnable.acceptOwnership, ())
-        });
-        vm.prank(IOwnable(_release.ctmChainAdmin).owner());
-        IChainAdminOwnable(_release.ctmChainAdmin).multicall(accept, true);
+        _transferTwoStep(IOwnable(Utils.getProxyAdminAddress(_release.bridgehub)).owner(), _release.governance);
+        _transferTwoStep(IOwnable(_release.chainTypeManager).owner(), _release.governance);
     }
 
     /// @notice Hands `_chain` to a new `ChainAdminOwnable` owned by the fixture's deployer, as production chains are
@@ -163,8 +211,8 @@ abstract contract PreviousReleaseFixture is Test {
     }
 
     /// @notice The fixture chain `_chainId`, positioned at batch zero for {_settleBatch}. Batch zero is rebuilt from
-    ///         the release's genesis root and checked against the chain's stored hash, since a pre-registry CTM keeps
-    ///         only that hash.
+    ///         the release's genesis root and checked against the chain's stored hash, since the chain keeps only that
+    ///         hash.
     /// @param _release The release {_loadPreviousRelease} loaded.
     function _fixtureChain(
         PreviousRelease memory _release,

@@ -103,16 +103,6 @@
             "name": "l1SharedBridgeProxy",
             "type": "address",
             "internalType": "address"
-          },
-          {
-            "name": "diamondCutData",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "forceDeploymentsData",
-            "type": "bytes",
-            "internalType": "bytes"
           }
         ]
       }

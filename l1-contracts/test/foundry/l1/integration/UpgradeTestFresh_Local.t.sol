@@ -34,6 +34,11 @@ library LiveL2Table {
     function shell(address _ctm) internal view returns (bytes memory) {
         return ICTMRelease(IChainTypeManager(_ctm).currentRelease()).l2SystemProxyBytecodeInfo();
     }
+
+    /// @notice The live genesis batch, which an edge re-pinning the live table carries over with it.
+    function genesisBatch(address _ctm) internal view returns (bytes32 batchHash, uint64 leafIndex) {
+        (, batchHash, leafIndex) = ICTMRelease(IChainTypeManager(_ctm).currentRelease()).genesisParams();
+    }
 }
 
 /// @notice The chain-release hop of these tests: a fresh verifier pinned by a new release over the
@@ -83,14 +88,14 @@ contract FreshTransitionReplacement is DefaultTransitionReplacement {
 contract CoreUpgradeNoLegForFresh is DefaultCoreUpgrade {}
 
 /// @notice A FRESH ecosystem — `DeployL1CoreContracts` + `DeployCTM` + `RegisterCTM` + governance's accepts,
-///         no bootstrap — is born in the registry model: it runs a registry-driven v35 -> v36 upgrade
+///         no bootstrap — is born in the registry model: it runs a registry-driven upgrade to the next minor
 ///         directly through the executors the deployment created, and a committed transition of it can be
 ///         repaired through the replacement prepare (`DefaultTransitionReplacement`). See "Replacing a
 ///         committed transition" in {protocol-docs/ecosystem-upgrade-coordination.md}.
 contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
     using stdToml for string;
 
-    /// @dev Names v36 as the target: one minor past the fresh ecosystem's genesis version.
+    /// @dev Targets one minor past the fresh ecosystem's genesis version.
     string internal constant HOP_INPUT = "/upgrade-envs/foundry-upgrade.toml";
     bytes32 internal constant HOP_SALT = keccak256("fresh-ecosystem-hop");
     /// @dev A replacement prepared under its own salt deploys its own engine, which is what makes it a
@@ -104,6 +109,7 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
     address internal eraChainAdmin;
 
     function setUp() public {
+        vm.createDir(string.concat(vm.projectRoot(), "/script-out/foundry-upgrade"), true);
         _deployL1Contracts();
         _deployEra();
         acceptPendingAdmin();
@@ -119,11 +125,6 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
         uint256 genesisVersion = IChainTypeManager(ctm).protocolVersion();
         address genesisRelease = IChainTypeManager(ctm).currentRelease();
         assertEq(IOwnable(ctm).owner(), upgradeExecutors.ctmExecutor, "born owned by the CTM executor");
-        assertEq(
-            IChainTypeManager(ctm).upgradeCutHash(genesisVersion),
-            bytes32(0),
-            "no legacy (bootstrap) edge was ever committed"
-        );
 
         FreshVerifierReleaseHop hop = _prepareHop();
         assertEq(
@@ -132,7 +133,6 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
             "the prepare finds the born CTM executor"
         );
         assertEq(hop.preparedInfrastructure(), address(0), "a verifier release swaps no CTM-domain implementation");
-        assertEq(hop.bootstrapMigrationAddress(), address(0), "a recurring prepare deploys no migration");
 
         ICTMTransition transition = ICTMTransition(hop.preparedTransition());
         assertEq(transition.fromRelease(), genesisRelease, "the edge departs from the genesis release");
@@ -156,7 +156,7 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
         );
     }
 
-    /// @notice The replacement prepare deploys a replacement for the committed v35 -> v36 transition and
+    /// @notice The replacement prepare deploys a replacement for the committed transition to the next minor and
     ///         emits ONE governance call; executed, it repairs the departure for a chain that has not crossed
     ///         it yet — the replaced object stops working at once and the chain crosses with the replacement.
     function test_replacementPrepare_repairsTheCommittedTransitionForALaggingChain() public {
@@ -167,7 +167,6 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
         FreshTransitionReplacement replacement = _initReplacement(REPLACEMENT_SALT, "fresh-replacement");
         replacement.setReplacedTransition(address(replaced));
         replacement.prepareCTMUpgrade();
-        replacement.prepareDefaultCTMAdminCalls();
         Call[] memory bundle = replacement.prepareDefaultGovernanceCalls();
 
         // ── The replacement departs exactly where the replaced edge does, onto the release a chain continues from ──
@@ -177,7 +176,7 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
         assertEq(repaired.oldProtocolVersionDeadline(), replaced.oldProtocolVersionDeadline(), "the same deadline");
         assertEq(repaired.newRelease(), IChainTypeManager(ctm).currentRelease(), "the continuation release");
         assertEq(repaired.newProtocolVersion(), replaced.newProtocolVersion(), "the same target");
-        assertTrue(repaired.upgradeEngine() != replaced.upgradeEngine(), "this run's engine is the repair");
+        assertTrue(repaired.chainUpgradeEngine() != replaced.chainUpgradeEngine(), "this run's engine is the repair");
 
         // ── One call, and nothing else ──
         assertEq(bundle.length, 1, "the single forward");

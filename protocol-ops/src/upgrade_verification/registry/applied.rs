@@ -1,42 +1,41 @@
 //! What a registry package must have left behind once its governance bundle ran, read from the
 //! fork `ecosystem upgrade-governance` replayed it on. The contracts assert part of it themselves
-//! (the bootstrap's `validateApplied()`, the CTM executor's check of its own commit); this holds
+//! (the CTM executor's check of its own commit); this holds
 //! the whole post-state a second time, so a bundle that executed but did not land is caught here
 //! too (`protocol-docs/ecosystem-upgrade.md#where-each-check-lives`).
 
 use alloy::primitives::Address;
 use alloy::providers::Provider;
 
-use crate::upgrade_verification::constants::CTM_CONTRACT_SERVER_NOTIFIER_SLOT;
+use crate::upgrade_verification::constants::L1_ECOSYSTEM_CONTRACTS;
 use crate::upgrade_verification::report::VerificationResult;
 
 use super::format_semver;
 use super::lifecycle::verify_executor_owners;
-use super::package::{
-    BootstrapPackage, LegKind, RegistryPackage, ReplacementPackage, UpgradePackage,
-};
+use super::package::{LegKind, RegistryPackage, ReplacementPackage, UpgradePackage};
 use super::provenance::tolerate;
+use super::rows::{discover_slot_proxy, Inventory};
+use super::upgrade::governance_controller;
 use super::views::{
     CTMReleaseView, CTMTransitionView, CTMUpgradeExecutorView, CoreUpgradeExecutorView, CtmView,
     Ownable2StepView, ProxyAdminView, ProxyUpgradeRow, ProxyUpgradeTransitionView,
-    RegistryBootstrapMigrationView, ServerNotifierView,
+    ServerNotifierView,
 };
 
 /// Holds the live state after `package`'s bundle executed against everything it must have left:
 /// each unmet expectation, and each read that fails, is an ERROR. `governance` is the account
-/// that executed the bundle; a bootstrap holds its executors to its manifest's governance instead.
+/// that executed the bundle. `bridgehub` is the Bridgehub the replay resolved, through which each core row's slot is
+/// discovered again ([`expect_core_rows_applied`]).
 pub(crate) async fn verify_applied<P: Provider>(
     provider: &P,
     package: &RegistryPackage,
     governance: Address,
+    bridgehub: Address,
     result: &mut VerificationResult,
 ) {
     match package {
         RegistryPackage::Upgrade(package) => {
-            verify_upgrade_applied(provider, package, governance, result).await
-        }
-        RegistryPackage::Bootstrap(package) => {
-            verify_bootstrap_applied(provider, package, result).await
+            verify_upgrade_applied(provider, package, governance, bridgehub, result).await
         }
         RegistryPackage::Replacement(package) => {
             verify_replacement_applied(provider, package, governance, result).await
@@ -45,13 +44,15 @@ pub(crate) async fn verify_applied<P: Provider>(
 }
 
 /// Reads, in order: each named executor's owner and pending owner (core first); for a core leg
-/// the core executor's `PROXY_ADMIN()`, its owner and the core rows; for CTM legs the CTM
-/// executor's bindings, the CTM domain ([`expect_ctm_domain_held`]), the infrastructure rows and
-/// the transition's commitment ([`expect_transition_committed`]).
+/// the core executor's `PROXY_ADMIN()`, its owner and the core rows ([`expect_core_rows_applied`]);
+/// for CTM legs the CTM executor's bindings, the CTM domain ([`expect_ctm_domain_held`]), the
+/// ValidatorTimelock ([`expect_validator_timelock_held`]), the infrastructure rows and the
+/// transition's commitment ([`expect_transition_committed`]).
 async fn verify_upgrade_applied<P: Provider>(
     provider: &P,
     package: &UpgradePackage,
     governance: Address,
+    bridgehub: Address,
     result: &mut VerificationResult,
 ) {
     let ctm_leg_executor = package
@@ -96,12 +97,13 @@ async fn verify_upgrade_applied<P: Provider>(
                 "the core executor",
             )
             .await;
-            expect_transition_rows_applied(
+            expect_core_rows_applied(
                 provider,
                 result,
                 "the core transition",
                 leg.object,
                 admin,
+                bridgehub,
             )
             .await;
         }
@@ -125,7 +127,15 @@ async fn verify_upgrade_applied<P: Provider>(
     ) else {
         return;
     };
-    expect_ctm_domain_held(provider, result, ctm, ctm_admin, ctm_executor, None).await;
+    expect_ctm_domain_held(provider, result, ctm, ctm_admin, ctm_executor).await;
+    expect_validator_timelock_held(
+        provider,
+        result,
+        ctm,
+        governance,
+        "the governance that executed the bundle",
+    )
+    .await;
     if let Some(leg) = package.leg(LegKind::Infrastructure) {
         expect_transition_rows_applied(
             provider,
@@ -141,147 +151,10 @@ async fn verify_upgrade_applied<P: Provider>(
     }
 }
 
-/// Reads, in order: the migration's manifest, `executed()` and `newProtocolVersion()`; the CTM's
-/// version and release, and the release's own version; the CTM domain
-/// ([`expect_ctm_domain_held`]); both executors' owners; the core executor's `PROXY_ADMIN()` and
-/// its owner; the CTM rows, then the core transition's rows.
-async fn verify_bootstrap_applied<P: Provider>(
-    provider: &P,
-    package: &BootstrapPackage,
-    result: &mut VerificationResult,
-) {
-    let migration = RegistryBootstrapMigrationView::new(package.migration, provider);
-    let Some(manifest) = tolerate(
-        migration.getManifest().call().await,
-        result,
-        "the migration's manifest",
-    ) else {
-        return;
-    };
-    match tolerate(
-        migration.executed().call().await,
-        result,
-        "the migration's executed()",
-    ) {
-        Some(true) => result.report_ok("the migration ran"),
-        Some(false) => result.report_error(
-            "the migration reports executed() == false: the bundle did not run the edge",
-        ),
-        None => {}
-    }
-    let ctm = CtmView::new(manifest.ctm, provider);
-    let target = tolerate(
-        migration.newProtocolVersion().call().await,
-        result,
-        "the migration's newProtocolVersion()",
-    );
-    let version = tolerate(
-        ctm.protocolVersion().call().await,
-        result,
-        "the CTM's protocolVersion()",
-    );
-    if let (Some(target), Some(version)) = (target, version) {
-        expect_equal(
-            result,
-            "the CTM's protocol version",
-            format_semver(version),
-            format_semver(target),
-            "the edge's target",
-        );
-    }
-    if let Some(release) = tolerate(
-        ctm.currentRelease().call().await,
-        result,
-        "the CTM's currentRelease()",
-    ) {
-        expect_equal(
-            result,
-            "the CTM's current release",
-            release,
-            manifest.currentRelease,
-            "the manifest's release",
-        );
-        expect_release_at_version(provider, result, release, version).await;
-    }
-
-    let notifier = manifest
-        .ctmProxyUpgrades
-        .get(CTM_CONTRACT_SERVER_NOTIFIER_SLOT)
-        .map(|row| row.proxy);
-    if notifier.is_none() {
-        result.report_error(
-            "the manifest carries no ServerNotifier slot, so the notifier the edge binds cannot \
-             be read",
-        );
-    }
-    expect_ctm_domain_held(
-        provider,
-        result,
-        manifest.ctm,
-        manifest.ctmProxyAdmin,
-        manifest.ctmExecutor,
-        notifier,
-    )
-    .await;
-    verify_executor_owners(
-        provider,
-        result,
-        Some(manifest.governance),
-        "the manifest's governance",
-        &[
-            ("the core executor", manifest.coreExecutor),
-            ("the CTM executor", manifest.ctmExecutor),
-        ],
-    )
-    .await;
-    let eco_admin = tolerate(
-        CoreUpgradeExecutorView::new(manifest.coreExecutor, provider)
-            .PROXY_ADMIN()
-            .call()
-            .await,
-        result,
-        "the core executor's PROXY_ADMIN",
-    );
-    if let Some(admin) = eco_admin {
-        expect_owner(
-            provider,
-            result,
-            "the ecosystem ProxyAdmin",
-            admin,
-            manifest.coreExecutor,
-            "the core executor",
-        )
-        .await;
-    }
-
-    let ctm_rows: Vec<ProxyUpgradeRow> = manifest
-        .ctmProxyUpgrades
-        .into_iter()
-        .filter(|row| !row.implNew.is_zero())
-        .collect();
-    expect_rows_applied(
-        provider,
-        result,
-        "the migration's CTM-domain inventory",
-        &ctm_rows,
-        manifest.ctmProxyAdmin,
-    )
-    .await;
-    if let (Some(core_transition), Some(admin)) = (package.core_transition, eco_admin) {
-        expect_transition_rows_applied(
-            provider,
-            result,
-            "the core transition",
-            core_transition,
-            admin,
-        )
-        .await;
-    }
-}
-
 /// Reads, in order: the CTM executor's owner and pending owner, the replacement's
 /// `oldProtocolVersion()`, the CTM's `upgradeTransition(departure)`, and — when the forward sets
-/// a nonzero deadline — the CTM's `protocolVersionDeadline` of that version.
+/// a deadline — the CTM's `protocolVersionDeadline` of that version, preceded for a cleared one
+/// (timestamp 0) by the transition the CTM commits for that version and its pinned deadline.
 async fn verify_replacement_applied<P: Provider>(
     provider: &P,
     package: &ReplacementPackage,
@@ -323,6 +196,9 @@ async fn verify_replacement_applied<P: Provider>(
             );
         }
     }
+    if let Some(change) = forward.deadline.filter(|change| change.timestamp.is_zero()) {
+        expect_deadline_override_cleared(provider, result, &ctm, change.protocol_version).await;
+    }
     if let Some(change) = forward
         .deadline
         .filter(|change| !change.timestamp.is_zero())
@@ -345,9 +221,196 @@ async fn verify_replacement_applied<P: Provider>(
     }
 }
 
+/// A forward that clears a deadline override (`setProtocolVersionDeadline(v, 0)`: zero is "not
+/// set" in the CTM's stored slot) leaves `protocolVersionDeadline(v)` at the deadline the
+/// transition committed for `v` pins — for a replacement's departure, the replacement's own.
+///
+/// Reads, in order: the CTM's `upgradeTransition(v)`, that transition's
+/// `oldProtocolVersionDeadline()`, the CTM's `protocolVersionDeadline(v)`.
+async fn expect_deadline_override_cleared<P: Provider>(
+    provider: &P,
+    result: &mut VerificationResult,
+    ctm: &CtmView::CtmViewInstance<&P>,
+    version: alloy::primitives::U256,
+) {
+    let Some(committed) = tolerate(
+        ctm.upgradeTransition(version).call().await,
+        result,
+        "the CTM's upgradeTransition of the cleared deadline's version",
+    ) else {
+        return;
+    };
+    if committed.is_zero() {
+        result.report_error(&format!(
+            "after the replay, the CTM commits no transition for {}, so the deadline override the \
+             forward cleared falls back to no pinned deadline",
+            format_semver(version)
+        ));
+        return;
+    }
+    let Some(pinned) = tolerate(
+        CTMTransitionView::new(committed, provider)
+            .oldProtocolVersionDeadline()
+            .call()
+            .await,
+        result,
+        "the committed transition's oldProtocolVersionDeadline()",
+    ) else {
+        return;
+    };
+    if let Some(deadline) = tolerate(
+        ctm.protocolVersionDeadline(version).call().await,
+        result,
+        "the CTM's protocolVersionDeadline",
+    ) {
+        expect_equal(
+            result,
+            &format!("the deadline of {}", format_semver(version)),
+            deadline,
+            pinned,
+            "the deadline its committed transition pins (the override is cleared)",
+        );
+    }
+}
+
+/// The CTM's ValidatorTimelock stayed with governance (`upgrade::verify_validator_timelock_owner`
+/// before the vote): owned by `governance`, labelled `governance_label`, with no nomination
+/// outstanding. Held by the account that owns a legacy `Governance.sol` governance it is a WARN,
+/// as before the vote; a nomination of the owner itself, or of governance, moves it to nobody
+/// else.
+///
+/// Reads, in order: the CTM's `validatorTimelockPostV29()`, the timelock's owner and pending
+/// owner, then — only when governance does not own it — governance's `owner()`.
+async fn expect_validator_timelock_held<P: Provider>(
+    provider: &P,
+    result: &mut VerificationResult,
+    ctm: Address,
+    governance: Address,
+    governance_label: &str,
+) {
+    let Some(timelock) = tolerate(
+        CtmView::new(ctm, provider)
+            .validatorTimelockPostV29()
+            .call()
+            .await,
+        result,
+        "the CTM's validatorTimelockPostV29()",
+    ) else {
+        return;
+    };
+    let view = Ownable2StepView::new(timelock, provider);
+    let owner = tolerate(
+        view.owner().call().await,
+        result,
+        "the ValidatorTimelock's owner",
+    );
+    let pending = tolerate(
+        view.pendingOwner().call().await,
+        result,
+        "the ValidatorTimelock's pending owner",
+    );
+    let (Some(owner), Some(pending)) = (owner, pending) else {
+        return;
+    };
+    if owner != governance && governance_controller(provider, governance).await == Some(owner) {
+        result.report_warn(&format!(
+            "after the replay, the ValidatorTimelock is owned by {owner}, which owns \
+             {governance_label} ({governance}) rather than being it: expected on a legacy \
+             `Governance.sol` ecosystem"
+        ));
+    } else {
+        expect_equal(
+            result,
+            "the ValidatorTimelock's owner",
+            owner,
+            governance,
+            governance_label,
+        );
+    }
+    if pending == owner || pending == governance {
+        result.report_ok(&format!(
+            "after the replay, the ValidatorTimelock has no nomination outstanding to anyone \
+             else (pending owner {pending})"
+        ));
+    } else {
+        expect_equal(
+            result,
+            "the ValidatorTimelock's pending owner",
+            pending,
+            Address::ZERO,
+            "no nomination",
+        );
+    }
+}
+
+/// Each participating row of the core transition upgraded the proxy its slot names — discovered
+/// again through `bridgehub`, as the review discovers it before the vote ([`super::rows`]) — and
+/// now runs its `implNew` behind `admin`.
+///
+/// Reads, in order: the transition's `getManifest()`, each participating slot's proxy
+/// ([`discover_slot_proxy`]), then each row's live implementation.
+async fn expect_core_rows_applied<P: Provider>(
+    provider: &P,
+    result: &mut VerificationResult,
+    label: &str,
+    transition: Address,
+    admin: Address,
+    bridgehub: Address,
+) {
+    let Some(manifest) = tolerate(
+        ProxyUpgradeTransitionView::new(transition, provider)
+            .getManifest()
+            .call()
+            .await,
+        result,
+        &format!("{label}'s getManifest()"),
+    ) else {
+        return;
+    };
+    let mut rows = Vec::new();
+    let mut in_their_slots = 0usize;
+    for (slot, row) in manifest.proxyUpgrades.into_iter().enumerate() {
+        if row.implNew.is_zero() {
+            continue;
+        }
+        let Some(member) = L1_ECOSYSTEM_CONTRACTS.get(slot) else {
+            result.report_error(&format!(
+                "after the replay, {label}'s row {slot} ({}) lies beyond the ecosystem enum: what \
+                 it upgraded cannot be named",
+                row.proxy
+            ));
+            rows.push(row);
+            continue;
+        };
+        match discover_slot_proxy(provider, Inventory::Ecosystem, member, bridgehub).await {
+            Ok(Some(proxy)) if proxy == row.proxy => in_their_slots += 1,
+            Ok(Some(proxy)) => result.report_error(&format!(
+                "core row {slot} upgraded proxy {}, but the reviewed Bridgehub names {proxy} as the \
+                 {member}: the row installed {member}'s implementation behind another contract",
+                row.proxy
+            )),
+            Ok(None) => result.report_error(&format!(
+                "after the replay, {label}'s row {slot} sits in the slot of {member}, which is no \
+                 ecosystem proxy"
+            )),
+            Err(why) => result.report_error(&format!(
+                "after the replay, the {member} {label}'s row {slot} names cannot be discovered — \
+                 {why}"
+            )),
+        }
+        rows.push(row);
+    }
+    if in_their_slots == rows.len() {
+        result.report_ok(&format!(
+            "after the replay, each of {label}'s {in_their_slots} row(s) upgraded the proxy its \
+             slot names on the Bridgehub {bridgehub}"
+        ));
+    }
+    expect_rows_applied(provider, result, label, &rows, admin).await;
+}
+
 /// The CTM domain landed under `executor`: the CTM owned by it with no nomination, its ProxyAdmin
-/// owned by it, and the ServerNotifier — `expected_notifier` when the package names one, else the
-/// CTM's — bound to the CTM and owned by it with no nomination.
+/// owned by it, and the CTM's ServerNotifier bound to the CTM and owned by it with no nomination.
 ///
 /// Reads, in order: the CTM's owner and pending owner, the ProxyAdmin's owner, the CTM's
 /// `serverNotifierAddress()`, then the notifier's owner, pending owner and `chainTypeManager()`.
@@ -357,7 +420,6 @@ async fn expect_ctm_domain_held<P: Provider>(
     ctm: Address,
     ctm_admin: Address,
     executor: Address,
-    expected_notifier: Option<Address>,
 ) {
     expect_owner(
         provider,
@@ -378,24 +440,14 @@ async fn expect_ctm_domain_held<P: Provider>(
         "the CTM executor",
     )
     .await;
-    let bound = tolerate(
+    let Some(notifier) = tolerate(
         CtmView::new(ctm, provider)
             .serverNotifierAddress()
             .call()
             .await,
         result,
         "the CTM's serverNotifierAddress()",
-    );
-    if let (Some(bound), Some(expected)) = (bound, expected_notifier) {
-        expect_equal(
-            result,
-            "the CTM's ServerNotifier",
-            bound,
-            expected,
-            "the manifest's ServerNotifier",
-        );
-    }
-    let Some(notifier) = expected_notifier.or(bound) else {
+    ) else {
         return;
     };
     expect_owner(
@@ -669,9 +721,9 @@ mod tests {
     use super::super::package::{
         recover_legs, DeadlineChange, LifecycleInputs, RecoveredReplacement,
     };
-    use super::super::views::{AuthoredL2Plan, BootstrapManifest};
+    use super::super::views::ProxyUpgradeTransitionManifest;
     use crate::common::governance_calls::GovernanceCall;
-    use crate::upgrade_verification::constants::CTM_CONTRACTS;
+    use crate::upgrade_verification::constants::PROXY_UPGRADE_DOMAIN_CORE;
 
     const GOVERNANCE: Address = Address::repeat_byte(0x60);
     const CORE_EXECUTOR: Address = Address::repeat_byte(0xE0);
@@ -679,16 +731,20 @@ mod tests {
     const CORE_TRANSITION: Address = Address::repeat_byte(0xEE);
     const INFRASTRUCTURE: Address = Address::repeat_byte(0x1F);
     const TRANSITION: Address = Address::repeat_byte(0xCC);
-    const MIGRATION: Address = Address::repeat_byte(0x3B);
     const CTM: Address = Address::repeat_byte(0xC7);
     const CTM_ADMIN: Address = Address::repeat_byte(0xA7);
     const ECO_ADMIN: Address = Address::repeat_byte(0xA0);
     const NOTIFIER: Address = Address::repeat_byte(0x5E);
+    const ENGINE: Address = Address::repeat_byte(0xE9);
     const R36: Address = Address::repeat_byte(0x36);
     const PROXY: Address = Address::repeat_byte(0x70);
     const OLD: Address = Address::repeat_byte(0x01);
     const NEW: Address = Address::repeat_byte(0x02);
     const STRANGER: Address = Address::repeat_byte(0x99);
+    const BRIDGEHUB: Address = Address::repeat_byte(0xB0);
+    const TIMELOCK: Address = Address::repeat_byte(0x7C);
+    /// The account that owns a legacy `Governance.sol` [`GOVERNANCE`].
+    const CONTROLLER: Address = Address::repeat_byte(0x6C);
     const V35: u64 = 0x23_0000_0000;
     const V36: u64 = 0x24_0000_0000;
 
@@ -717,6 +773,18 @@ mod tests {
             self
         }
 
+        /// A read the change to an earlier answer adds, right after the read named `after`.
+        fn then(mut self, after: &str, label: &'static str, value: impl SolValue) -> Self {
+            let at = self
+                .0
+                .iter()
+                .position(|(name, _)| *name == after)
+                .unwrap_or_else(|| panic!("no read named {after}"));
+            self.0
+                .insert(at + 1, (label, Some(Bytes::from(value.abi_encode()))));
+            self
+        }
+
         fn slot(&mut self, label: &str) -> &mut (&'static str, Option<Bytes>) {
             self.0
                 .iter_mut()
@@ -735,7 +803,7 @@ mod tests {
         }
         let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
         let mut result = VerificationResult::default();
-        verify_applied(&provider, package, GOVERNANCE, &mut result).await;
+        verify_applied(&provider, package, GOVERNANCE, BRIDGEHUB, &mut result).await;
         assert!(
             asserter.read_q().is_empty(),
             "every read was made, in the documented order"
@@ -749,6 +817,26 @@ mod tests {
             expectedOldImpl: OLD,
             implNew: NEW,
             callInitializeUpgrade: false,
+        }
+    }
+
+    /// A core transition whose one participating row upgrades the `ChainRegistrationSender`
+    /// (the last ecosystem slot, discovered with one read) at [`PROXY`].
+    fn core_manifest() -> ProxyUpgradeTransitionManifest {
+        let mut rows = vec![
+            ProxyUpgradeRow {
+                proxy: Address::ZERO,
+                expectedOldImpl: Address::ZERO,
+                implNew: Address::ZERO,
+                callInitializeUpgrade: false,
+            };
+            L1_ECOSYSTEM_CONTRACTS.len()
+        ];
+        *rows.last_mut().unwrap() = row(PROXY);
+        ProxyUpgradeTransitionManifest {
+            domain: PROXY_UPGRADE_DOMAIN_CORE,
+            proxyUpgrades: rows,
+            proxyUpgradeEngine: ENGINE,
         }
     }
 
@@ -818,7 +906,8 @@ mod tests {
             .answer("ctmExecutor.pendingOwner", Address::ZERO)
             .answer("coreExecutor.PROXY_ADMIN", ECO_ADMIN)
             .answer("ecoAdmin.owner", CORE_EXECUTOR)
-            .answer("coreTransition.rows", vec![row(PROXY)])
+            .answer("coreTransition.getManifest", core_manifest())
+            .answer("bridgehub.chainRegistrationSender", PROXY)
             .answer("coreRow.implementation", NEW)
             .answer("ctmExecutor.CHAIN_TYPE_MANAGER", CTM)
             .answer("ctmExecutor.CTM_PROXY_ADMIN", CTM_ADMIN)
@@ -829,6 +918,9 @@ mod tests {
             .answer("notifier.owner", CTM_EXECUTOR)
             .answer("notifier.pendingOwner", Address::ZERO)
             .answer("notifier.chainTypeManager", CTM)
+            .answer("ctm.validatorTimelockPostV29", TIMELOCK)
+            .answer("timelock.owner", GOVERNANCE)
+            .answer("timelock.pendingOwner", Address::ZERO)
             .answer("infrastructure.rows", vec![row(PROXY)])
             .answer("infrastructureRow.implementation", NEW)
             .answer("transition.oldProtocolVersion", U256::from(V35))
@@ -911,6 +1003,25 @@ mod tests {
                     "the core transition's proxy",
                 ),
                 (
+                    "core row behind another slot's proxy",
+                    r().set("bridgehub.chainRegistrationSender", STRANGER),
+                    "but the reviewed Bridgehub names",
+                ),
+                (
+                    "timelock owner",
+                    r().set("timelock.owner", STRANGER).then(
+                        "timelock.pendingOwner",
+                        "governance.owner",
+                        CONTROLLER,
+                    ),
+                    "the ValidatorTimelock's owner",
+                ),
+                (
+                    "timelock nomination",
+                    r().set("timelock.pendingOwner", STRANGER),
+                    "the ValidatorTimelock's pending owner",
+                ),
+                (
                     "infrastructure row",
                     r().set("infrastructureRow.implementation", OLD),
                     "the CTM infrastructure transition's proxy",
@@ -948,190 +1059,40 @@ mod tests {
             .answer("coreExecutor.pendingOwner", Address::ZERO)
             .answer("coreExecutor.PROXY_ADMIN", ECO_ADMIN)
             .answer("ecoAdmin.owner", CORE_EXECUTOR)
-            .answer("coreTransition.rows", vec![row(PROXY)])
+            .answer("coreTransition.getManifest", core_manifest())
+            .answer("bridgehub.chainRegistrationSender", PROXY)
             .answer("coreRow.implementation", NEW);
         let result = run(&RegistryPackage::Upgrade(package), reads).await;
         assert_eq!(result.errors, 0, "{:?}", result.error_messages);
     }
 
-    // ───────────────────────── the bootstrap ─────────────────────────
-
-    fn manifest() -> BootstrapManifest {
-        let mut rows = vec![
-            ProxyUpgradeRow {
-                proxy: Address::ZERO,
-                expectedOldImpl: Address::ZERO,
-                implNew: Address::ZERO,
-                callInitializeUpgrade: false,
-            };
-            CTM_CONTRACTS.len()
-        ];
-        rows[CTM_CONTRACTS
-            .iter()
-            .position(|m| *m == "ChainTypeManager")
-            .unwrap()] = row(CTM);
-        rows[CTM_CONTRACT_SERVER_NOTIFIER_SLOT] = row(NOTIFIER);
-        BootstrapManifest {
-            ctm: CTM,
-            expectedProtocolVersion: U256::from(V35),
-            ctmProxyAdmin: CTM_ADMIN,
-            ctmProxyUpgrades: rows,
-            currentRelease: R36,
-            oldProtocolVersionDeadline: U256::MAX,
-            upgradeEngine: Address::repeat_byte(0xEA),
-            l2Plan: AuthoredL2Plan {
-                delegateBytecodeInfo: Bytes::new(),
-                extraBytecodeInfos: Vec::new(),
-                delegateComposer: Address::ZERO,
-            },
-            upgradeTimestamp: U256::ZERO,
-            ctmExecutor: CTM_EXECUTOR,
-            coreExecutor: CORE_EXECUTOR,
-            governance: GOVERNANCE,
-        }
-    }
-
-    fn bootstrap() -> RegistryPackage {
-        RegistryPackage::Bootstrap(BootstrapPackage {
-            core_transition: Some(CORE_TRANSITION),
-            release: R36,
-            migration: MIGRATION,
-            reported_migration: Some(MIGRATION),
-            reported_ctm_executor: Some(CTM_EXECUTOR),
-            reported_ctm: Some(CTM),
-            reported_ctm_proxy_admin: Some(CTM_ADMIN),
-            reported_singletons: Default::default(),
-            ctm_key: "zksync_os".to_string(),
-            calls: Vec::new(),
-            external_actions: Vec::new(),
-            create2_salts: Vec::new(),
-            lifecycle: Default::default(),
-            force_deployments_data: None,
-            executor_records: Default::default(),
-            member_records: Default::default(),
-        })
-    }
-
-    /// The landed edge, in the order `verify_bootstrap_applied` reads it.
-    fn bootstrap_reads() -> Reads {
-        Reads::new()
-            .answer("migration.getManifest", manifest())
-            .answer("migration.executed", true)
-            .answer("migration.newProtocolVersion", U256::from(V36))
-            .answer("ctm.protocolVersion", U256::from(V36))
-            .answer("ctm.currentRelease", R36)
-            .answer("release.protocolVersion", U256::from(V36))
-            .answer("ctm.owner", CTM_EXECUTOR)
-            .answer("ctm.pendingOwner", Address::ZERO)
-            .answer("ctmAdmin.owner", CTM_EXECUTOR)
-            .answer("ctm.serverNotifierAddress", NOTIFIER)
-            .answer("notifier.owner", CTM_EXECUTOR)
-            .answer("notifier.pendingOwner", Address::ZERO)
-            .answer("notifier.chainTypeManager", CTM)
-            .answer("coreExecutor.owner", GOVERNANCE)
-            .answer("coreExecutor.pendingOwner", Address::ZERO)
-            .answer("ctmExecutor.owner", GOVERNANCE)
-            .answer("ctmExecutor.pendingOwner", Address::ZERO)
-            .answer("coreExecutor.PROXY_ADMIN", ECO_ADMIN)
-            .answer("ecoAdmin.owner", CORE_EXECUTOR)
-            .answer("ctmRow.implementation", NEW)
-            .answer("notifierRow.implementation", NEW)
-            .answer("coreTransition.rows", vec![row(PROXY)])
-            .answer("coreRow.implementation", NEW)
-    }
-
-    /// boot-49..55: what `validateApplied` asserts on chain, read again after the replay.
+    /// The fresh-ecosystem shape (`ecosystem init`): the ValidatorTimelock is held by the account
+    /// that owns the legacy `Governance.sol`, nominated to itself, while the executors hold the
+    /// CTM. A WARN, as before the vote; held by anyone else it stays an error.
     #[tokio::test]
-    async fn a_bootstrap_that_did_not_land_fails() {
-        let r = bootstrap_reads;
-        each_unmet_expectation_fails(
-            &bootstrap(),
-            r,
-            vec![
-                (
-                    "not executed",
-                    r().set("migration.executed", false),
-                    "executed() == false",
-                ),
-                (
-                    "version",
-                    r().set("ctm.protocolVersion", U256::from(V35))
-                        .set("release.protocolVersion", U256::from(V35)),
-                    "the CTM's protocol version is v0.35.0, not the edge's target",
-                ),
-                (
-                    "release",
-                    r().set("ctm.currentRelease", STRANGER),
-                    "not the manifest's release",
-                ),
-                (
-                    "release version",
-                    r().set("release.protocolVersion", U256::from(V35)),
-                    "the current release's version",
-                ),
-                (
-                    "CTM left with the migration",
-                    r().set("ctm.owner", MIGRATION),
-                    "the CTM's owner",
-                ),
-                (
-                    "CTM nomination",
-                    r().set("ctm.pendingOwner", CTM_EXECUTOR),
-                    "the CTM's pending owner",
-                ),
-                (
-                    "CTM ProxyAdmin",
-                    r().set("ctmAdmin.owner", MIGRATION),
-                    "the CTM-domain ProxyAdmin's owner",
-                ),
-                (
-                    "notifier re-pointed",
-                    r().set("ctm.serverNotifierAddress", STRANGER),
-                    "not the manifest's ServerNotifier",
-                ),
-                (
-                    "notifier owner",
-                    r().set("notifier.owner", STRANGER),
-                    "the ServerNotifier's owner",
-                ),
-                (
-                    "notifier nomination",
-                    r().set("notifier.pendingOwner", STRANGER),
-                    "the ServerNotifier's pending owner",
-                ),
-                (
-                    "notifier CTM",
-                    r().set("notifier.chainTypeManager", STRANGER),
-                    "the CTM the ServerNotifier serves",
-                ),
-                (
-                    "executor owner",
-                    r().set("ctmExecutor.owner", STRANGER),
-                    "the manifest's governance",
-                ),
-                (
-                    "executor nomination",
-                    r().set("coreExecutor.pendingOwner", STRANGER),
-                    "has a pending owner",
-                ),
-                (
-                    "ecosystem ProxyAdmin",
-                    r().set("ecoAdmin.owner", GOVERNANCE),
-                    "the ecosystem ProxyAdmin's owner",
-                ),
-                (
-                    "CTM row",
-                    r().set("ctmRow.implementation", OLD),
-                    "the migration's CTM-domain inventory's proxy",
-                ),
-                (
-                    "core row",
-                    r().set("coreRow.implementation", OLD),
-                    "the core transition's proxy",
-                ),
-            ],
-        )
-        .await;
+    async fn a_timelock_held_by_the_owner_of_legacy_governance_is_a_warning() {
+        let held = |owner: Address| {
+            upgrade_reads()
+                .set("timelock.owner", owner)
+                .set("timelock.pendingOwner", owner)
+                .then("timelock.pendingOwner", "governance.owner", CONTROLLER)
+        };
+        let result = run(&upgrade(), held(CONTROLLER)).await;
+        assert_eq!(
+            (result.errors, result.warnings),
+            (0, 1),
+            "{:?}",
+            result.error_messages
+        );
+
+        let result = run(&upgrade(), held(STRANGER)).await;
+        assert_eq!(result.errors, 1, "{:?}", result.error_messages);
+        assert!(result.has_error("the ValidatorTimelock's owner"));
+
+        let nominated = held(CONTROLLER).set("timelock.pendingOwner", STRANGER);
+        let result = run(&upgrade(), nominated).await;
+        assert_eq!(result.errors, 1, "{:?}", result.error_messages);
+        assert!(result.has_error("the ValidatorTimelock's pending owner"));
     }
 
     // ───────────────────────── a replacement ─────────────────────────
@@ -1140,7 +1101,7 @@ mod tests {
     const DEADLINE: u64 = 1_900_000_000;
 
     fn replacement(deadline: Option<DeadlineChange>) -> RegistryPackage {
-        RegistryPackage::Replacement(Box::new(ReplacementPackage {
+        RegistryPackage::Replacement(ReplacementPackage {
             forward: RecoveredReplacement {
                 index: 0,
                 executor: CTM_EXECUTOR,
@@ -1157,6 +1118,7 @@ mod tests {
             reported_ctm_executor: None,
             reported_ctm: None,
             reported_ctm_proxy_admin: None,
+            reported_bridgehub: None,
             calls: Vec::new(),
             external_actions: Vec::new(),
             create2_salts: Vec::new(),
@@ -1164,7 +1126,7 @@ mod tests {
             reported_new_version: None,
             executor_records: Default::default(),
             member_records: Default::default(),
-        }))
+        })
     }
 
     fn replacement_reads() -> Reads {
@@ -1203,11 +1165,32 @@ mod tests {
         assert_eq!(result.errors, 1);
         assert!(result.has_error("the deadline of v0.35.0"));
 
-        // A cleared override is not read back: the getter then falls back to the pin.
+        // A cleared override (timestamp 0): the getter falls back to the deadline the
+        // transition committed for the version pins, which after the replay is the replacement.
         let cleared = replacement(Some(DeadlineChange {
             protocol_version: U256::from(V35),
             timestamp: U256::ZERO,
         }));
-        assert_eq!(run(&cleared, replacement_reads()).await.errors, 0);
+        let with_cleared = |effective: u64| {
+            replacement_reads()
+                .answer("ctm.upgradeTransition(cleared)", REPLACEMENT)
+                .answer(
+                    "replacement.oldProtocolVersionDeadline",
+                    U256::from(DEADLINE),
+                )
+                .answer("ctm.protocolVersionDeadline", U256::from(effective))
+        };
+        assert_eq!(run(&cleared, with_cleared(DEADLINE)).await.errors, 0);
+        let result = run(&cleared, with_cleared(DEADLINE + 1)).await;
+        assert_eq!(result.errors, 1, "{:?}", result.error_messages);
+        assert!(result.has_error("the deadline its committed transition pins"));
+        // No transition committed for the version: nothing past it is read.
+        let result = run(
+            &cleared,
+            replacement_reads().answer("ctm.upgradeTransition(cleared)", Address::ZERO),
+        )
+        .await;
+        assert_eq!(result.errors, 1, "{:?}", result.error_messages);
+        assert!(result.has_error("falls back to no pinned deadline"));
     }
 }

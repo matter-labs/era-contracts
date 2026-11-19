@@ -1,6 +1,5 @@
-//! Verification of a registry-driven UPGRADE — the ordinary case, and the one every upgrade
-//! after the bootstrap takes: governance calls the domain executors directly, one contiguous run
-//! of 1..3 legs in canonical order (`protocol-docs/ecosystem-upgrade-coordination.md`):
+//! Verification of a registry-driven UPGRADE — the ordinary case: governance calls the domain
+//! executors directly, one contiguous run of 1..3 legs in canonical order (`protocol-docs/ecosystem-upgrade-coordination.md`):
 //!
 //! 1. `CoreUpgradeExecutor.applyL1Upgrade(coreTransition)` — a Core-domain
 //!    `ProxyUpgradeTransition`;
@@ -23,8 +22,8 @@
 //! **Does the signed transaction invoke the reviewed upgrade at the intended addresses, in the
 //! intended order?** is answered by [`verify_upgrade_calls`]: each leg is re-encoded from the
 //! reviewed executor and object and the run must appear EXACTLY ONCE, CONTIGUOUS, in canonical
-//! order; every other call must be a declared governance external action, matched one for one and
-//! in declared order, that reaches none of the upgrade's authorities. With no coordinator on
+//! order; every other call must reach none of the upgrade's authorities and is held to the
+//! declared-calls rule ([`super::declared_calls`]). With no coordinator on
 //! chain, this ordered bundle check is what keeps the core rows ahead of the CTM infrastructure
 //! and the infrastructure ahead of the transition commit; the one governance execution keeps them
 //! atomic. The legs' INTERNAL calls are NOT re-derived — the executors derive them on chain from
@@ -33,21 +32,25 @@
 //! Everything else this module does is the part the objects cannot answer for themselves: that
 //! the executors the legs run through are the reviewed ones (their construction,
 //! [`super::lifecycle`]; they set immutables, so no codehash identifies them) and bound to the
-//! independently reviewed CTM and ProxyAdmins, that governance owns them with no nomination
-//! outstanding, that the live state the upgrade departs from is the state it claims, and that the
-//! ecosystem is READY for it (the L2 bytecodes published).
+//! reviewed ecosystem — the CTM registered on the reviewed Bridgehub, the ProxyAdmins the ones
+//! administering its proxies ([`super::ecosystem_binding`]) — that governance owns them with no
+//! nomination outstanding and still holds the CTM's ValidatorTimelock, that the live state the
+//! upgrade departs from is the state it claims, and that the ecosystem is READY for it (the L2
+//! bytecodes published).
 
 use std::collections::BTreeMap;
 
 use alloy::primitives::{Address, B256, U256};
 use alloy::providers::Provider;
-use alloy::sol_types::SolValue;
+use alloy::sol_types::{SolCall, SolValue};
 
 use crate::common::external_actions::{ExternalAction, GOVERNANCE_PHASE};
 use crate::common::governance_calls::GovernanceCall;
 use crate::upgrade_verification::report::VerificationResult;
 
 use super::construction::{expect_canonical_construction, ReviewedBuild};
+use super::declared_calls::{judge_declared_calls, DerivedRun};
+use super::ecosystem_binding::{bind_to_reviewed_ecosystem, EcosystemClaims};
 use super::genesis::{judge_release_genesis, ReviewedGenesis};
 use super::lifecycle::{
     verify_executor_owners, verify_lifecycle_construction, CoreExecutorReview, CtmExecutorReview,
@@ -55,7 +58,8 @@ use super::lifecycle::{
 };
 use super::member_construction::{MemberReview, ReviewedEnv};
 use super::members::{
-    verify_engine_and_l2_plan, verify_release_members, DepartingMembers, TRANSITION_ENGINES,
+    verify_engine_and_l2_plan, verify_proxy_upgrade_engine, verify_release_members,
+    DepartingMembers,
 };
 use super::package::{LegKind, UpgradePackage};
 use super::provenance::{expect_code_identity, expect_code_present, tolerate};
@@ -64,8 +68,8 @@ use super::rows::{
 };
 use super::shell::verify_shell_kept;
 use super::views::{
-    BytecodesSupplierView, CTMReleaseView, CTMTransitionView, CommittedUpgradeView, CtmView,
-    ProxyAdminView, ProxyUpgradeRow, ProxyUpgradeTransitionView,
+    BridgehubView, BytecodesSupplierView, CTMReleaseView, CTMTransitionView, CommittedUpgradeView,
+    CtmView, Ownable2StepView, ProxyAdminView, ProxyUpgradeRow, ProxyUpgradeTransitionView,
 };
 use super::{format_semver, render_derived_payloads};
 
@@ -73,12 +77,13 @@ use super::{format_semver, render_derived_payloads};
 ///
 /// Reads, in order: each leg's object (core, infrastructure, transition — the transition preceded
 /// by the live genesis expectations); the executors' construction
-/// ([`verify_lifecycle_construction`]) and owners ([`verify_executor_owners`]); the CTM's and the
-/// CTM-domain ProxyAdmin's owners and the CTM's pending owner (CTM legs), the ecosystem
-/// ProxyAdmin's owner (core leg); the CTM's version and release (transition leg); the
-/// inventories' slots and departures; the transition's readiness and its system-proxy shell. The
-/// members' construction reads the sources their recorded arguments are held against as it needs
-/// them ([`super::member_construction`]).
+/// ([`verify_lifecycle_construction`]), their binding to the reviewed ecosystem
+/// ([`bind_to_reviewed_ecosystem`]) and their owners ([`verify_executor_owners`]); the CTM's and
+/// the CTM-domain ProxyAdmin's owners, the CTM's pending owner and the ValidatorTimelock's owners
+/// ([`verify_validator_timelock_owner`]) (CTM legs), the ecosystem ProxyAdmin's owner (core leg);
+/// the CTM's version and release (transition leg); the inventories' slots and departures; the
+/// transition's readiness and its system-proxy shell. The members' construction reads the sources
+/// their recorded arguments are held against as it needs them ([`super::member_construction`]).
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn verify<P: Provider>(
     provider: &P,
@@ -135,6 +140,7 @@ pub(crate) async fn verify<P: Provider>(
                 provider,
                 build,
                 result,
+                &members,
                 "the core transition",
                 leg.object,
                 Inventory::Ecosystem,
@@ -154,6 +160,7 @@ pub(crate) async fn verify<P: Provider>(
                 provider,
                 build,
                 result,
+                &members,
                 "the CTM infrastructure transition",
                 leg.object,
                 Inventory::CtmDomain,
@@ -176,7 +183,7 @@ pub(crate) async fn verify<P: Provider>(
                 .force_deployments
                 .read_live(
                     provider,
-                    package.reported_ctm,
+                    env.bridgehub().map(|bridgehub| bridgehub.address),
                     expected_governance_owner,
                     "--expected-governance-owner",
                 )
@@ -249,6 +256,22 @@ pub(crate) async fn verify<P: Provider>(
         &mut reviewed,
     )
     .await?;
+    bind_to_reviewed_ecosystem(
+        provider,
+        result,
+        env.bridgehub(),
+        &EcosystemClaims {
+            reported_bridgehub: package.reported_singletons.bridgehub,
+            ctms: bindings
+                .ctm
+                .into_iter()
+                .chain(package.reported_ctm)
+                .collect(),
+            core_proxy_admin: bindings.core_proxy_admin,
+            ctm_proxy_admin: bindings.ctm.zip(bindings.ctm_proxy_admin),
+        },
+    )
+    .await;
     let executors: Vec<(&str, Address)> = core_executor
         .map(|address| ("the core executor", address))
         .into_iter()
@@ -263,8 +286,7 @@ pub(crate) async fn verify<P: Provider>(
     )
     .await;
 
-    // The authority each domain must already HOLD. Unlike a bootstrap, an upgrade hands nothing
-    // over — it executes on authority the previous edge established, so authority that has since
+    // The authority each domain must already HOLD. An upgrade hands nothing over — it executes on authority the previous edge established, so authority that has since
     // drifted is a finding now rather than a revert mid-bundle.
     if let Some(ctm_executor) = ctm_executor {
         if let (Some(ctm), Some(ctm_admin)) = (bindings.ctm, bindings.ctm_proxy_admin) {
@@ -305,6 +327,16 @@ pub(crate) async fn verify<P: Provider>(
                 )),
                 None => {}
             }
+            if let Some(governance) = expected_governance_owner {
+                verify_validator_timelock_owner(
+                    provider,
+                    result,
+                    ctm,
+                    (governance, "the reviewed governance"),
+                    (&package.calls, &package.external_actions),
+                )
+                .await;
+            }
         }
     }
     if let (Some(core_executor), Some(core_admin)) = (core_executor, bindings.core_proxy_admin) {
@@ -322,8 +354,23 @@ pub(crate) async fn verify<P: Provider>(
     // ── 3. The state the upgrade departs from ──
     result.print_info("\n== Departing state ==");
     let ctm = bindings.ctm.map(|ctm| CtmView::new(ctm, provider));
-    if let (Some(edge), Some(ctm)) = (&transition_edge, &ctm) {
-        verify_transition_departure(result, ctm, edge).await;
+    if let Some(ctm) = &ctm {
+        if let Some(edge) = &transition_edge {
+            verify_transition_departure(result, ctm, edge).await;
+        }
+        if lands_the_v36_ctm(
+            result,
+            ctm,
+            transition_edge.as_ref(),
+            infrastructure_rows.as_deref(),
+        )
+        .await
+        {
+            let bridgehub = env.bridgehub().map(|bridgehub| bridgehub.address);
+            if let Some(chains) = read_chain_versions(provider, result, bridgehub, ctm).await {
+                judge_chains_below_v35(result, &chains);
+            }
+        }
     }
     if let Some(rows) = &infrastructure_rows {
         match bindings.ctm_proxy_admin {
@@ -337,8 +384,8 @@ pub(crate) async fn verify<P: Provider>(
                         rows,
                         domain_admin,
                         anchor: bindings.ctm,
-                        departure_unreadable: None,
                         reported: package.reported_singletons,
+                        reviewed_bridgehub: env.bridgehub(),
                     },
                 )
                 .await?;
@@ -353,7 +400,6 @@ pub(crate) async fn verify<P: Provider>(
     if let Some(rows) = core_rows.as_ref().filter(|rows| participating(rows) > 0) {
         match bindings.core_proxy_admin {
             Some(domain_admin) => {
-                let anchor = ecosystem_anchor(provider, result, package, &bindings).await;
                 let outcome = verify_inventory(
                     provider,
                     build,
@@ -362,9 +408,9 @@ pub(crate) async fn verify<P: Provider>(
                         inventory: Inventory::Ecosystem,
                         rows,
                         domain_admin,
-                        anchor,
-                        departure_unreadable: None,
+                        anchor: env.bridgehub().map(|bridgehub| bridgehub.address),
                         reported: Default::default(),
+                        reviewed_bridgehub: env.bridgehub(),
                     },
                 )
                 .await?;
@@ -402,17 +448,9 @@ pub(crate) async fn verify<P: Provider>(
     }
 
     // ── 5. The L2 proxy logic chains crossing the edge keep ──
-    if let (Some(edge), Some(ctm)) = (&transition_edge, &ctm) {
+    if let Some(edge) = &transition_edge {
         result.print_info("\n== L2 system-proxy shell ==");
-        verify_shell_kept(
-            provider,
-            build.identity(),
-            genesis.image.as_ref().ok(),
-            result,
-            ctm,
-            &edge.manifest,
-        )
-        .await;
+        verify_shell_kept(provider, build.identity(), result, &edge.manifest).await;
     }
 
     // ── 6. The calldata governance will actually sign ──
@@ -493,37 +531,125 @@ async fn verify_transition_departure<P: Provider>(
     }
 }
 
-/// Where the ecosystem inventory's slots are discovered: the Bridgehub of the CTM the package
-/// upgrades (bound or reported), or — for a core-only package naming no CTM — the core prepare's
-/// `bridgehub_proxy_addr`. `None` (reported) when neither is available.
-async fn ecosystem_anchor<P: Provider>(
+/// v0.35.0 and v0.36.0 in the packed encoding.
+const V35: U256 = U256::from_limbs([35 << 32, 0, 0, 0]);
+const V36: U256 = U256::from_limbs([36 << 32, 0, 0, 0]);
+
+/// Whether the package installs a v0.36.0 CTM implementation on a CTM still below v0.36.0: through
+/// the transition onto v0.36.0, or through an infrastructure row swapping the CTM proxy, which a
+/// package can carry without a transition. Past v0.36.0 there is nothing left to prevent. An
+/// unreadable CTM version (reported) counts as below it.
+async fn lands_the_v36_ctm<P: Provider>(
+    result: &mut VerificationResult,
+    ctm: &CtmView::CtmViewInstance<&P>,
+    transition_edge: Option<&TransitionEdge>,
+    infrastructure_rows: Option<&[ProxyUpgradeRow]>,
+) -> bool {
+    if transition_edge.is_some_and(|edge| edge.old_version < V36 && edge.new_version >= V36) {
+        return true;
+    }
+    let swaps_the_ctm = infrastructure_rows.is_some_and(|rows| {
+        rows.iter()
+            .any(|row| row.proxy == *ctm.address() && !row.implNew.is_zero())
+    });
+    if !swaps_the_ctm {
+        return false;
+    }
+    tolerate(
+        ctm.protocolVersion().call().await,
+        result,
+        "the CTM's live protocol version",
+    )
+    .is_none_or(|version| version < V36)
+}
+
+/// One chain the Bridgehub registers on the CTM.
+#[derive(Debug)]
+struct ChainVersion {
+    chain_id: U256,
+    /// `None` when its CTM or its version could not be read (already reported).
+    protocol_version: Option<U256>,
+}
+
+/// Every chain the reviewed Bridgehub registers on `ctm`, with the protocol version the CTM
+/// reports for it. `None` (reported) when the chains cannot be enumerated. A chain whose CTM or
+/// version cannot be read is an error, because it cannot be shown to be at v0.35.0 or later.
+async fn read_chain_versions<P: Provider>(
     provider: &P,
     result: &mut VerificationResult,
-    package: &UpgradePackage,
-    bindings: &LifecycleBindings,
-) -> Option<Address> {
-    if let Some(ctm) = bindings.ctm.or(package.reported_ctm) {
-        return tolerate(
-            CtmView::new(ctm, provider).BRIDGE_HUB().call().await,
-            result,
-            "the CTM's BRIDGE_HUB(), through which the ecosystem rows' proxies are discovered",
-        );
+    bridgehub: Option<Address>,
+    ctm: &CtmView::CtmViewInstance<&P>,
+) -> Option<Vec<ChainVersion>> {
+    let not_enumerable = |result: &mut VerificationResult, e: &dyn std::fmt::Display| {
+        result.report_error(&format!(
+            "the chains on the CTM cannot be enumerated ({e}), so none of them can be shown to be \
+             at v0.35.0 or later"
+        ));
+    };
+    let Some(bridgehub) = bridgehub.map(|bridgehub| BridgehubView::new(bridgehub, provider)) else {
+        not_enumerable(result, &"there is no reviewed Bridgehub");
+        return None;
+    };
+    let chain_ids = match bridgehub.getAllZKChainChainIDs().call().await {
+        Ok(ids) => ids,
+        Err(e) => {
+            not_enumerable(result, &e);
+            return None;
+        }
+    };
+    let mut chains = Vec::new();
+    for chain_id in chain_ids {
+        let protocol_version = match bridgehub.chainTypeManager(chain_id).call().await {
+            Ok(chain_ctm) if chain_ctm != *ctm.address() => continue,
+            Ok(_) => match ctm.getProtocolVersion(chain_id).call().await {
+                Ok(version) => Some(version),
+                Err(e) => {
+                    result.report_error(&format!(
+                        "chain {chain_id}: the CTM could not read its protocol version ({e}), so \
+                         it cannot be shown to be at v0.35.0 or later"
+                    ));
+                    None
+                }
+            },
+            Err(e) => {
+                result.report_error(&format!(
+                    "chain {chain_id}: its CTM could not be read ({e}), so it cannot be shown to \
+                     be at v0.35.0 or later"
+                ));
+                None
+            }
+        };
+        chains.push(ChainVersion {
+            chain_id,
+            protocol_version,
+        });
     }
-    match package.reported_singletons.bridgehub {
-        Some(bridgehub) => {
-            result.print_info(&format!(
-                "  the package names no CTM, so the ecosystem rows' proxies are discovered \
-                 through the core prepare's bridgehub_proxy_addr {bridgehub}"
-            ));
-            Some(bridgehub)
+    Some(chains)
+}
+
+/// Reports an error for every chain below v0.35.0. The v0.36.0 CTM no longer serves the
+/// `upgradeCutHash` and `protocolVersionVerifier` views such a chain's upgrade reads, so once
+/// it lands the chain has no upgrade path. Each one has to be moved to v0.35.0 before the edge
+/// executes.
+fn judge_chains_below_v35(result: &mut VerificationResult, chains: &[ChainVersion]) {
+    let mut cleared = 0usize;
+    for chain in chains {
+        match chain.protocol_version {
+            Some(version) if version < V35 => result.report_error(&format!(
+                "chain {} is at {}: once the v0.36.0 CTM lands it has no upgrade path, so move it \
+                 to v0.35.0 before this upgrade executes",
+                chain.chain_id,
+                format_semver(version)
+            )),
+            Some(_) => cleared += 1,
+            None => {}
         }
-        None => {
-            result.report_error(
-                "the package names neither a CTM nor the core prepare's bridgehub_proxy_addr, so \
-                 the ecosystem rows' proxies cannot be discovered",
-            );
-            None
-        }
+    }
+    if cleared == chains.len() {
+        result.report_ok(&format!(
+            "all {} chain(s) on the CTM are at v0.35.0 or later",
+            chains.len()
+        ));
     }
 }
 
@@ -590,10 +716,8 @@ fn upgrade_authorities(
 ///
 /// Every other call is held to two rules. A call reaching any of `authorities` — the executors,
 /// the objects, the CTM, either ProxyAdmin — is an ERROR whether declared or not: the run is the
-/// complete list of what the upgrade needs from them. Every remaining call must be one of the
-/// declared governance external actions, matched ONE FOR ONE and in DECLARED ORDER (the order the
-/// prepares emitted them in, `ExternalActionsLib.callsForPhase`), and every declared one must
-/// appear: an undeclared, duplicated, reordered or missing action is an ERROR.
+/// complete list of what the upgrade needs from them. Every remaining call is held to the
+/// declared-calls rule ([`judge_declared_calls`]).
 pub(super) fn verify_upgrade_calls(
     package: &UpgradePackage,
     authorities: &BTreeMap<Address, String>,
@@ -690,7 +814,18 @@ pub(super) fn verify_upgrade_calls(
             None => others.push((index, call)),
         }
     }
-    judge_external_actions(&others, &package.external_actions, run_start, result);
+    let run_end = package.legs.iter().map(|leg| leg.index + 1).max();
+    judge_declared_calls(
+        &others,
+        &package.external_actions,
+        &DerivedRun {
+            at: run_start.zip(run_end).map(|(start, end)| start..end),
+            name: "the legs",
+            member: "a leg of this upgrade",
+            declared: false,
+        },
+        result,
+    );
 }
 
 /// Names why the expected run is not in the bundle: the legs out of canonical order, the legs
@@ -736,85 +871,6 @@ fn report_broken_run(package: &UpgradePackage, expected: usize, result: &mut Ver
          reviewed upgrade does not describe",
         package.calls.len()
     ));
-}
-
-/// The calls outside the run against the declared governance external actions: one for one, in
-/// declared order, every declaration present. `run_start` is where the legs begin, to report on
-/// which side of them each action runs.
-fn judge_external_actions(
-    others: &[(usize, &GovernanceCall)],
-    declared: &[ExternalAction],
-    run_start: Option<usize>,
-    result: &mut VerificationResult,
-) {
-    let declared: Vec<&ExternalAction> = declared
-        .iter()
-        .filter(|action| action.phase == GOVERNANCE_PHASE)
-        .collect();
-    let mut claimed = vec![false; declared.len()];
-    let mut order: Vec<usize> = Vec::with_capacity(others.len());
-    let mut accounted = true;
-    for (index, call) in others {
-        let selector = alloy::hex::encode(call.data.get(..4).unwrap_or_default());
-        match (0..declared.len()).find(|&i| !claimed[i] && declared[i].is_call(call)) {
-            Some(i) => {
-                claimed[i] = true;
-                order.push(i);
-                let side = match run_start {
-                    Some(start) if *index < start => "before",
-                    Some(_) => "after",
-                    None => "beside",
-                };
-                result.print_info(&format!(
-                    "  call {index} -> declared external action `{}` on {} (selector \
-                     0x{selector}), {side} the legs",
-                    declared[i].label, call.target
-                ));
-            }
-            None if declared.iter().any(|action| action.is_call(call)) => {
-                accounted = false;
-                result.report_error(&format!(
-                    "call {index} to {} (selector 0x{selector}) repeats a declared governance \
-                     external action more often than it is declared: each declaration accounts \
-                     for exactly one call",
-                    call.target
-                ));
-            }
-            None => {
-                accounted = false;
-                result.report_error(&format!(
-                    "call {index} to {} (selector 0x{selector}) is neither a leg of this upgrade \
-                     nor a declared governance external action: the bundle carries an \
-                     instruction no part of this review accounts for",
-                    call.target
-                ));
-            }
-        }
-    }
-    for (i, action) in declared.iter().enumerate() {
-        if !claimed[i] {
-            accounted = false;
-            result.report_error(&format!(
-                "the package declares a governance external action the bundle never carries — {}: \
-                 the declaration a reviewer reads describes a call governance would not sign",
-                action.describe()
-            ));
-        }
-    }
-    if order.windows(2).any(|pair| pair[0] > pair[1]) {
-        accounted = false;
-        result.report_error(
-            "the declared governance external actions appear out of their declared order: the \
-             prepares emit them in declaration order, so a reordered bundle is not the one they \
-             produced",
-        );
-    }
-    if accounted && !others.is_empty() {
-        result.report_ok(
-            "every call outside the run of legs is a declared governance external action, one \
-             for one and in declared order, to a target outside the upgrade's authorities",
-        );
-    }
 }
 
 /// The transition as the departing-state check reads it: the manifest its address commits to, and
@@ -933,8 +989,7 @@ pub(super) async fn verify_transition<P: Provider>(
         result,
         members,
         label,
-        manifest.upgradeEngine,
-        TRANSITION_ENGINES,
+        manifest.chainUpgradeEngine,
         &manifest.l2Plan,
     )
     .await?;
@@ -1031,8 +1086,7 @@ pub(super) async fn verify_release<P: Provider>(
 }
 
 /// The release's own `validate()`, called before the vote. It is state-independent and runs on
-/// chain when a transition is built over the release, in the bootstrap's `validate()`, and when
-/// the CTM installs it, so a revert here is the release failing every one of them.
+/// chain when a transition is built over the release and when the CTM installs it, so a revert here is the release failing every one of them.
 fn judge_release_validity(
     result: &mut VerificationResult,
     label: &str,
@@ -1083,9 +1137,14 @@ fn judge_release_validity(
     ));
 }
 
-/// A `ProxyUpgradeTransition`'s provenance and construction, and its domain held against
-/// `expected` — the domain of the leg that applies it (the core leg's executor applies only Core,
-/// the infrastructure leg's only CTM), fixed by the caller and never read from the object.
+/// A `ProxyUpgradeTransition`'s provenance and construction (the manifest its address commits to,
+/// `proxyUpgradeEngine` included), the engine it pins held to its role
+/// ([`verify_proxy_upgrade_engine`]), and its domain held against `expected` — the domain of the
+/// leg that applies it (the core leg's executor applies only Core, the infrastructure leg's only
+/// CTM), fixed by the caller and never read from the object.
+///
+/// Reads, in order: the object's code, its `getManifest()`, then the engine's code (and whatever
+/// its construction check reads; nothing for the default engine, which takes no arguments).
 /// Returns the whole enum-indexed inventory it pins, for [`verify_inventory`], or `None` when it
 /// cannot be read or belongs to another domain (both reported).
 #[allow(clippy::too_many_arguments)]
@@ -1093,6 +1152,7 @@ pub(super) async fn verify_proxy_upgrade_transition<P: Provider>(
     provider: &P,
     build: &ReviewedBuild,
     result: &mut VerificationResult,
+    members: &MemberReview<'_>,
     label: &str,
     transition: Address,
     expected: Inventory,
@@ -1130,6 +1190,17 @@ pub(super) async fn verify_proxy_upgrade_transition<P: Provider>(
     ) {
         reviewed.insert(transition, label.to_string());
     }
+    // The engine the executor delegatecalls to apply the rows runs with the executor's whole
+    // authority, so it is held to its role like a transition's engine.
+    verify_proxy_upgrade_engine(
+        provider,
+        build,
+        result,
+        members,
+        label,
+        manifest.proxyUpgradeEngine,
+    )
+    .await?;
     if manifest.domain != expected.domain_tag() {
         result.report_error(&format!(
             "{label} at {transition} is a {}-domain object, but its leg applies {}-domain rows: \
@@ -1278,6 +1349,151 @@ pub(super) async fn expect_owned_by<P: Provider>(
     }
 }
 
+/// The CTM's ValidatorTimelock (`validatorTimelockPostV29()`, a `MultisigCommitter` on a fresh CTM)
+/// stays with governance across every edge: its owner decides who commits, proves and executes
+/// the CTM's chains' batches, and no edge hands it to an executor. It must be owned by the
+/// reviewed governance with no nomination outstanding — or have nominated it, with the bundle
+/// carrying governance's declared `acceptOwnership()` on it (the merge's normalization when the
+/// prepare's ownership pre-step nominated governance). A timelock held by the account that owns a
+/// legacy `Governance.sol` governance is a WARN, as at the merge-base: the same principals control
+/// it, without governance's timelock in front of them (an `ecosystem init` deployment hands it to
+/// `owner_address`, which owns its `Governance`). A nomination of the owner itself moves nothing.
+///
+/// Of what the bundle does to the timelock this checks only the `acceptOwnership()`, which reverts
+/// the whole bundle unless governance is nominated; the state the bundle leaves is checked after a
+/// replay ([`super::applied`]).
+///
+/// `governance` is the reviewed governance and how the report names it; `bundle` the calls
+/// governance signs and the package's declared external actions.
+///
+/// Reads, in order: the CTM's `validatorTimelockPostV29()`, the timelock's `owner()` and
+/// `pendingOwner()`, then — only for a timelock neither governance holds nor accepts — governance's
+/// `owner()` ([`governance_controller`]).
+pub(super) async fn verify_validator_timelock_owner<P: Provider>(
+    provider: &P,
+    result: &mut VerificationResult,
+    ctm: Address,
+    (governance, governance_label): (Address, &str),
+    (calls, declared): (&[GovernanceCall], &[ExternalAction]),
+) {
+    let Some(timelock) = tolerate(
+        CtmView::new(ctm, provider)
+            .validatorTimelockPostV29()
+            .call()
+            .await,
+        result,
+        "the CTM's validatorTimelockPostV29()",
+    ) else {
+        return;
+    };
+    if timelock.is_zero() {
+        result.report_error(
+            "the CTM names no ValidatorTimelock (validatorTimelockPostV29() is the zero address): \
+             who commits its chains' batches cannot be held against governance",
+        );
+        return;
+    }
+    let view = Ownable2StepView::new(timelock, provider);
+    let owner = tolerate(
+        view.owner().call().await,
+        result,
+        "the ValidatorTimelock's owner",
+    );
+    let pending = tolerate(
+        view.pendingOwner().call().await,
+        result,
+        "the ValidatorTimelock's pending owner",
+    );
+    let (Some(owner), Some(pending)) = (owner, pending) else {
+        return;
+    };
+    let accept = GovernanceCall {
+        target: timelock,
+        value: U256::ZERO,
+        data: Ownable2StepView::acceptOwnershipCall {}.abi_encode(),
+    };
+    let carried = calls.iter().any(|call| {
+        call.target == accept.target && call.value == accept.value && call.data == accept.data
+    });
+    let accepted = carried
+        && declared
+            .iter()
+            .any(|action| action.phase == GOVERNANCE_PHASE && action.is_call(&accept));
+    let label = format!("the ValidatorTimelock {timelock}");
+    if carried && pending != governance {
+        result.report_error(&format!(
+            "the bundle carries `acceptOwnership()` on {label}, but its pending owner is \
+             {pending}, not {governance_label} ({governance}): the call reverts, and with it the \
+             whole bundle"
+        ));
+    }
+    let outstanding = !pending.is_zero() && pending != owner && pending != governance;
+    if owner == governance {
+        if outstanding {
+            result.report_error(&format!(
+                "{label} is owned by {governance_label} but has a pending owner {pending}: a \
+                 nomination is outstanding that could take the timelock, and with it who commits \
+                 the CTM's chains' batches, from governance"
+            ));
+        } else {
+            result.report_ok(&format!(
+                "{label} is owned by {governance_label} ({governance}) with no nomination \
+                 outstanding"
+            ));
+        }
+    } else if pending == governance && accepted {
+        result.report_ok(&format!(
+            "{label} is owned by {owner} and has nominated {governance_label} ({governance}); the \
+             bundle carries governance's declared `acceptOwnership()` on it"
+        ));
+    } else if governance_controller(provider, governance).await == Some(owner) {
+        if outstanding {
+            result.report_error(&format!(
+                "{label} is owned by {owner}, the owner of {governance_label} ({governance}), but \
+                 has a pending owner {pending}: a nomination is outstanding that could take the \
+                 timelock, and with it who commits the CTM's chains' batches, from both"
+            ));
+        } else {
+            result.report_warn(&format!(
+                "{label} is owned by {owner}, which owns {governance_label} ({governance}) rather \
+                 than being it: the same principals control who commits the CTM's chains' \
+                 batches, but without governance's timelock in front of them. Expected on a \
+                 legacy `Governance.sol` ecosystem (`ecosystem init` hands the timelock to \
+                 `owner_address`)"
+            ));
+        }
+    } else if pending == governance {
+        result.report_error(&format!(
+            "{label} is owned by {owner} and has nominated {governance_label} ({governance}), but \
+             the bundle carries no declared `acceptOwnership()` on it: the timelock would stay \
+             with {owner}"
+        ));
+    } else {
+        result.report_error(&format!(
+            "{label} is owned by {owner} (pending owner {pending}), not by {governance_label} \
+             ({governance}): who commits the CTM's chains' batches would answer to someone other \
+             than the governance this package is reviewed for"
+        ));
+    }
+}
+
+/// The account that owns `governance`: a legacy `Governance.sol`'s `owner()`. `None` where
+/// governance answers no owner — a ProtocolUpgradeHandler is not `Ownable` — or the zero address;
+/// neither is a finding, so nothing is reported.
+pub(super) async fn governance_controller<P: Provider>(
+    provider: &P,
+    governance: Address,
+) -> Option<Address> {
+    match Ownable2StepView::new(governance, provider)
+        .owner()
+        .call()
+        .await
+    {
+        Ok(owner) if !owner.is_zero() => Some(owner),
+        _ => None,
+    }
+}
+
 /// Renders the facet cuts the transition DERIVED at construction, so a reviewer can read the
 /// routing every chain will apply rather than trust a count.
 async fn render_facet_cuts<P: Provider>(
@@ -1345,7 +1561,6 @@ mod tests {
     use super::*;
     use alloy::primitives::Bytes;
     use alloy::providers::ProviderBuilder;
-    use alloy::sol_types::SolCall;
     use alloy::transports::mock::Asserter;
 
     use super::super::construction::canonical_create2_address;
@@ -1708,22 +1923,61 @@ mod tests {
 
     const SALT: B256 = B256::repeat_byte(0x5A);
     const TRANSITION_RUNTIME: &[u8] = b"the reviewed ProxyUpgradeTransition runtime";
+    const ENGINE_RUNTIME: &[u8] = b"the reviewed DefaultProxyUpgradeEngine runtime";
 
     fn transition_code() -> Vec<u8> {
         b"reviewed creation code of ProxyUpgradeTransition".to_vec()
+    }
+
+    fn engine_code() -> Vec<u8> {
+        b"reviewed creation code of DefaultProxyUpgradeEngine".to_vec()
+    }
+
+    /// Where the prepare deploys the default engine (no constructor arguments) under [`SALT`].
+    fn engine() -> Address {
+        canonical_create2_address(SALT, &engine_code(), &[])
+    }
+
+    /// The prepare's `[member_deployments]` record of [`engine`].
+    fn engine_records() -> MemberDeployments {
+        [(
+            engine(),
+            MemberDeploymentRecord {
+                contract: "DefaultProxyUpgradeEngine".to_string(),
+                create2_factory: DETERMINISTIC_CREATE2_FACTORY,
+                create2_salt: SALT,
+                constructor_args: Bytes::new(),
+            },
+        )]
+        .into_iter()
+        .collect()
+    }
+
+    /// The build artifacts of the transition object and the default engine.
+    fn object_artifacts() -> Vec<super::super::construction::TestArtifact> {
+        vec![
+            (
+                "ProxyUpgradeTransition.sol",
+                "ProxyUpgradeTransition",
+                transition_code(),
+                TRANSITION_RUNTIME.to_vec(),
+                Vec::new(),
+            ),
+            (
+                "DefaultProxyUpgradeEngine.sol",
+                "DefaultProxyUpgradeEngine",
+                engine_code(),
+                ENGINE_RUNTIME.to_vec(),
+                Vec::new(),
+            ),
+        ]
     }
 
     fn reviewed_build() -> ReviewedBuild {
         ReviewedBuild::from_artifacts(
             CodeIdentity::empty()
                 .with_contract("l1-contracts/ProxyUpgradeTransition", TRANSITION_RUNTIME),
-            vec![(
-                "ProxyUpgradeTransition.sol",
-                "ProxyUpgradeTransition",
-                transition_code(),
-                TRANSITION_RUNTIME.to_vec(),
-                Vec::new(),
-            )],
+            object_artifacts(),
         )
     }
 
@@ -1748,13 +2002,17 @@ mod tests {
         ProxyUpgradeTransitionManifest {
             domain,
             proxyUpgrades: rows,
+            proxyUpgradeEngine: engine(),
         }
     }
 
-    /// Serves `manifest` from a genuinely constructed object and verifies it as `expected`.
-    async fn verify_object(
+    /// Serves `manifest` from a genuinely constructed object, its engine running `engine_runtime`,
+    /// and verifies it as `expected` with `records` as the package's member records.
+    async fn verify_object_with(
         manifest: &ProxyUpgradeTransitionManifest,
         expected: Inventory,
+        engine_runtime: &'static [u8],
+        records: &MemberDeployments,
     ) -> (
         Option<Vec<ProxyUpgradeRow>>,
         VerificationResult,
@@ -1765,13 +2023,18 @@ mod tests {
         let asserter = Asserter::new();
         asserter.push_success(&Bytes::from_static(TRANSITION_RUNTIME));
         asserter.push_success(&Bytes::from(manifest.abi_encode()));
+        if !manifest.proxyUpgradeEngine.is_zero() {
+            asserter.push_success(&Bytes::from_static(engine_runtime));
+        }
         let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
         let mut result = VerificationResult::default();
         let mut reviewed = BTreeMap::new();
+        let env = ReviewedEnv::default();
         let rows = verify_proxy_upgrade_transition(
             &provider,
             &reviewed_build(),
             &mut result,
+            &MemberReview::new(records, &env, None, None),
             "the object",
             address,
             expected,
@@ -1782,6 +2045,20 @@ mod tests {
         .unwrap();
         assert!(asserter.read_q().is_empty());
         (rows, result, reviewed, address)
+    }
+
+    /// Serves `manifest` from a genuinely constructed object, its engine the reviewed default
+    /// one, and verifies it as `expected` with the engine's record.
+    async fn verify_object(
+        manifest: &ProxyUpgradeTransitionManifest,
+        expected: Inventory,
+    ) -> (
+        Option<Vec<ProxyUpgradeRow>>,
+        VerificationResult,
+        BTreeMap<Address, String>,
+        Address,
+    ) {
+        verify_object_with(manifest, expected, ENGINE_RUNTIME, &engine_records()).await
     }
 
     /// A genuine object of the leg's domain: its construction re-derives (the constructor argument
@@ -1868,6 +2145,7 @@ mod tests {
             let empty = ProxyUpgradeTransitionManifest {
                 domain,
                 proxyUpgrades: vec![inert(); slots],
+                proxyUpgradeEngine: engine(),
             };
             let (rows, result, reviewed, address) = verify_object(&empty, expected).await;
             assert_eq!(result.errors, 1, "{:?}", result.error_messages);
@@ -1878,6 +2156,107 @@ mod tests {
                 "its construction still verifies"
             );
         }
+    }
+
+    /// The mirror decodes a manifest as Solidity encodes it, POSITIONALLY: `(domain,
+    /// proxyUpgrades, proxyUpgradeEngine)`, the engine the third head word of the struct.
+    #[test]
+    fn a_proxy_upgrade_manifest_decodes_with_its_engine() {
+        use alloy::dyn_abi::DynSolValue;
+        let row = |byte: u8| {
+            DynSolValue::Tuple(vec![
+                DynSolValue::Address(Address::repeat_byte(byte)),
+                DynSolValue::Address(Address::repeat_byte(byte + 1)),
+                DynSolValue::Address(Address::repeat_byte(byte + 2)),
+                DynSolValue::Bool(true),
+            ])
+        };
+        let solidity = DynSolValue::Tuple(vec![
+            DynSolValue::Uint(U256::from(PROXY_UPGRADE_DOMAIN_CTM), 8),
+            DynSolValue::Array(vec![row(0x10), row(0x20)]),
+            DynSolValue::Address(engine()),
+        ])
+        .abi_encode();
+        // offset, then the struct's heads: domain, the rows' offset, the engine.
+        assert_eq!(&solidity[64 + 32 + 12..64 + 64], engine().as_slice());
+
+        let decoded = ProxyUpgradeTransitionManifest::abi_decode(&solidity).unwrap();
+        assert_eq!(decoded.domain, PROXY_UPGRADE_DOMAIN_CTM);
+        assert_eq!(decoded.proxyUpgrades.len(), 2);
+        assert_eq!(decoded.proxyUpgrades[1].implNew, Address::repeat_byte(0x22));
+        assert_eq!(decoded.proxyUpgradeEngine, engine());
+        assert_eq!(
+            decoded.abi_encode(),
+            solidity,
+            "re-encodes as the address commits to"
+        );
+        let returned =
+            ProxyUpgradeTransitionView::getManifestCall::abi_decode_returns(&solidity).unwrap();
+        assert_eq!(returned.proxyUpgradeEngine, engine());
+    }
+
+    /// The engine is part of what the object's address commits to: the same rows under another
+    /// engine are another object.
+    #[test]
+    fn the_engine_is_part_of_the_construction() {
+        let mut other = manifest(PROXY_UPGRADE_DOMAIN_CORE, L1_ECOSYSTEM_CONTRACTS.len());
+        let genuine = canonical_create2_address(SALT, &transition_code(), &other.abi_encode());
+        other.proxyUpgradeEngine = STRANGER;
+        assert_ne!(
+            canonical_create2_address(SALT, &transition_code(), &other.abi_encode()),
+            genuine
+        );
+    }
+
+    /// An engine running code no reviewed engine is — it would run by delegatecall with the
+    /// executor's whole authority — is a finding, as is a zero or an unrecorded one.
+    #[tokio::test]
+    async fn an_unknown_zero_or_unrecorded_engine_fails() {
+        let manifest = manifest(PROXY_UPGRADE_DOMAIN_CTM, CTM_CONTRACTS.len());
+        let (rows, result, reviewed, address) = verify_object_with(
+            &manifest,
+            Inventory::CtmDomain,
+            b"an engine no reviewed artifact is",
+            &engine_records(),
+        )
+        .await;
+        assert_eq!(result.errors, 1, "{:?}", result.error_messages);
+        assert!(
+            result.has_error("proxyUpgradeEngine"),
+            "{:?}",
+            result.error_messages
+        );
+        assert!(rows.is_some(), "the rows are still handed on");
+        assert!(
+            reviewed.contains_key(&address),
+            "the object's own construction holds"
+        );
+
+        let mut zero = manifest.clone();
+        zero.proxyUpgradeEngine = Address::ZERO;
+        let (_, result, _, _) = verify_object_with(
+            &zero,
+            Inventory::CtmDomain,
+            ENGINE_RUNTIME,
+            &engine_records(),
+        )
+        .await;
+        assert_eq!(result.errors, 1, "{:?}", result.error_messages);
+        assert!(result.has_error("proxyUpgradeEngine is the zero address"));
+
+        let (_, result, _, _) = verify_object_with(
+            &manifest,
+            Inventory::CtmDomain,
+            ENGINE_RUNTIME,
+            &MemberDeployments::new(),
+        )
+        .await;
+        assert_eq!(result.errors, 1, "{:?}", result.error_messages);
+        assert!(
+            result.has_error("proxyUpgradeEngine at"),
+            "{:?}",
+            result.error_messages
+        );
     }
 
     // ───────────────────────── the release's own validate() ─────────────────────────
@@ -1986,14 +2365,14 @@ mod tests {
 
     // ───────────────────────── readiness ─────────────────────────
 
-    /// boot-42: the publication check reads the object's `l2Plan()` against the CTM's supplier and
-    /// names the call that would refuse an unpublished dependency — for the bootstrap, the
-    /// migration's `validate()` rather than a transition commit.
+    /// The publication check reads the object's `l2Plan()` against the CTM's supplier and names
+    /// the call that would refuse an unpublished dependency — for a replacement,
+    /// `replaceUpgradeTransition` rather than a transition commit.
     #[tokio::test]
     async fn an_unpublished_dependency_names_the_call_that_refuses_it() {
         use super::super::views::{L2UpgradePlan, UniversalContractUpgradeInfo};
         const SUPPLIER: Address = Address::repeat_byte(0x5B);
-        const MIGRATION: Address = Address::repeat_byte(0x3B);
+        const REPLACEMENT: Address = Address::repeat_byte(0x3B);
         let plan = L2UpgradePlan {
             deployments: Vec::<UniversalContractUpgradeInfo>::new(),
             delegateTo: Address::ZERO,
@@ -2012,17 +2391,229 @@ mod tests {
             &mut result,
             &CtmView::new(CTM, &provider),
             Publication {
-                object: MIGRATION,
-                label: "the bootstrap migration",
-                required_by: "`RegistryBootstrapMigration.validate()` (run by `migrate()`)",
+                object: REPLACEMENT,
+                label: "the replacement",
+                required_by: "`ChainTypeManager.replaceUpgradeTransition`",
             },
         )
         .await
         .unwrap();
         assert!(asserter.read_q().is_empty());
         assert_eq!(result.errors, 1, "{:?}", result.error_messages);
-        assert!(result
-            .has_error("`RegistryBootstrapMigration.validate()` (run by `migrate()`) refuses it"));
+        assert!(result.has_error("`ChainTypeManager.replaceUpgradeTransition` refuses it"));
+    }
+
+    // ───────────────────────── chains below v0.35.0 ─────────────────────────
+
+    /// v0.29.1 in the packed encoding: a chain the v0.36.0 CTM would strand.
+    const V29_1: u64 = (29 << 32) | 1;
+
+    fn chain(chain_id: u64, protocol_version: Option<u64>) -> ChainVersion {
+        ChainVersion {
+            chain_id: U256::from(chain_id),
+            protocol_version: protocol_version.map(U256::from),
+        }
+    }
+
+    #[test]
+    fn chains_at_v35_or_later_pass_the_gate() {
+        let mut result = VerificationResult::default();
+        judge_chains_below_v35(
+            &mut result,
+            &[chain(270, Some(35 << 32)), chain(271, Some(36 << 32))],
+        );
+        assert_eq!((result.errors, result.warnings), (0, 0));
+        assert!(result.ensure_success().is_ok());
+    }
+
+    /// Each chain below v0.35.0 is an error of its own, naming the chain and its version.
+    #[test]
+    fn each_chain_below_v35_fails_the_gate() {
+        let mut result = VerificationResult::default();
+        judge_chains_below_v35(
+            &mut result,
+            &[
+                chain(270, Some(35 << 32)),
+                chain(8022832, Some(V29_1)),
+                chain(36900, Some(V29_1)),
+            ],
+        );
+        assert_eq!(result.errors, 2, "{:?}", result.error_messages);
+        assert!(result.has_error("chain 8022832 is at v0.29.1"));
+        assert!(result.has_error("chain 36900 is at v0.29.1"));
+    }
+
+    /// An unreadable version was reported as an error when it was read, so the verdict adds no
+    /// second error for it.
+    #[test]
+    fn an_unreadable_chain_adds_no_second_error() {
+        let mut result = VerificationResult::default();
+        judge_chains_below_v35(&mut result, &[chain(270, None)]);
+        assert_eq!((result.errors, result.warnings), (0, 0));
+    }
+
+    /// The live read path, in the order it queries: the reviewed Bridgehub's chain ids, then per
+    /// chain its CTM and, for this CTM's chains only, the version the CTM reports.
+    #[tokio::test]
+    async fn the_chains_are_enumerated_through_the_bridgehub_and_filtered_by_ctm() {
+        const BRIDGEHUB: Address = Address::repeat_byte(0xB0);
+        const OTHER_CTM: Address = Address::repeat_byte(0xC1);
+        let asserter = Asserter::new();
+        let ids = vec![U256::from(270u64), U256::from(271u64), U256::from(272u64)];
+        asserter.push_success(&Bytes::from(ids.abi_encode()));
+        asserter.push_success(&Bytes::from(CTM.abi_encode()));
+        asserter.push_success(&Bytes::from(U256::from(35u64 << 32).abi_encode()));
+        asserter.push_success(&Bytes::from(OTHER_CTM.abi_encode()));
+        asserter.push_success(&Bytes::from(CTM.abi_encode()));
+        asserter.push_success(&Bytes::from(U256::from(V29_1).abi_encode()));
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        let mut result = VerificationResult::default();
+        let chains = read_chain_versions(
+            &provider,
+            &mut result,
+            Some(BRIDGEHUB),
+            &CtmView::new(CTM, &provider),
+        )
+        .await
+        .expect("the chains are enumerable");
+        assert!(asserter.read_q().is_empty(), "every answer was read");
+        assert_eq!(result.errors, 0, "{:?}", result.error_messages);
+        let read: Vec<_> = chains
+            .iter()
+            .map(|c| (c.chain_id, c.protocol_version))
+            .collect();
+        assert_eq!(
+            read,
+            vec![
+                (U256::from(270u64), Some(U256::from(35u64 << 32))),
+                (U256::from(272u64), Some(U256::from(V29_1))),
+            ]
+        );
+    }
+
+    /// A chain whose CTM or version cannot be read is an error of its own, and stays in the list
+    /// so the verdict does not count the CTM's chains as all cleared without it.
+    #[tokio::test]
+    async fn a_chain_that_cannot_be_read_fails_the_gate() {
+        const BRIDGEHUB: Address = Address::repeat_byte(0xB0);
+        let asserter = Asserter::new();
+        let ids = vec![U256::from(270u64), U256::from(271u64)];
+        asserter.push_success(&Bytes::from(ids.abi_encode()));
+        asserter.push_failure_msg("no CTM for 270");
+        asserter.push_success(&Bytes::from(CTM.abi_encode()));
+        asserter.push_failure_msg("no version for 271");
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        let mut result = VerificationResult::default();
+        let chains = read_chain_versions(
+            &provider,
+            &mut result,
+            Some(BRIDGEHUB),
+            &CtmView::new(CTM, &provider),
+        )
+        .await
+        .expect("the chains are enumerable");
+        assert!(asserter.read_q().is_empty(), "every answer was read");
+        assert_eq!(result.errors, 2, "{:?}", result.error_messages);
+        assert!(result.has_error("chain 270: its CTM could not be read"));
+        assert!(result.has_error("chain 271: the CTM could not read its protocol version"));
+        let read: Vec<_> = chains
+            .iter()
+            .map(|c| (c.chain_id, c.protocol_version))
+            .collect();
+        assert_eq!(
+            read,
+            vec![(U256::from(270u64), None), (U256::from(271u64), None)]
+        );
+    }
+
+    /// The gate cannot pass on chains it never saw: no reviewed Bridgehub, or one whose chains
+    /// cannot be read, is an error.
+    #[tokio::test]
+    async fn chains_that_cannot_be_enumerated_fail_the_gate() {
+        const BRIDGEHUB: Address = Address::repeat_byte(0xB0);
+        let asserter = Asserter::new();
+        asserter.push_failure_msg("no chain ids");
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        for bridgehub in [None, Some(BRIDGEHUB)] {
+            let mut result = VerificationResult::default();
+            let chains = read_chain_versions(
+                &provider,
+                &mut result,
+                bridgehub,
+                &CtmView::new(CTM, &provider),
+            )
+            .await;
+            assert!(chains.is_none());
+            assert_eq!(result.errors, 1, "{:?}", result.error_messages);
+            assert!(result.has_error("cannot be enumerated"));
+        }
+        assert!(asserter.read_q().is_empty(), "every answer was read");
+    }
+
+    fn swap(proxy: Address) -> ProxyUpgradeRow {
+        ProxyUpgradeRow {
+            proxy,
+            expectedOldImpl: Address::repeat_byte(0x01),
+            implNew: Address::repeat_byte(0x02),
+            callInitializeUpgrade: false,
+        }
+    }
+
+    /// Whether the gate runs for an infrastructure-only package, given its rows and the CTM's
+    /// live version (`None`: the rows give the CTM's version no say, so nothing is read).
+    async fn gates_infrastructure(
+        rows: &[ProxyUpgradeRow],
+        live_version: Option<Result<u64, &'static str>>,
+    ) -> (bool, VerificationResult) {
+        let asserter = Asserter::new();
+        match live_version {
+            Some(Ok(version)) => {
+                asserter.push_success(&Bytes::from(U256::from(version).abi_encode()))
+            }
+            Some(Err(message)) => asserter.push_failure_msg(message),
+            None => {}
+        }
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        let mut result = VerificationResult::default();
+        let gated =
+            lands_the_v36_ctm(&mut result, &CtmView::new(CTM, &provider), None, Some(rows)).await;
+        assert!(asserter.read_q().is_empty(), "every answer was read");
+        (gated, result)
+    }
+
+    /// An infrastructure-only package swapping the CTM proxy on a CTM below v0.36.0 installs the
+    /// v0.36.0 CTM without a transition, so the gate runs for it.
+    #[tokio::test]
+    async fn an_infrastructure_only_ctm_swap_below_v36_is_gated() {
+        let (gated, result) = gates_infrastructure(&[swap(CTM)], Some(Ok(35 << 32))).await;
+        assert!(gated);
+        assert_eq!(result.errors, 0, "{:?}", result.error_messages);
+    }
+
+    /// A CTM already on v0.36.0 runs the trimmed implementation, so swapping it strands nothing new.
+    #[tokio::test]
+    async fn a_ctm_swap_from_v36_is_not_gated() {
+        let (gated, _) = gates_infrastructure(&[swap(CTM)], Some(Ok(36 << 32))).await;
+        assert!(!gated);
+    }
+
+    /// Rows that leave the CTM proxy alone, or name it inertly, install no CTM implementation.
+    #[tokio::test]
+    async fn rows_not_swapping_the_ctm_are_not_gated() {
+        let inert_ctm = ProxyUpgradeRow {
+            proxy: CTM,
+            ..inert()
+        };
+        let (gated, _) = gates_infrastructure(&[swap(CTM_ADMIN), inert_ctm], None).await;
+        assert!(!gated);
+    }
+
+    /// A CTM whose version cannot be read cannot be shown to be past v0.36.0, so the gate runs.
+    #[tokio::test]
+    async fn a_ctm_swap_on_an_unreadable_ctm_is_gated() {
+        let (gated, result) = gates_infrastructure(&[swap(CTM)], Some(Err("no version"))).await;
+        assert!(gated);
+        assert!(result.has_error("the CTM's live protocol version could not be read"));
     }
 
     // ───────────────────────── the whole path ─────────────────────────
@@ -2069,10 +2660,12 @@ mod tests {
         let core = ProxyUpgradeTransitionManifest {
             domain: PROXY_UPGRADE_DOMAIN_CORE,
             proxyUpgrades: vec![inert(); L1_ECOSYSTEM_CONTRACTS.len()],
+            proxyUpgradeEngine: engine(),
         };
         let infrastructure = ProxyUpgradeTransitionManifest {
             domain: PROXY_UPGRADE_DOMAIN_CTM,
             proxyUpgrades: vec![inert(); CTM_CONTRACTS.len()],
+            proxyUpgradeEngine: engine(),
         };
         let at = |manifest: &ProxyUpgradeTransitionManifest| {
             canonical_create2_address(SALT, &transition_code(), &manifest.abi_encode())
@@ -2090,6 +2683,7 @@ mod tests {
         for manifest in [&core, &infrastructure] {
             asserter.push_success(&Bytes::from_static(TRANSITION_RUNTIME));
             asserter.push_success(&Bytes::from(manifest.abi_encode()));
+            asserter.push_success(&Bytes::from_static(ENGINE_RUNTIME));
         }
         for answer in [
             Bytes::from_static(&[0x60]), // the core executor's code
@@ -2218,15 +2812,26 @@ mod tests {
         fn new(
             kind: LegKind,
             executor: Address,
+            inventory: (u8, usize, usize),
+            constructor: (&'static str, &'static str),
+        ) -> Self {
+            Self::naming(kind, executor, inventory, constructor, ROW_PROXY)
+        }
+
+        /// [`Self::new`] with the row naming `proxy`.
+        fn naming(
+            kind: LegKind,
+            executor: Address,
             (domain, slots, slot): (u8, usize, usize),
             (contract, parameter): (&'static str, &'static str),
+            proxy: Address,
         ) -> Self {
             let creation = format!("the creation code of {contract}").into_bytes();
             let args = BRIDGEHUB.abi_encode();
             let implementation = canonical_create2_address(SALT, &creation, &args);
             let mut rows = vec![inert(); slots];
             rows[slot] = ProxyUpgradeRow {
-                proxy: ROW_PROXY,
+                proxy,
                 expectedOldImpl: OLD_IMPL,
                 implNew: implementation,
                 callInitializeUpgrade: false,
@@ -2234,28 +2839,22 @@ mod tests {
             let manifest = ProxyUpgradeTransitionManifest {
                 domain,
                 proxyUpgrades: rows,
+                proxyUpgradeEngine: engine(),
             };
             let object =
                 canonical_create2_address(SALT, &transition_code(), &manifest.abi_encode());
+            let mut artifacts = object_artifacts();
+            artifacts.push((
+                "Row.sol",
+                contract,
+                creation.clone(),
+                ROW_RUNTIME.to_vec(),
+                Vec::new(),
+            ));
             let build = ReviewedBuild::from_artifacts(
                 CodeIdentity::empty()
                     .with_contract("l1-contracts/ProxyUpgradeTransition", TRANSITION_RUNTIME),
-                vec![
-                    (
-                        "ProxyUpgradeTransition.sol",
-                        "ProxyUpgradeTransition",
-                        transition_code(),
-                        TRANSITION_RUNTIME.to_vec(),
-                        Vec::new(),
-                    ),
-                    (
-                        "Row.sol",
-                        contract,
-                        creation.clone(),
-                        ROW_RUNTIME.to_vec(),
-                        Vec::new(),
-                    ),
-                ],
+                artifacts,
             )
             .with_constructor(contract, &[(parameter, "address")]);
             let records = [(
@@ -2282,15 +2881,17 @@ mod tests {
             let asserter = Asserter::new();
             asserter.push_success(&Bytes::from_static(TRANSITION_RUNTIME));
             asserter.push_success(&Bytes::from(self.manifest.abi_encode()));
+            asserter.push_success(&Bytes::from_static(ENGINE_RUNTIME));
             for answer in answers {
                 asserter.push_success(answer);
             }
             let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-            self.package.member_records = if recorded {
-                self.records.clone()
-            } else {
-                MemberDeployments::new()
-            };
+            // The engine is always recorded: only the row's record is what a run drives.
+            let mut records = engine_records();
+            if recorded {
+                records.extend(self.records.clone());
+            }
+            self.package.member_records = records;
             let mut result = VerificationResult::default();
             verify(
                 &provider,
@@ -2324,37 +2925,50 @@ mod tests {
             ("ValidatorTimelock", "_bridgehubAddr"),
         );
         assert_eq!(CTM_CONTRACTS[6], "ValidatorTimelock");
-        let answers = |ctm_bridgehub: Option<Address>| {
+        let answers = |ctm_bridgehub: Address, recorded: bool| {
             let mut answers = vec![
-                Bytes::from_static(&[0x60]), // the CTM executor's code
-                word(CTM),                   // its CHAIN_TYPE_MANAGER
-                word(CTM_ADMIN),             // its CTM_PROXY_ADMIN
-                word(GOVERNANCE),            // the CTM executor's owner
-                word(Address::ZERO),         // its pending owner
-                word(CTM_EXECUTOR),          // the CTM's owner
-                word(CTM_EXECUTOR),          // the CTM-domain ProxyAdmin's owner
-                word(Address::ZERO),         // the CTM's pending owner
-                word(ROW_PROXY),             // the CTM's validatorTimelockPostV29()
-                word(OLD_IMPL),              // the row's live implementation
+                Bytes::from_static(&[0x60]),    // the CTM executor's code
+                word(CTM),                      // its CHAIN_TYPE_MANAGER
+                word(CTM_ADMIN),                // its CTM_PROXY_ADMIN
+                Bytes::from(true.abi_encode()), // the reviewed Bridgehub registers the CTM
+                word(ctm_bridgehub),            // the CTM's BRIDGE_HUB()
+                word(CTM_ADMIN),                // the CTM proxy's EIP-1967 admin slot
+                word(GOVERNANCE),               // the CTM executor's owner
+                word(Address::ZERO),            // its pending owner
+                word(CTM_EXECUTOR),             // the CTM's owner
+                word(CTM_EXECUTOR),             // the CTM-domain ProxyAdmin's owner
+                word(Address::ZERO),            // the CTM's pending owner
+                word(ROW_PROXY),                // the CTM's validatorTimelockPostV29()
+                word(GOVERNANCE),               // the ValidatorTimelock's owner
+                word(Address::ZERO),            // its pending owner
+                word(ROW_PROXY), // the CTM's validatorTimelockPostV29(), the row's slot
+                word(OLD_IMPL),  // the row's live implementation
                 Bytes::from_static(ROW_RUNTIME),
             ];
             // The package's CTM's BRIDGE_HUB(), read once the record is.
-            answers.extend(ctm_bridgehub.map(word));
+            if recorded {
+                answers.push(word(ctm_bridgehub));
+            }
             answers
         };
-        let control = fixture.verify(true, &answers(Some(BRIDGEHUB))).await;
+        let control = fixture.verify(true, &answers(BRIDGEHUB, true)).await;
         assert!(
             !control.has_error("ValidatorTimelock"),
             "{:?}",
             control.error_messages
         );
 
-        let unrecorded = fixture.verify(false, &answers(None)).await;
+        let unrecorded = fixture.verify(false, &answers(BRIDGEHUB, false)).await;
         assert_eq!(unrecorded.errors, control.errors + 1);
         assert!(unrecorded.has_error("a row installs only an implementation its prepare deployed"));
 
-        let elsewhere = fixture.verify(true, &answers(Some(STRANGER))).await;
-        assert_eq!(elsewhere.errors, control.errors + 1);
+        // A CTM over another Bridgehub fails its binding, and every argument held against the
+        // reviewed Bridgehub then fails too.
+        let elsewhere = fixture.verify(true, &answers(STRANGER, true)).await;
+        assert_eq!(elsewhere.errors, control.errors + 2);
+        assert!(elsewhere.has_error(&format!(
+            "the CTM {CTM} is built over Bridgehub {STRANGER}, not the reviewed {BRIDGEHUB}"
+        )));
         assert!(elsewhere.has_error(&format!(
             "the package's CTM {CTM} answers BRIDGE_HUB() {STRANGER}, not env test's \
              bridgehub_proxy_addr {BRIDGEHUB}"
@@ -2385,10 +2999,11 @@ mod tests {
         let answers = [
             Bytes::from_static(&[0x60]), // the core executor's code
             word(ECO_ADMIN),             // its PROXY_ADMIN
+            word(ECO_ADMIN),             // the reviewed Bridgehub's EIP-1967 admin slot
             word(GOVERNANCE),            // the core executor's owner
             word(Address::ZERO),         // its pending owner
             word(CORE_EXECUTOR),         // the ecosystem ProxyAdmin's owner
-            word(ROW_PROXY),             // the Bridgehub's chainRegistrationSender()
+            word(ROW_PROXY),             // the reviewed Bridgehub's chainRegistrationSender()
             word(OLD_IMPL),              // the row's live implementation
             Bytes::from_static(ROW_RUNTIME),
         ];
@@ -2403,12 +3018,602 @@ mod tests {
         assert_eq!(unrecorded.errors, control.errors + 1);
         assert!(unrecorded.has_error("a row installs only an implementation its prepare deployed"));
 
+        // A package prepared against another Bridgehub fails its binding, and every argument held
+        // against the reviewed Bridgehub then fails too.
         fixture.package.reported_singletons.bridgehub = Some(STRANGER);
         let elsewhere = fixture.verify(true, &answers).await;
-        assert_eq!(elsewhere.errors, control.errors + 1);
+        assert_eq!(elsewhere.errors, control.errors + 2);
+        assert!(elsewhere.has_error(&format!(
+            "the core prepare's bridgehub_proxy_addr {STRANGER} is not the reviewed Bridgehub \
+             {BRIDGEHUB}"
+        )));
         assert!(elsewhere.has_error(&format!(
             "the package's bridgehub_proxy_addr {STRANGER} is not env test's bridgehub_proxy_addr \
              {BRIDGEHUB}"
         )));
+    }
+
+    // ───────────────────────── the ValidatorTimelock's owner (OZ L-21) ─────────────────────────
+
+    const TIMELOCK: Address = Address::repeat_byte(0x7C);
+
+    /// Governance's acceptance of the timelock's nomination, as the merge prepends it.
+    fn timelock_accept() -> GovernanceCall {
+        GovernanceCall {
+            target: TIMELOCK,
+            value: U256::ZERO,
+            data: Ownable2StepView::acceptOwnershipCall {}.abi_encode(),
+        }
+    }
+
+    /// The account that owns a legacy `Governance.sol` [`GOVERNANCE`].
+    const CONTROLLER: Address = Address::repeat_byte(0x6C);
+
+    /// Runs the check over a timelock owned by `owner` with `pending` nominated, against a bundle
+    /// of `calls` declaring `declared`; every answer read. `governance_owner` is what governance's
+    /// `owner()` answers when the check reads it (`Some(None)`: it reverts, as a
+    /// ProtocolUpgradeHandler's does), and `None` when the check must not read it.
+    async fn judge_timelock(
+        timelock: Address,
+        (owner, pending): (Address, Address),
+        (calls, declared): (&[GovernanceCall], &[ExternalAction]),
+        governance_owner: Option<Option<Address>>,
+    ) -> VerificationResult {
+        let asserter = Asserter::new();
+        asserter.push_success(&word(timelock));
+        if !timelock.is_zero() {
+            asserter.push_success(&word(owner));
+            asserter.push_success(&word(pending));
+        }
+        match governance_owner {
+            Some(Some(controller)) => asserter.push_success(&word(controller)),
+            Some(None) => asserter.push_failure_msg("execution reverted"),
+            None => {}
+        }
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        let mut result = VerificationResult::default();
+        verify_validator_timelock_owner(
+            &provider,
+            &mut result,
+            CTM,
+            (GOVERNANCE, "the reviewed governance"),
+            (calls, declared),
+        )
+        .await;
+        assert!(asserter.read_q().is_empty(), "every answer was read");
+        result
+    }
+
+    /// OZ L-21: the timelock stays governance's — owned outright with no nomination, or nominated
+    /// with governance's acceptance declared and carried; an acceptance with nobody nominating
+    /// governance reverts the bundle.
+    #[tokio::test]
+    async fn the_validator_timelock_must_stay_with_governance() {
+        let accept = timelock_accept();
+        let carried = [accept.clone(), core()];
+        let declares = declared(std::slice::from_ref(&accept));
+        let accepting = (&carried[..], &declares[..]);
+        let plain = (&[core()][..], &[][..]);
+
+        let result = judge_timelock(TIMELOCK, (GOVERNANCE, Address::ZERO), plain, None).await;
+        assert_eq!((result.errors, result.warnings), (0, 0));
+
+        let result = judge_timelock(TIMELOCK, (STRANGER, GOVERNANCE), accepting, None).await;
+        assert_eq!(
+            (result.errors, result.warnings),
+            (0, 0),
+            "{:?}",
+            result.error_messages
+        );
+
+        for (case, owners, bundle, governance_owner, needle) in [
+            (
+                "a nomination beside governance's ownership",
+                (GOVERNANCE, STRANGER),
+                plain,
+                None,
+                "but has a pending owner",
+            ),
+            (
+                "governance nominated, no acceptance",
+                (STRANGER, GOVERNANCE),
+                plain,
+                Some(Some(CONTROLLER)),
+                "carries no declared `acceptOwnership()`",
+            ),
+            (
+                "an acceptance the package does not declare",
+                (STRANGER, GOVERNANCE),
+                (&carried[..], &[][..]),
+                Some(Some(CONTROLLER)),
+                "carries no declared `acceptOwnership()`",
+            ),
+            (
+                "a declared acceptance the bundle does not carry",
+                (STRANGER, GOVERNANCE),
+                (&[core()][..], &declares[..]),
+                Some(Some(CONTROLLER)),
+                "carries no declared `acceptOwnership()`",
+            ),
+            (
+                "another owner, nobody nominated",
+                (STRANGER, Address::ZERO),
+                plain,
+                Some(Some(CONTROLLER)),
+                "not by the reviewed governance",
+            ),
+            (
+                "another owner, under a governance that is not Ownable",
+                (STRANGER, Address::ZERO),
+                plain,
+                Some(None),
+                "not by the reviewed governance",
+            ),
+            (
+                "an acceptance of a timelock governance already holds",
+                (GOVERNANCE, Address::ZERO),
+                accepting,
+                None,
+                "the call reverts, and with it the whole bundle",
+            ),
+            (
+                "the owner of legacy governance with a stranger nominated",
+                (CONTROLLER, STRANGER),
+                plain,
+                Some(Some(CONTROLLER)),
+                "a nomination is outstanding",
+            ),
+        ] {
+            let result = judge_timelock(TIMELOCK, owners, bundle, governance_owner).await;
+            assert_eq!(result.errors, 1, "{case}: {:?}", result.error_messages);
+            assert!(
+                result.has_error(needle),
+                "{case}: {:?}",
+                result.error_messages
+            );
+        }
+
+        let result = judge_timelock(Address::ZERO, (GOVERNANCE, Address::ZERO), plain, None).await;
+        assert_eq!(result.errors, 1);
+        assert!(result.has_error("names no ValidatorTimelock"));
+    }
+
+    /// The fresh-ecosystem shape: `ecosystem init` hands the timelock to `owner_address`, which
+    /// owns the legacy `Governance.sol` the Bridgehub answers to (and, deployed by that same
+    /// account, nominated to itself). A WARN, as at the merge-base — not with governance
+    /// nominated and accepted, which is the normalization.
+    #[tokio::test]
+    async fn a_timelock_held_by_the_owner_of_legacy_governance_is_a_warning() {
+        let plain = (&[core()][..], &[][..]);
+        for pending in [Address::ZERO, CONTROLLER, GOVERNANCE] {
+            let result = judge_timelock(
+                TIMELOCK,
+                (CONTROLLER, pending),
+                plain,
+                Some(Some(CONTROLLER)),
+            )
+            .await;
+            assert_eq!(
+                (result.errors, result.warnings),
+                (0, 1),
+                "pending {pending}: {:?}",
+                result.error_messages
+            );
+        }
+    }
+
+    /// F1 (inverts the external review's forged-anchor repro): a core-only package naming its own
+    /// Bridgehub F was anchored on F, unchecked, so a row in the `L1Bridgehub` slot naming F
+    /// verified clean. The anchor is now the reviewed Bridgehub: the package's F fails its binding
+    /// and the row fails its slot. The executors carry no records and the row's implementation
+    /// none, alike in both runs.
+    #[tokio::test]
+    async fn a_core_only_package_is_anchored_on_the_reviewed_bridgehub() {
+        const FORGED: Address = Address::repeat_byte(0xF0);
+        let run = |bridgehub: Address| async move {
+            let mut fixture = RowFixture::naming(
+                LegKind::Core,
+                CORE_EXECUTOR,
+                (PROXY_UPGRADE_DOMAIN_CORE, L1_ECOSYSTEM_CONTRACTS.len(), 0),
+                ("L1Bridgehub", "_bridgehub"),
+                bridgehub,
+            );
+            fixture.package.reported_ctm_executor = None;
+            fixture.package.reported_ctm = None;
+            fixture.package.reported_ctm_proxy_admin = None;
+            fixture.package.reported_singletons.bridgehub = Some(bridgehub);
+            let answers = [
+                Bytes::from_static(&[0x60]), // the core executor's code
+                word(ECO_ADMIN),             // its PROXY_ADMIN
+                word(ECO_ADMIN),             // the reviewed Bridgehub's EIP-1967 admin slot
+                word(GOVERNANCE),            // the core executor's owner
+                word(Address::ZERO),         // its pending owner
+                word(CORE_EXECUTOR),         // the ecosystem ProxyAdmin's owner
+                word(OLD_IMPL),              // the row's live implementation (no slot read)
+                Bytes::from_static(ROW_RUNTIME),
+            ];
+            fixture.verify(false, &answers).await
+        };
+        assert_eq!(L1_ECOSYSTEM_CONTRACTS[0], "L1Bridgehub");
+        let control = run(BRIDGEHUB).await;
+        assert!(
+            !control.has_error("is not the reviewed Bridgehub")
+                && !control.has_error("names proxy"),
+            "{:?}",
+            control.error_messages
+        );
+
+        let forged = run(FORGED).await;
+        assert_eq!(
+            forged.errors,
+            control.errors + 2,
+            "{:?}",
+            forged.error_messages
+        );
+        assert!(forged.has_error(&format!(
+            "the core prepare's bridgehub_proxy_addr {FORGED} is not the reviewed Bridgehub \
+             {BRIDGEHUB}"
+        )));
+        assert!(forged.has_error(&format!(
+            "names proxy {FORGED}, but the live L1Bridgehub is {BRIDGEHUB}"
+        )));
+    }
+
+    // ───────────────────── the reviewed Bridgehub, through the whole path ─────────────────────
+
+    use super::super::keyed_l1::KeyedL1;
+
+    /// A Bridgehub the CTM may be built over instead of [`BRIDGEHUB`].
+    const CTMS_BRIDGEHUB: Address = Address::repeat_byte(0xF0);
+    const ROOT_PROXY: Address = Address::repeat_byte(0x7A);
+    const OTHER_PROXY: Address = Address::repeat_byte(0x7B);
+    const NEW_IMPL: Address = Address::repeat_byte(0x02);
+    const FROM_RELEASE: Address = Address::repeat_byte(0x35);
+    const NEW_RELEASE: Address = Address::repeat_byte(0x36);
+    /// The CTM's one chain.
+    const CHAIN_ID: u64 = 270;
+
+    /// The live state a v0.35.0 -> v0.36.0 package runs against: its core leg upgrades the
+    /// ecosystem's `L1MessageRoot` at [`ROOT_PROXY`], its infrastructure leg the CTM's
+    /// ValidatorTimelock at [`TIMELOCK`], and its transition lands the v0.36.0 CTM.
+    /// [`CTMS_BRIDGEHUB`] answers `messageRoot()` and the chain list with other values. The
+    /// objects, releases, engines, executor records and bytecodes supplier are left unanswered, so
+    /// they are unverified the same way in every run.
+    #[derive(Clone, Copy)]
+    struct ReviewedEcosystemRun {
+        registered: bool,
+        /// What the CTM answers as `BRIDGE_HUB()`.
+        built_over: Address,
+        /// What the reviewed Bridgehub, and [`CTMS_BRIDGEHUB`], answer as `messageRoot()`.
+        message_root: (Address, Address),
+        timelock_owner: Address,
+        /// The protocol version the CTM reports for [`CHAIN_ID`].
+        chain_version: U256,
+    }
+
+    impl ReviewedEcosystemRun {
+        /// Everything as the review expects it.
+        fn control() -> Self {
+            Self {
+                registered: true,
+                built_over: BRIDGEHUB,
+                message_root: (ROOT_PROXY, OTHER_PROXY),
+                timelock_owner: GOVERNANCE,
+                chain_version: V35,
+            }
+        }
+
+        async fn verify(self) -> (VerificationResult, KeyedL1) {
+            use super::super::views::{
+                AuthoredL2Plan, CoreUpgradeExecutorView, TransitionManifest,
+            };
+            use crate::upgrade_verification::constants::EIP1967_PROXY_ADMIN_SLOT;
+
+            let l1 = KeyedL1::default();
+            // The executors, bound to the CTM and the domains' ProxyAdmins and owned by
+            // governance. Only the presence of their code is read.
+            l1.code(CORE_EXECUTOR, b"\x60");
+            l1.answer(
+                CORE_EXECUTOR,
+                CoreUpgradeExecutorView::PROXY_ADMINCall {},
+                ECO_ADMIN,
+            );
+            l1.code(CTM_EXECUTOR, b"\x60");
+            l1.answer(
+                CTM_EXECUTOR,
+                CTMUpgradeExecutorView::CHAIN_TYPE_MANAGERCall {},
+                CTM,
+            );
+            l1.answer(
+                CTM_EXECUTOR,
+                CTMUpgradeExecutorView::CTM_PROXY_ADMINCall {},
+                CTM_ADMIN,
+            );
+            for executor in [CORE_EXECUTOR, CTM_EXECUTOR] {
+                l1.answer(executor, Ownable2StepView::ownerCall {}, GOVERNANCE);
+                l1.answer(
+                    executor,
+                    Ownable2StepView::pendingOwnerCall {},
+                    Address::ZERO,
+                );
+            }
+
+            // Each leg's row, in its member's slot, departing from the implementation its
+            // domain's ProxyAdmin reports. Each ProxyAdmin administers its domain's anchor and is
+            // owned by its executor.
+            for (object, domain, inventory, member, proxy, admin, anchor, executor) in [
+                (
+                    CORE_TRANSITION,
+                    PROXY_UPGRADE_DOMAIN_CORE,
+                    &L1_ECOSYSTEM_CONTRACTS[..],
+                    "L1MessageRoot",
+                    ROOT_PROXY,
+                    ECO_ADMIN,
+                    BRIDGEHUB,
+                    CORE_EXECUTOR,
+                ),
+                (
+                    INFRASTRUCTURE,
+                    PROXY_UPGRADE_DOMAIN_CTM,
+                    &CTM_CONTRACTS[..],
+                    "ValidatorTimelock",
+                    TIMELOCK,
+                    CTM_ADMIN,
+                    CTM,
+                    CTM_EXECUTOR,
+                ),
+            ] {
+                let mut rows = vec![inert(); inventory.len()];
+                let slot = inventory.iter().position(|m| *m == member).unwrap();
+                rows[slot] = ProxyUpgradeRow {
+                    proxy,
+                    expectedOldImpl: OLD_IMPL,
+                    implNew: NEW_IMPL,
+                    callInitializeUpgrade: false,
+                };
+                l1.answer(
+                    object,
+                    ProxyUpgradeTransitionView::getManifestCall {},
+                    ProxyUpgradeTransitionManifest {
+                        domain,
+                        proxyUpgrades: rows,
+                        proxyUpgradeEngine: engine(),
+                    },
+                );
+                l1.answer(
+                    admin,
+                    ProxyAdminView::getProxyImplementationCall { proxy },
+                    OLD_IMPL,
+                );
+                l1.storage(anchor, EIP1967_PROXY_ADMIN_SLOT, admin.into_word());
+                l1.answer(admin, ProxyAdminView::ownerCall {}, executor);
+            }
+
+            // The transition: from v0.35.0 and the release the CTM is on, to v0.36.0.
+            l1.answer(
+                TRANSITION,
+                CTMTransitionView::getManifestCall {},
+                TransitionManifest {
+                    fromRelease: FROM_RELEASE,
+                    newRelease: NEW_RELEASE,
+                    chainUpgradeEngine: engine(),
+                    oldProtocolVersionDeadline: U256::ZERO,
+                    upgradeTimestamp: U256::ZERO,
+                    l2Plan: AuthoredL2Plan {
+                        delegateBytecodeInfo: Bytes::new(),
+                        extraBytecodeInfos: Vec::new(),
+                        delegateComposer: Address::ZERO,
+                    },
+                },
+            );
+            l1.answer(
+                TRANSITION,
+                CTMTransitionView::oldProtocolVersionCall {},
+                V35,
+            );
+            l1.answer(
+                TRANSITION,
+                CTMTransitionView::newProtocolVersionCall {},
+                V36,
+            );
+
+            // The CTM: registered on the reviewed Bridgehub or not, built over `built_over`,
+            // owned by its executor with nobody nominated, at the transition's departure, and
+            // naming `TIMELOCK`.
+            l1.answer(
+                BRIDGEHUB,
+                BridgehubView::chainTypeManagerIsRegisteredCall {
+                    _chainTypeManager: CTM,
+                },
+                self.registered,
+            );
+            l1.answer(CTM, CtmView::BRIDGE_HUBCall {}, self.built_over);
+            l1.answer(CTM, CtmView::ownerCall {}, CTM_EXECUTOR);
+            l1.answer(CTM, CtmView::pendingOwnerCall {}, Address::ZERO);
+            l1.answer(CTM, CtmView::protocolVersionCall {}, V35);
+            l1.answer(CTM, CtmView::currentReleaseCall {}, FROM_RELEASE);
+            l1.answer(CTM, CtmView::validatorTimelockPostV29Call {}, TIMELOCK);
+            l1.answer(
+                TIMELOCK,
+                Ownable2StepView::ownerCall {},
+                self.timelock_owner,
+            );
+            l1.answer(
+                TIMELOCK,
+                Ownable2StepView::pendingOwnerCall {},
+                Address::ZERO,
+            );
+
+            // The ecosystem as each Bridgehub tells it: the reviewed one enumerates the CTM's
+            // chain, the CTM's own enumerates none. The live force-deployment values are left
+            // unanswered: the release they are held to is unread, so only where they are read
+            // from matters.
+            let (reviewed_root, ctms_root) = self.message_root;
+            l1.answer(BRIDGEHUB, BridgehubView::messageRootCall {}, reviewed_root);
+            l1.answer(CTMS_BRIDGEHUB, BridgehubView::messageRootCall {}, ctms_root);
+            let chain_id = U256::from(CHAIN_ID);
+            l1.answer(
+                BRIDGEHUB,
+                BridgehubView::getAllZKChainChainIDsCall {},
+                vec![chain_id],
+            );
+            l1.answer(
+                CTMS_BRIDGEHUB,
+                BridgehubView::getAllZKChainChainIDsCall {},
+                Vec::<U256>::new(),
+            );
+            l1.answer(
+                BRIDGEHUB,
+                BridgehubView::chainTypeManagerCall { _chainId: chain_id },
+                CTM,
+            );
+            l1.answer(
+                CTM,
+                CtmView::getProtocolVersionCall { _chainId: chain_id },
+                self.chain_version,
+            );
+
+            let mut result = VerificationResult::default();
+            verify(
+                &l1.provider(),
+                &ReviewedBuild::from_parts(&[]),
+                &unread_genesis(),
+                &package(vec![core(), infrastructure(), transition()], Vec::new()),
+                Some(GOVERNANCE),
+                &[SALT],
+                &ReviewedEnv::for_test(None, Some(BRIDGEHUB)),
+                &mut result,
+            )
+            .await
+            .unwrap();
+            (result, l1)
+        }
+    }
+
+    /// Asserts that the ecosystem reads of `run` went to the reviewed Bridgehub, and none to
+    /// [`CTMS_BRIDGEHUB`].
+    fn assert_read_through_the_reviewed_bridgehub(run: &str, l1: &KeyedL1) {
+        for (read, through_reviewed) in [
+            (
+                "the live force-deployment values",
+                l1.called::<BridgehubView::MAX_NUMBER_OF_ZK_CHAINSCall>(BRIDGEHUB),
+            ),
+            (
+                "the chain enumeration",
+                l1.called::<BridgehubView::getAllZKChainChainIDsCall>(BRIDGEHUB),
+            ),
+            (
+                "the ecosystem leg's slots",
+                l1.called::<BridgehubView::messageRootCall>(BRIDGEHUB),
+            ),
+        ] {
+            assert!(
+                through_reviewed,
+                "{run}: {read} must be read through the reviewed Bridgehub"
+            );
+        }
+        assert_eq!(
+            l1.selectors_called_on(CTMS_BRIDGEHUB),
+            Vec::<[u8; 4]>::new(),
+            "{run}: no read follows the CTM's BRIDGE_HUB()"
+        );
+    }
+
+    /// F1 and OZ L-21, through `verify` itself: the CTM is held to the reviewed Bridgehub's
+    /// registry, the ecosystem reads go through the reviewed Bridgehub even when the CTM names
+    /// another, and a chain below v0.35.0 or a ValidatorTimelock outside governance fails. Each
+    /// of these checks, removed or re-anchored on the CTM's `BRIDGE_HUB()`, fails an assertion.
+    #[tokio::test]
+    async fn the_upgrade_is_bound_to_the_reviewed_bridgehub() {
+        let control_run = ReviewedEcosystemRun::control();
+        let (control, l1) = control_run.verify().await;
+        for finding in [
+            "is not registered on the reviewed Bridgehub",
+            "is built over Bridgehub",
+            "names proxy",
+            "the ValidatorTimelock",
+            "has no upgrade path",
+            "cannot be enumerated",
+        ] {
+            assert!(
+                !control.has_error(finding),
+                "control: {finding}: {:?}",
+                control.error_messages
+            );
+        }
+        assert_read_through_the_reviewed_bridgehub("control", &l1);
+
+        let (built_over, l1) = ReviewedEcosystemRun {
+            built_over: CTMS_BRIDGEHUB,
+            ..control_run
+        }
+        .verify()
+        .await;
+        assert!(
+            built_over.has_error(&format!(
+                "the CTM {CTM} is built over Bridgehub {CTMS_BRIDGEHUB}, not the reviewed \
+                 {BRIDGEHUB}"
+            )),
+            "{:?}",
+            built_over.error_messages
+        );
+        assert_read_through_the_reviewed_bridgehub("built over another Bridgehub", &l1);
+        assert_eq!(
+            built_over.errors,
+            control.errors + 1,
+            "built over another Bridgehub: {:?}",
+            built_over.error_messages
+        );
+
+        for (variant, run, finding) in [
+            (
+                "a CTM the reviewed Bridgehub does not register",
+                ReviewedEcosystemRun {
+                    registered: false,
+                    ..control_run
+                },
+                format!("the CTM {CTM} is not registered on the reviewed Bridgehub {BRIDGEHUB}"),
+            ),
+            (
+                "a message root the row does not name",
+                ReviewedEcosystemRun {
+                    message_root: (OTHER_PROXY, ROOT_PROXY),
+                    ..control_run
+                },
+                format!("names proxy {ROOT_PROXY}, but the live L1MessageRoot is {OTHER_PROXY}"),
+            ),
+            (
+                "a ValidatorTimelock governance does not hold",
+                ReviewedEcosystemRun {
+                    timelock_owner: STRANGER,
+                    ..control_run
+                },
+                format!("the ValidatorTimelock {TIMELOCK} is owned by {STRANGER}"),
+            ),
+            (
+                "a chain below v0.35.0",
+                ReviewedEcosystemRun {
+                    chain_version: U256::from(V29_1),
+                    ..control_run
+                },
+                format!(
+                    "chain {CHAIN_ID} is at v0.29.1: once the v0.36.0 CTM lands it has no upgrade \
+                     path"
+                ),
+            ),
+        ] {
+            let (found, _) = run.verify().await;
+            assert_eq!(
+                found.errors,
+                control.errors + 1,
+                "{variant}: {:?}",
+                found.error_messages
+            );
+            assert!(
+                found.has_error(&finding),
+                "{variant}: {:?}",
+                found.error_messages
+            );
+        }
     }
 }

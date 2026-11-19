@@ -16,9 +16,9 @@ upgrade-envs/
 
 `<release>` is the full release name (`v0.34.0-chain-config`); `<env>` is `stage`, `testnet`,
 `mainnet`, `local`, `foundry-upgrade` or `zksync-os-integration-test`. `protocol_ops --env <env>` reads
-`permanent-values/<env>.toml` together with `<release>/<env>.toml` of the release named by
-`current_upgrade_env_dir!` in `protocol-ops/src/common/forge/scripts/mod.rs` (moved by
-`yarn new-release`), and writes to
+`permanent-values/<env>.toml` together with `<release>/<env>.toml` of the current release, the one
+`v<major>.<minor>.<patch>-<name>` of the version in `configs/genesis/zksync-os/latest.json` (`yarn new-release`
+bumps it and creates the next release's directory), and writes to
 `<release>/output/<env>/`. Both files must exist for an environment: the tooling refuses to fall
 back to `local` values.
 
@@ -32,7 +32,7 @@ impersonated. Update it when a release moves an address; never put per-release v
 
 ### `<release>/<env>.toml`
 
-What the release needs from the environment: the owner address and Era chain id, the CREATE2 salt
+What the release needs from the environment: the owner address, the CREATE2 salt
 for the core deploys and one per CTM under `[create2_factory_salts]`, and the release's one-off
 switches (`redeploy_zk_governance`, which `yarn new-release` does not copy into the next release,
 `[contracts] eip7702_checker`). Keep it small: anything derivable from L1 is read from L1 instead. The old protocol version in particular

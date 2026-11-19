@@ -22,8 +22,7 @@ import {
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The version-shape and schedule rules every committed CTM edge obeys, checked when the
 ///         edge's object is constructed — before governance can commit an edge that would bump the
-///         CTM and then revert on every chain. Shared by `CTMTransition` and
-///         `RegistryBootstrapMigration`.
+///         CTM and then revert on every chain. Used by `CTMTransition`.
 library VersionEdgeLib {
     /// @notice Reverts unless the edge `_oldVersion -> _newVersion` with this schedule and L2 side
     ///         is one every chain can execute.

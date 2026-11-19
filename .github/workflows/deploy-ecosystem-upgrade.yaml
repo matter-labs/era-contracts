@@ -4,8 +4,9 @@ name: "Ecosystem Upgrade: Deploy + Verify"
 # (`generate-ecosystem-upgrade-calldata.yaml`) produces the calldata + the
 # deployer prepare bundles on a fork; THIS workflow takes those deployer
 # bundles and actually BROADCASTS them to a real L1, producing
-# `transactions.txt` (the record of what was broadcast), then
-# verifies the freshly deployed contracts on Etherscan.
+# `transactions.txt` (the record of what was broadcast). Each deployed contract
+# is verified on Etherscan as soon as the broadcast lands it, and the run then
+# checks that Etherscan shows this checkout's sources for every one of them.
 # To verify an existing deployment without loading its signing key or sending
 # any transactions, dispatch with verify_only=true and run_verify=true using
 # the SAME generate_run_id that supplied the deployed bundle.
@@ -13,6 +14,14 @@ name: "Ecosystem Upgrade: Deploy + Verify"
 # It runs the SAME `protocol_ops` commands you'd run locally (see
 # `docs/ecosystem-upgrade-deploy.md`), so a local deploy and a CI deploy are
 # byte-for-byte the same tool — CI is just a convenience wrapper.
+#
+# The run must check out the commit the bundle was generated from, with clean
+# contract sources, and before any key is loaded `protocol_ops ecosystem
+# check-deployer-plan` holds every call the deployer would sign to this
+# checkout's build, the env's reviewed inputs and what L1 says (the CTMs'
+# ProxyAdmin, BytecodesSupplier and ValidatorTimelock, the Bridgehub's
+# ProxyAdmin). What it admits, and the protected-environment
+# proposal for this job: `docs/upgrade-operations.md` ("Deployer signing").
 #
 # What gets broadcast: ONLY the deployer's (Camp-A) bundles — the ones whose
 # `manifest.bundles[].target` is the deployer EOA. The legacy-Governance /
@@ -31,10 +40,10 @@ name: "Ecosystem Upgrade: Deploy + Verify"
 # (`l1.chain_id`), NOT inferred from the `environment` name. This prevents a
 # mismatched name from selecting the wrong chain and key. So:
 #
-#   l1.chain_id = 1         → L1_RPC_URL_MAINNET + DEPLOYER_PRIVATE_KEY_MAINNET,
-#                             Etherscan `--chain mainnet`
-#   l1.chain_id = 11155111  → L1_RPC_URL_SEPOLIA + DEPLOYER_PRIVATE_KEY_SEPOLIA,
-#                             Etherscan `--chain sepolia`
+#   l1.chain_id = 1         → L1_RPC_URL_MAINNET + DEPLOYER_PRIVATE_KEY_MAINNET
+#   l1.chain_id = 11155111  → L1_RPC_URL_SEPOLIA + DEPLOYER_PRIVATE_KEY_SEPOLIA
+#
+# Etherscan verification passes `--chain <l1.chain_id>`.
 #
 # Unlike step 1 (a fork rehearsal that impersonates the deployer and signs
 # nothing), this step signs REAL transactions, so it needs the deployer key. The
@@ -42,8 +51,8 @@ name: "Ecosystem Upgrade: Deploy + Verify"
 # prepared for — otherwise `--skip-unkeyed` would drop every bundle and "succeed"
 # having deployed nothing.
 #
-# Optional:
-#   ETHERSCAN_API_KEY                         — for the Etherscan verify step
+# With run_verify (the default):
+#   ETHERSCAN_API_KEY                         — for Etherscan verification and the source check
 # The L1 RPC URL comes from the secret (never a plaintext input) so its API key
 # is never shown in the run-summary UI.
 
@@ -83,6 +92,11 @@ on:
         required: false
         default: false
         type: boolean
+      etherscan_earlier_commits:
+        description: "Space-separated full contracts_commit hashes of earlier cuts of this release on the same L1, each an ancestor of this run's commit. A re-cut keeps a contract whose code and salt did not change, and Etherscan then shows the sources of the cut that deployed it: the source check accepts those."
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -190,7 +204,9 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          # Recursive, as AllContractsHashes.json was built: the deployer plan check holds this
+          # build to it, and nested libraries are part of the remapping set.
+          submodules: recursive
 
       - name: Install Foundry (cast + forge for verify)
         uses: ./.github/actions/install-foundry
@@ -216,11 +232,11 @@ jobs:
         working-directory: protocol-ops
         run: cargo build --release
 
-      # forge verify-contract compiles the source to compare against the
-      # on-chain bytecode, so it needs the EVM (out/) artifacts. Skipped when
-      # not verifying — the broadcast itself needs no contract build.
-      - name: Build contracts (for Etherscan verify)
-        if: ${{ inputs.run_verify }}
+      # The deployer plan check holds every deployment to the creation code of
+      # this build, and forge verify-contract compiles the source to compare
+      # against the on-chain bytecode: both need the EVM (out/) artifacts.
+      - name: Build contracts (for the deployer plan check and Etherscan verify)
+        if: ${{ inputs.run_verify || !inputs.verify_only }}
         run: yarn l1 build:foundry
 
       # The deploy bundle produced by step 1: the deployer calls, ecosystem.toml,
@@ -274,9 +290,9 @@ jobs:
             echo "UPGRADE_KIND=$KIND"
           } >> "$GITHUB_ENV"
 
-      # Tie the downloaded bytes back to the exact successful generation run.
-      # Broadcasting is commit-agnostic, but Etherscan verification recompiles
-      # from this checkout, so a different checkout is still warned separately.
+      # Tie the downloaded bytes back to the exact successful generation run,
+      # and this checkout to the commit it was generated from: the deployer plan
+      # check and the Etherscan verification both build this checkout.
       - name: Check bundle provenance against the proven run
         env:
           ENVIRONMENT: ${{ inputs.environment }}
@@ -301,7 +317,7 @@ jobs:
             echo "::error::bundle was generated from a dirty or unknown worktree"; exit 1
           fi
           if [ "$bundle_commit" != "$GITHUB_SHA" ]; then
-            echo "::warning::bundle was generated from $bundle_commit but this run checked out $GITHUB_SHA — re-dispatch on that commit for a source-matching Etherscan verify."
+            echo "::error::bundle was generated from $bundle_commit but this run checked out $GITHUB_SHA. Dispatch this workflow on a ref at $bundle_commit: the deployer plan is checked against, and Etherscan verifies, this checkout's build."; exit 1
           fi
 
       # A failed broadcast can already have mined some CREATE2 transactions.
@@ -371,51 +387,83 @@ jobs:
             echo "TXLOG=$OUTDIR/transactions.txt"
           } >> "$GITHUB_ENV"
 
-      - name: Select Etherscan network for verification only
-        if: ${{ inputs.verify_only }}
-        run: |
-          set -euo pipefail
-          case "$(jq -r '.l1.chain_id' "$DEPLOY_BUNDLE_DIR/bundle-metadata.json")" in
-            1) echo "ETHERSCAN_CHAIN=mainnet" >> "$GITHUB_ENV" ;;
-            11155111) echo "ETHERSCAN_CHAIN=sepolia" >> "$GITHUB_ENV" ;;
-            *) echo "::error::Unsupported Etherscan chain"; exit 1 ;;
-          esac
-
       # Which L1 to broadcast to comes from the BUNDLE, not from the env's name:
       # `bundle-metadata.json` records the `l1.chain_id` the calldata was computed
       # against, avoiding a name-based selection of the wrong chain and key.
-      - name: Select + mask RPC and deployer key (L1 from the bundle)
+      - name: Select + mask the L1 RPC (L1 from the bundle)
         if: ${{ !inputs.verify_only }}
         env:
           ENVIRONMENT: ${{ inputs.environment }}
           RPC_SEPOLIA: ${{ secrets.L1_RPC_URL_SEPOLIA }}
           RPC_MAINNET: ${{ secrets.L1_RPC_URL_MAINNET }}
-          PK_SEPOLIA: ${{ secrets.DEPLOYER_PRIVATE_KEY_SEPOLIA }}
-          PK_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
         run: |
           set -euo pipefail
           META="$DEPLOY_BUNDLE_DIR/bundle-metadata.json"
           L1_CHAIN_ID="$(jq -r '.l1.chain_id // empty' "$META")"
           case "$L1_CHAIN_ID" in
-            1)        rpc="$RPC_MAINNET"; pk="$PK_MAINNET"; net=mainnet ;;
-            11155111) rpc="$RPC_SEPOLIA"; pk="$PK_SEPOLIA"; net=sepolia ;;
+            1)        rpc="$RPC_MAINNET"; net=mainnet ;;
+            11155111) rpc="$RPC_SEPOLIA"; net=sepolia ;;
             *) echo "::error::Cannot map l1_chain_id='$L1_CHAIN_ID' to a secret (only 1 / 11155111 are wired)"; exit 1 ;;
           esac
           echo "Broadcasting '$ENVIRONMENT' to L1 $net (chain id $L1_CHAIN_ID)"
           if [ -z "$rpc" ]; then
             echo "::error::Missing L1 RPC secret for $net (L1_RPC_URL_$(echo "$net" | tr a-z A-Z))"; exit 1
           fi
-          if [ -z "$pk" ]; then
-            echo "::error::Missing deployer key secret for $net (DEPLOYER_PRIVATE_KEY_$(echo "$net" | tr a-z A-Z))"; exit 1
-          fi
           echo "::add-mask::$rpc"
-          echo "::add-mask::$pk"
           actual_chain_id="$(cast chain-id --rpc-url "$rpc")"
           if [ "$actual_chain_id" != "$L1_CHAIN_ID" ]; then
             echo "::error::RPC selected for $net reports chain id $actual_chain_id, bundle requires $L1_CHAIN_ID"
             exit 1
           fi
           echo "RPC chain id verified: $actual_chain_id"
+          {
+            echo "L1_RPC_URL=$rpc"
+            echo "L1_NETWORK=$net"
+          } >> "$GITHUB_ENV"
+
+      # Every call the deployer key would sign, held to this checkout before the
+      # key is loaded: no value, CREATE2 deployments only of the reviewed build
+      # under the env's declared salts, any other call only from the reviewed
+      # allowlist (protocol-ops/src/commands/ecosystem/deployer_plan.rs). It reads
+      # the CTMs' ProxyAdmin, BytecodesSupplier and ValidatorTimelock and the
+      # Bridgehub's ProxyAdmin from L1, and refuses unless this checkout is the
+      # bundle's commit with clean contract sources.
+      - name: Check the deployer plan against this checkout
+        if: ${{ !inputs.verify_only }}
+        run: |
+          set -euo pipefail
+          ./protocol-ops/target/release/protocol_ops ecosystem check-deployer-plan \
+            --bundle "$DEPLOY_BUNDLE_DIR" \
+            --l1-rpc-url "$L1_RPC_URL"
+
+      # The build carries no CBOR metadata, so the bytecode does not bind its verified source:
+      # whoever verifies an address first sets the source Etherscan shows for it. This submits
+      # each contract as soon as the broadcast lands it, not after the whole broadcast. It runs
+      # in the background from here, before the deployer key is loaded; "Verify contracts on
+      # Etherscan" waits for it.
+      - name: Start Etherscan verification alongside the broadcast
+        if: ${{ inputs.run_verify && !inputs.verify_only }}
+        env:
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+        run: bash .github/scripts/deploy-ecosystem-upgrade/start-etherscan-follower.sh
+
+      - name: Check the deployer key against the bundle
+        if: ${{ !inputs.verify_only }}
+        env:
+          PK_SEPOLIA: ${{ secrets.DEPLOYER_PRIVATE_KEY_SEPOLIA }}
+          PK_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
+        run: |
+          set -euo pipefail
+          META="$DEPLOY_BUNDLE_DIR/bundle-metadata.json"
+          case "$L1_NETWORK" in
+            mainnet) pk="$PK_MAINNET" ;;
+            sepolia) pk="$PK_SEPOLIA" ;;
+            *) echo "::error::No deployer key wired for L1 network '$L1_NETWORK'"; exit 1 ;;
+          esac
+          if [ -z "$pk" ]; then
+            echo "::error::Missing deployer key secret for $L1_NETWORK (DEPLOYER_PRIVATE_KEY_$(echo "$L1_NETWORK" | tr a-z A-Z))"; exit 1
+          fi
+          echo "::add-mask::$pk"
           deployer="$(cast wallet address --private-key "$pk")"
           echo "Deployer (real signer): $deployer"
           # The bundle names the EOA whose bundles are the deployer's. If the key in
@@ -430,14 +478,9 @@ jobs:
             exit 1
           fi
           # The key itself is not exported: $GITHUB_ENV reaches every later step,
-          # including the Etherscan step that evaluates commands from the
+          # including the Etherscan step that runs commands built from the
           # downloaded bundle. The broadcast step reads it from the secret again.
-          {
-            echo "L1_RPC_URL=$rpc"
-            echo "L1_NETWORK=$net"
-            echo "DEPLOYER_ADDR=$deployer"
-            echo "ETHERSCAN_CHAIN=$net"
-          } >> "$GITHUB_ENV"
+          echo "DEPLOYER_ADDR=$deployer" >> "$GITHUB_ENV"
 
       # Broadcast ONLY the deployer bundles (target == deployer), robustly, one
       # at a time. Writes transactions.txt next to --out, the record of what was
@@ -457,13 +500,22 @@ jobs:
           esac
           MANIFEST="$DEPLOY_BUNDLE_DIR/prepare/manifest.json"
           echo "Manifest: $MANIFEST"
-          ./protocol-ops/target/release/protocol_ops ecosystem upgrade-broadcast \
+          halt=()
+          if [ -n "${ETHERSCAN_VERIFY_DIR:-}" ]; then halt=(--halt-when "$ETHERSCAN_VERIFY_DIR/failed"); fi
+          if ! ./protocol-ops/target/release/protocol_ops ecosystem upgrade-broadcast \
             --manifest "$MANIFEST" \
             --l1-rpc-url "$L1_RPC_URL" \
             --key "${DEPLOYER_ADDR}=${pk}" \
             --skip-unkeyed \
             --max-gas-price-gwei "$MAX_GAS_PRICE_GWEI" \
-            --out "$DEPLOY_OUTDIR/deploy-executed.json"
+            --out "$DEPLOY_OUTDIR/deploy-executed.json" \
+            "${halt[@]}"; then
+            if [ -n "${ETHERSCAN_VERIFY_DIR:-}" ] && [ -f "$ETHERSCAN_VERIFY_DIR/failed" ]; then
+              cat "$ETHERSCAN_VERIFY_DIR/log"
+              echo "::error::The Etherscan verifier exited during the broadcast (its log is above), so the broadcast stopped before its next transaction. Fix the cause, then resume the deploy (resume_deploy_run_id): its verifier first submits what already landed."
+            fi
+            exit 1
+          fi
           echo "=== transactions.txt ==="
           cat "$TXLOG" || true
 
@@ -489,69 +541,61 @@ jobs:
           if-no-files-found: warn
           retention-days: 90
 
-      # Etherscan verification. Replays the `forge verify-contract` commands step
-      # 1 logged — which already carry the exact `--constructor-args <hex>` taken
-      # from the CREATE2 init code, so nothing is guessed. Etherscan read APIs lag
-      # freshly deployed code, so `--retries/--delay` ride that out; any residual
-      # failure does not fail a deployment, but DOES fail verification-only runs.
+      # Etherscan verification of every contract step 1 logged
+      # (`forge verify-contract <address> <Contract> [--constructor-args <hex>]`, the
+      # arguments taken from the CREATE2 init code it deployed). A deploy run first waits for the
+      # verifier started before the broadcast, which does not wait for Etherscan's verdicts. This
+      # step then submits the whole bundle again and waits for each verdict; Etherscan answers an
+      # address it has verified as such. Failures are reported, never fatal: the source check
+      # below is what passes or fails the run.
       - name: Verify contracts on Etherscan
         if: ${{ inputs.run_verify }}
-        continue-on-error: ${{ !inputs.verify_only }}
+        continue-on-error: true
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
-        working-directory: l1-contracts
         run: |
-          set -uo pipefail
-          if [ -z "${ETHERSCAN_API_KEY:-}" ]; then
-            echo "::error::ETHERSCAN_API_KEY not set"; exit 1
-          fi
-          LOG="$DEPLOY_BUNDLE_DIR/extra-verification-logs.txt"
-          if [ ! -f "$LOG" ]; then
-            if [ "${UPGRADE_KIND:-}" = "forge-script" ]; then
-              echo "The bundle logged no contract deployments to verify ($UPGRADE)."; exit 0
+          set -euo pipefail
+          if [ -n "${ETHERSCAN_VERIFY_DIR:-}" ]; then
+            # The broadcast is over: the verifier makes a last pass and reports what never landed.
+            touch "$ETHERSCAN_VERIFY_DIR/broadcast-done"
+            while [ ! -f "$ETHERSCAN_VERIFY_DIR/status" ]; do sleep 10; done
+            cat "$ETHERSCAN_VERIFY_DIR/log"
+            if [ "$(cat "$ETHERSCAN_VERIFY_DIR/status")" != 0 ]; then
+              echo "::warning::The verifier that followed the broadcast did not submit every contract"
             fi
-            echo "::error::extra-verification-logs.txt not found"; exit 1
           fi
-          # $ETHERSCAN_CHAIN was resolved from the bundle's l1.chain_id, not from
-          # the env's name (see the RPC step).
-          CHAIN="${ETHERSCAN_CHAIN:?}"
-          # Replay each logged `forge verify-contract …` command VERBATIM. Step 1
-          # already emits the exact `--constructor-args <hex>` for every contract
-          # that has them (derived from the CREATE2 init code it deployed — see
-          # Create2FactoryUtils.notifyAboutDeployment), so there is nothing to
-          # guess. We only append the chain + `--watch`; the key comes from
-          # $ETHERSCAN_API_KEY in the env. `--retries/--delay` ride out Etherscan
-          # indexing freshly-deployed code. Report partial failures explicitly;
-          # normal deployments tolerate them, verification-only runs do not.
-          verified=0
-          failed=0
-          readonly verification_attempts=3
-          readonly verification_retry_delay=10
-          while IFS= read -r cmd; do
-            echo "--- $cmd"
-            read -r _forge _verify _address contract _rest <<< "$cmd"
-            success=false
-            for ((attempt=1; attempt<=verification_attempts; attempt++)); do
-              # --retries covers verification polling, but not an initial ABI
-              # request timeout. Retry the complete idempotent submission too.
-              if eval "$cmd --chain $CHAIN --watch --retries 8 --delay 20"; then
-                success=true
-                break
-              fi
-              if [ "$attempt" -lt "$verification_attempts" ]; then
-                echo "Retrying verification ($attempt/$verification_attempts): $contract"
-                sleep "$verification_retry_delay"
-              fi
-            done
-            if [ "$success" = true ]; then
-              echo "  OK"
-              verified=$((verified + 1))
-            else
-              echo "::warning::verification failed after $verification_attempts attempts: $cmd"
-              failed=$((failed + 1))
+          forge_script=()
+          if [ "${UPGRADE_KIND:-}" = "forge-script" ]; then forge_script=(--forge-script); fi
+          ./protocol-ops/target/release/protocol_ops ecosystem etherscan-verify \
+            --bundle "$DEPLOY_BUNDLE_DIR" \
+            "${forge_script[@]}"
+
+      # What Etherscan shows for every deployed address must be this checkout's sources, or an
+      # earlier cut's (etherscan_earlier_commits), byte for byte, comments included; so must a
+      # similar match. For each address that fails, protocol_ops prints what to do.
+      - name: Check Etherscan shows this checkout's sources
+        if: ${{ inputs.run_verify }}
+        env:
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+          ETHERSCAN_EARLIER_COMMITS: ${{ inputs.etherscan_earlier_commits }}
+        run: |
+          set -euo pipefail
+          forge_script=()
+          if [ "${UPGRADE_KIND:-}" = "forge-script" ]; then forge_script=(--forge-script); fi
+          earlier=()
+          read -ra commits <<< "$ETHERSCAN_EARLIER_COMMITS"
+          for commit in "${commits[@]}"; do
+            if ! [[ "$commit" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::etherscan_earlier_commits: '$commit' is not a full commit hash"; exit 1
             fi
-          done < <(grep 'forge verify-contract' "$LOG" | sed 's/^.*forge verify-contract/forge verify-contract/' | sort -u)
-          echo "Etherscan verification: $verified succeeded, $failed failed"
-          if [ "$failed" -ne 0 ] || [ "$verified" -eq 0 ]; then
-            echo "::error::Etherscan verification incomplete"; exit 1
+            earlier+=(--also-commit "$commit")
+          done
+          if [ "${#earlier[@]}" -gt 0 ] && [ "$(git rev-parse --is-shallow-repository)" = true ]; then
+            # An earlier cut must be in this checkout's history, which protocol_ops checks: fetch
+            # that history, never a commit by hash (GitHub serves forks' commits that way too).
+            git fetch --no-tags --unshallow origin "$(git rev-parse HEAD)"
           fi
+          ./protocol-ops/target/release/protocol_ops ecosystem etherscan-check \
+            --bundle "$DEPLOY_BUNDLE_DIR" \
+            "${forge_script[@]}" \
+            "${earlier[@]}"

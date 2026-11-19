@@ -10,6 +10,8 @@ use clap::Subcommand;
 use crate::{
     commands::ecosystem::broadcast::UpgradeBroadcastArgs,
     commands::ecosystem::bundle::{RehearseUpgradeArgs, ReplayBundleArgs, VerifyBundleArgs},
+    commands::ecosystem::deployer_plan::CheckDeployerPlanArgs,
+    commands::ecosystem::etherscan::{EtherscanCheckArgs, EtherscanVerifyArgs},
     commands::ecosystem::init::EcosystemInitArgs,
     commands::ecosystem::simulator::GovernanceTomlToSimulatorArgs,
     commands::ecosystem::upgrade::{ListCtmsArgs, UpgradeGovernanceArgs, UpgradePrepareAllArgs},
@@ -18,6 +20,8 @@ use crate::{
 
 pub mod broadcast;
 pub mod bundle;
+pub mod deployer_plan;
+pub mod etherscan;
 pub mod init;
 pub mod simulator;
 pub mod upgrade;
@@ -44,11 +48,12 @@ pub enum EcosystemCommands {
     /// `--env` is set, or pass `--governance-toml` explicitly.
     #[command(name = "upgrade-governance")]
     UpgradeGovernance(UpgradeGovernanceArgs),
-    /// Verify a v35 registry-driven upgrade package — an upgrade of 1..3 executor legs, the
-    /// one-time bootstrap edge or a transition replacement, decided from its calldata. Checks
+    /// Verify a registry-driven upgrade package — an upgrade of 1..3 executor legs or a
+    /// transition replacement, decided from its calldata. Checks
     /// object provenance and construction, the authority binding and the owner it lands on, every
     /// proxy row's slot and departing implementation, readiness, and that the governance calldata
-    /// invokes the reviewed legs as one contiguous run in canonical order. Read-only.
+    /// invokes the reviewed legs as one contiguous run in canonical order. Read-only. (The name
+    /// predates the retirement of the one-time bootstrap edge; `verify-package` is an alias.)
     #[command(name = "verify-bootstrap", visible_alias = "verify-package")]
     VerifyBootstrap(VerifyBootstrapArgs),
     /// Broadcast the bundles produced by `upgrade-prepare-all` to a real (or
@@ -68,6 +73,20 @@ pub enum EcosystemCommands {
     ReplayBundle(ReplayBundleArgs),
     /// Check a deploy bundle's files against the digests in its `bundle-metadata.json`.
     VerifyBundle(VerifyBundleArgs),
+    /// Hold every call the deployer would sign to this checkout before anything is signed: no
+    /// value; CREATE2 deployments only under the env's salts, of reviewed code the package records
+    /// or names; every other call only from the reviewed allowlist. `replay-bundle` runs it before
+    /// a fork rehearsal or a broadcast.
+    #[command(name = "check-deployer-plan")]
+    CheckDeployerPlan(CheckDeployerPlanArgs),
+    /// Submit every contract the deploy bundle logged to Etherscan. With `--l1-rpc-url` it runs
+    /// next to the broadcast and submits each contract as soon as its code is on L1.
+    #[command(name = "etherscan-verify")]
+    EtherscanVerify(EtherscanVerifyArgs),
+    /// Hold what Etherscan shows for every contract the deploy bundle logged to this checkout:
+    /// the contract name and every source file, comments included. Read-only.
+    #[command(name = "etherscan-check")]
+    EtherscanCheck(EtherscanCheckArgs),
     /// Print a starter `--ctm-config` TOML by enumerating every CTM
     /// registered on the supplied bridgehub. Use this on stage / mainnet to
     /// discover the Atlas CTM address without having to look it up by hand.
@@ -96,6 +115,9 @@ pub async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
         EcosystemCommands::RehearseUpgrade(args) => bundle::run_rehearse_upgrade(args).await,
         EcosystemCommands::ReplayBundle(args) => bundle::run_replay_bundle(args).await,
         EcosystemCommands::VerifyBundle(args) => bundle::run_verify_bundle(args),
+        EcosystemCommands::CheckDeployerPlan(args) => deployer_plan::run(args).await,
+        EcosystemCommands::EtherscanVerify(args) => etherscan::run_verify(args).await,
+        EcosystemCommands::EtherscanCheck(args) => etherscan::run_check(args).await,
         EcosystemCommands::ListCtms(args) => upgrade::run_list_ctms(args).await,
         EcosystemCommands::GovernanceTomlToSimulator(args) => simulator::run(args).await,
     }

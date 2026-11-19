@@ -7,13 +7,7 @@
 
 import type { JsonFragment } from "@ethersproject/abi";
 import * as path from "path";
-import {
-  loadAbiFromOut,
-  loadBytecodeFromOut,
-  loadCreationBytecodeFromOut,
-  loadDeterministicBytecodeFromOut,
-  loadDeterministicCreationBytecodeFromOut,
-} from "./artifacts";
+import { loadAbiFromOut, loadBytecodeFromOut, loadCreationBytecodeFromOut } from "./artifacts";
 
 // ── Artifact path registry ──────────────────────────────────────
 //
@@ -36,8 +30,10 @@ const ARTIFACTS = {
   ICTMTransition: "ICTMTransition.sol/ICTMTransition.json",
   IProxyUpgradeTransition: "IProxyUpgradeTransition.sol/IProxyUpgradeTransition.json",
   DefaultUpgrade: "DefaultUpgrade.sol/DefaultUpgrade.json",
-  BootstrapUpgrade: "BootstrapUpgrade.sol/BootstrapUpgrade.json",
+  // The engine a `ProxyUpgradeTransition` pins; its executor delegatecalls it to apply the rows.
+  DefaultProxyUpgradeEngine: "DefaultProxyUpgradeEngine.sol/DefaultProxyUpgradeEngine.json",
   DiamondInit: "DiamondInit.sol/DiamondInit.json",
+  EIP7702Checker: "EIP7702Checker.sol/EIP7702Checker.json",
   ZKsyncOSTestnetVerifier: "ZKsyncOSTestnetVerifier.sol/ZKsyncOSTestnetVerifier.json",
   MultiProofVerifier: "MultiProofVerifier.sol/MultiProofVerifier.json",
   MultiProofTestnetVerifier: "MultiProofTestnetVerifier.sol/MultiProofTestnetVerifier.json",
@@ -52,10 +48,6 @@ const ARTIFACTS = {
   CTMTransition: "CTMTransition.sol/CTMTransition.json",
   ProxyUpgradeTransition: "ProxyUpgradeTransition.sol/ProxyUpgradeTransition.json",
   ServerNotifier: "ServerNotifier.sol/ServerNotifier.json",
-  // Bootstrap edge (see bootstrap-upgrade-stage.ts): the one-time entry into the registry-driven
-  // model, plus the legacy cut-taking entrypoint a fixture may need installed.
-  RegistryBootstrapMigration: "RegistryBootstrapMigration.sol/RegistryBootstrapMigration.json",
-  LegacyTestAdminFacet: "LegacyTestAdminFacet.sol/LegacyTestAdminFacet.json",
   BridgedStandardERC20: "BridgedStandardERC20.sol/BridgedStandardERC20.json",
   ChainAdminOwnable: "ChainAdminOwnable.sol/ChainAdminOwnable.json",
   ChainRegistrationSender: "ChainRegistrationSender.sol/ChainRegistrationSender.json",
@@ -134,25 +126,6 @@ export function getBytecode(name: ContractName): string {
 
 export function getCreationBytecode(name: ContractName): string {
   return loadCreationBytecodeFromOut(ARTIFACTS[name]);
-}
-
-/**
- * Deployed (runtime) bytecode from the deterministic (CBOR-metadata-free) build — see
- * `[profile.registry-deterministic]` in l1-contracts/foundry.toml. Used for every contract an
- * bytecode-DERIVED value the committed registry manifest pins, and for the addresses it names.
- */
-export function getDeterministicBytecode(name: ContractName): string {
-  return loadDeterministicBytecodeFromOut(ARTIFACTS[name]);
-}
-
-/** Creation (init) bytecode from the deterministic (CBOR-metadata-free) build. */
-export function getDeterministicCreationBytecode(name: ContractName): string {
-  return loadDeterministicCreationBytecodeFromOut(ARTIFACTS[name]);
-}
-
-/** Solidity contract name behind `name`, which can differ from the harness name. */
-export function getSolidityContractName(name: ContractName): string {
-  return path.basename(ARTIFACTS[name], ".json");
 }
 
 /** Name of the Solidity source file that defines `name`, e.g. `SystemContext.sol`. */

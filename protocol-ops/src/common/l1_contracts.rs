@@ -367,12 +367,12 @@ pub async fn resolve_pubdata_pricing_mode(
         .context("chain.getPubdataPricingMode() call failed")
 }
 
-/// Resolve the L2 DA commitment scheme the chain currently commits with — the second half of
-/// `chain.getDAValidatorPair()`.
-pub async fn resolve_l2_da_commitment_scheme(
+/// Resolve `chain.getDAValidatorPair()`: the L1 DA validator and the L2 DA commitment scheme the
+/// chain currently commits with.
+pub async fn resolve_da_validator_pair(
     l1_rpc_url: &str,
     chain_address: Address,
-) -> anyhow::Result<crate::types::L2DACommitmentScheme> {
+) -> anyhow::Result<(Address, crate::types::L2DACommitmentScheme)> {
     use crate::common::abi::ZkChainAbi;
 
     let pair = ZkChainAbi::new(chain_address, provider(l1_rpc_url)?)
@@ -380,8 +380,62 @@ pub async fn resolve_l2_da_commitment_scheme(
         .call()
         .await
         .context("chain.getDAValidatorPair() call failed")?;
-    crate::types::L2DACommitmentScheme::try_from(pair._1)
-        .map_err(|e| anyhow::anyhow!("chain reports an unknown L2 DA commitment scheme: {e}"))
+    let scheme = crate::types::L2DACommitmentScheme::try_from(pair._1)
+        .map_err(|e| anyhow::anyhow!("chain reports an unknown L2 DA commitment scheme: {e}"))?;
+    Ok((pair._0, scheme))
+}
+
+/// Resolve `RollupDAManager(rollup_da_manager).isPairAllowed(l1_da_validator, scheme)`.
+pub async fn is_rollup_da_pair_allowed(
+    l1_rpc_url: &str,
+    rollup_da_manager: Address,
+    l1_da_validator: Address,
+    scheme: crate::types::L2DACommitmentScheme,
+) -> anyhow::Result<bool> {
+    use crate::common::abi::RollupDAManagerAbi;
+
+    RollupDAManagerAbi::new(rollup_da_manager, provider(l1_rpc_url)?)
+        .isPairAllowed(l1_da_validator, scheme as u8)
+        .call()
+        .await
+        .with_context(|| {
+            format!("RollupDAManager({rollup_da_manager:#x}).isPairAllowed() call failed")
+        })
+}
+
+/// Resolve the minor component of `chain.getSemverProtocolVersion()` — the version the chain runs
+/// now, which can lag its CTM's.
+pub async fn resolve_chain_minor_protocol_version(
+    l1_rpc_url: &str,
+    chain_address: Address,
+) -> anyhow::Result<u64> {
+    let version = ZkChainAbi::new(chain_address, provider(l1_rpc_url)?)
+        .getSemverProtocolVersion()
+        .call()
+        .await
+        .context("chain.getSemverProtocolVersion() call failed")?;
+    Ok(u64::from(version._1))
+}
+
+/// Resolve `chain.getPubdataContent()`. Only diamonds from the version that introduced the pubdata
+/// content expose the getter, so the caller checks the chain's version first.
+pub async fn resolve_pubdata_content(
+    l1_rpc_url: &str,
+    chain_address: Address,
+) -> anyhow::Result<crate::types::PubdataContent> {
+    use crate::types::PubdataContent;
+    use clap::ValueEnum;
+
+    let content = ZkChainAbi::new(chain_address, provider(l1_rpc_url)?)
+        .getPubdataContent()
+        .call()
+        .await
+        .context("chain.getPubdataContent() call failed")?;
+    PubdataContent::value_variants()
+        .iter()
+        .copied()
+        .find(|known| known.to_u8() == content)
+        .with_context(|| format!("chain reports an unknown pubdata content: {content}"))
 }
 
 /// Resolve the minor component of `ctm.protocolVersion()` — the version chains upgrading from this

@@ -43,6 +43,8 @@ State the three SHAs at the top of the report. Every finding cites code at HEAD.
   each comment's author, body and date. Keep the unresolved ones, plus resolved ones with comments newer than SINCE.
 - `AGENTS.md`, plus every `docs/ai-review/docs/*.md` whose `## Relevant files` covers a changed path (`general.md`
   always). Read those in full and skip the rest.
+- `REVIEW.md` at the root: the "every file" section and each section whose path heading covers a changed path. Raise a
+  style-rule break as a `nit` naming the rule, and a "What to check" break as `should-fix` or `blocker`.
 - `git diff --stat BASE..HEAD`. Set generated artifacts aside: `AllContractsHashes.json`, `selectors`, `zkstack-out`,
   chain states and genesis JSON. Check they are consistent with the code, or that a draft regenerates them later
   (`ci-green.md`); don't read them line by line.
@@ -94,8 +96,10 @@ changed function into its callers and callees. On top of the rules from step 2, 
   Nothing duplicates an existing helper or pattern. No new flag or config for what can be read from L1. The scope
   matches the title.
 - **Tests** assert outcomes, and mocks only isolate. A test that cannot fail is a finding.
-- **Contracts.** A comment-only edit still changes CBOR metadata, and with it the hashes and genesis. Deleting covered
-  code fails the coverage gate. L2-deployable contracts have no constructors or immutables.
+- **Contracts.** The build has no CBOR metadata, so a constructor-only edit leaves the runtime code unchanged: the
+  upgrade must declare that contract (`changedReleaseMembers()`, `changedEcosystemImplementations()`) or its prepare
+  keeps the live one. Deleting covered code fails the coverage gate. L2-deployable contracts have no constructors or
+  immutables.
 - **PR metadata.** The title (it becomes the squash commit) and the body describe what the code does now. TODOs carry a
   ticket.
 

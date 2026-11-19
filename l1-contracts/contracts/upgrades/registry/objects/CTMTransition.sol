@@ -49,12 +49,10 @@ contract CTMTransition is ICTMTransition, ManifestStorage {
     ///         contract: everything is written once, at construction.
     constructor(TransitionManifest memory _manifest) ManifestStorage(abi.encode(_manifest)) {
         // `fromRelease` is MANDATORY: every transition departs from a real, pinned release.
-        // Bootstrapping a pre-registry CTM is one-time migration code, never an accommodation
-        // here; see the Bootstrap section of {docs/registry-driven-upgrades.md}.
         if (
             _manifest.fromRelease == address(0) ||
             _manifest.newRelease == address(0) ||
-            _manifest.upgradeEngine == address(0)
+            _manifest.chainUpgradeEngine == address(0)
         ) {
             revert ZeroAddress();
         }
@@ -186,8 +184,8 @@ contract CTMTransition is ICTMTransition, ManifestStorage {
         return getManifest().newRelease;
     }
 
-    function upgradeEngine() external view returns (address) {
-        return getManifest().upgradeEngine;
+    function chainUpgradeEngine() external view returns (address) {
+        return getManifest().chainUpgradeEngine;
     }
 
     function oldProtocolVersionDeadline() external view returns (uint256) {
@@ -216,7 +214,7 @@ contract CTMTransition is ICTMTransition, ManifestStorage {
 
     /// @inheritdoc ICTMTransition
     function l2UpgradeTx(address _bridgehub, uint256 _chainId) external view returns (L2CanonicalTransaction memory) {
-        return IDefaultUpgrade(getManifest().upgradeEngine).l2UpgradeTx(address(this), _bridgehub, _chainId);
+        return IDefaultUpgrade(getManifest().chainUpgradeEngine).l2UpgradeTx(address(this), _bridgehub, _chainId);
     }
 
     /// @inheritdoc ICTMTransition
@@ -226,7 +224,7 @@ contract CTMTransition is ICTMTransition, ManifestStorage {
     ///      installed.
     function validate() external view {
         TransitionManifest memory m = getManifest();
-        ObjectAnchorLib.requireCode(m.upgradeEngine);
+        ObjectAnchorLib.requireCode(m.chainUpgradeEngine);
         if (m.l2Plan.delegateComposer != address(0)) {
             ObjectAnchorLib.requireCode(m.l2Plan.delegateComposer);
         }

@@ -27,8 +27,8 @@ echo "==> [2/5] regenerating zkstack-out"
 yarn copy-to-zkstack-out
 
 echo "==> [3/5] regenerating anvil-interop chain states (port offset ${PORT_OFFSET})"
-# setup-and-dump-state.ts builds l1-contracts, including its DA validators, with the
-# deterministic anvil-interop profile before generating the snapshots.
+# setup-and-dump-state.ts builds l1-contracts, including its DA validators, before
+# generating the snapshots.
 (cd test/anvil-interop && ANVIL_INTEROP_PORT_OFFSET="${PORT_OFFSET}" npx ts-node setup-and-dump-state.ts)
 
 echo "==> [4/5] regenerating the registry manifest from the fresh chain states"

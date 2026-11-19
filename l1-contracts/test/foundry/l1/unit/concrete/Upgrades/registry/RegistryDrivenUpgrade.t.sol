@@ -148,6 +148,8 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         verifierV33 = address(new AcceptingVerifier());
         delegateComposer = new FixedDelegateCalldataComposer(DELEGATE_CALLDATA);
 
+        _handARealServerNotifierTo(chainContractAddress, ctmExecutor, address(ctmExecutor.CTM_PROXY_ADMIN()));
+
         // Hand CTM ownership to the executor through its fixed entrypoint, then perform one raw
         // admin action through the owner-gated escape hatch (exactly what it exists for): raise the
         // chain's priority-tx gas limit.
@@ -275,7 +277,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
             TransitionManifest({
                 fromRelease: _fromRelease,
                 newRelease: release,
-                upgradeEngine: defaultUpgrade,
+                chainUpgradeEngine: defaultUpgrade,
                 oldProtocolVersionDeadline: 1000,
                 upgradeTimestamp: 0,
                 l2Plan: l2Plan

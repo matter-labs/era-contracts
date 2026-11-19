@@ -94,7 +94,7 @@ contract DefaultTransitionReplacement is DefaultCTMUpgrade {
             "the replaced transition is not the one committed for its departure"
         );
         prepareL2Side();
-        upgradeAddresses.upgradeEngine = deployUsedUpgradeContract();
+        upgradeAddresses.chainUpgradeEngine = deployUsedUpgradeContract();
         deployReplacementTransition();
         _declareReplacementCall();
         saveOutput(upgradeConfig.outputPath);
@@ -107,7 +107,7 @@ contract DefaultTransitionReplacement is DefaultCTMUpgrade {
         TransitionManifest memory manifest = TransitionManifest({
             fromRelease: replaced.fromRelease(),
             newRelease: continuationRelease(replacementTargetVersion()),
-            upgradeEngine: committedUpgradeEngine(),
+            chainUpgradeEngine: committedChainUpgradeEngine(),
             oldProtocolVersionDeadline: replaced.oldProtocolVersionDeadline(),
             upgradeTimestamp: replaced.upgradeTimestamp(),
             l2Plan: authoredL2Plan()

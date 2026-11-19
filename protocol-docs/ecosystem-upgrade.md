@@ -32,9 +32,10 @@ A protocol release is the combination of:
   root, nullifier, asset router, native token vault, interop handler, CTM deployment tracker, chain
   registration sender) and for the CTM-domain proxies (`ChainTypeManager`, `ValidatorTimelock`,
   `BytecodesSupplier`, `PermissionlessValidator`, `ServerNotifier`), each deployed only when the
-  release changes it: an implementation that already runs the code the current sources produce is
-  reused. The core ones become rows of a Core-domain `ProxyUpgradeTransition`, the CTM-domain ones
-  rows of a CTM-domain one;
+  release changes it. An ecosystem implementation the release does not declare changed is reused
+  (it must already run the code the current sources produce); a CTM-domain one is deployed only by
+  a version's `deployNewCTMContracts`. The core ones become rows of a Core-domain
+  `ProxyUpgradeTransition`, the CTM-domain ones rows of a CTM-domain one;
 - **a new chain version**: a write-once `CTMRelease` naming the diamond facets, `DiamondInit`, the
   verifier, the genesis upgrade and the L2 description, and a `CTMTransition` from the departing
   release to it, which derives the facet cuts and the L2 upgrade transaction (force deployments of
@@ -42,8 +43,12 @@ A protocol release is the combination of:
   also makes the new release the CTM's `currentRelease`, so chains created after the upgrade come up
   directly on the new version with the same genesis as the upgraded ones;
 - **release-specific one-time work**: new proxies, wiring calls, storage migrations, and
-  post-governance steps that a from-scratch deployment gets for free. Any governance or admin call
-  beyond the upgrade itself is a declared external action of the prepare output.
+  post-governance steps that a from-scratch deployment gets for free. Wiring the domain's executor
+  has the authority for (its `ProxyAdmin`, and in a CTM domain the CTM and the ServerNotifier) is
+  code in the release's pinned upgrade engine, which the executor runs inside the domain's proxy
+  leg ([the pinned upgrade engine](../docs/registry-driven-upgrades.md#follow-up-calls-the-pinned-upgrade-engine)).
+  Any other governance or admin call beyond the upgrade itself is a declared external action of the
+  prepare output.
 
 The objects and their rules are described in
 [docs/registry-driven-upgrades.md](../docs/registry-driven-upgrades.md#objects).
@@ -55,14 +60,14 @@ genesis-versus-upgrade consistency rules are spelled out in
 
 ## Roles
 
-| Role                 | Who                                                                                                                                                                                                                                              | Signs                                                                                                                                               |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Deployer             | any funded EOA                                                                                                                                                                                                                                   | the CREATE2 deployments (implementations and the write-once objects) and bytecode publication                                                       |
-| Post-governance      | any funded EOA (not necessarily the deployer)                                                                                                                                                                                                    | release-specific post-governance steps, if the release has any (v34 has none)                                                                       |
-| Ecosystem governance | the owner of the upgrade executors, which own the core and CTM-domain `ProxyAdmin`s and the CTMs (before the v35 bootstrap edge, governance owns those directly); `ProtocolUpgradeHandler` on the public ecosystems, `Governance` on a fresh one | the one governance bundle: the executor legs (`applyL1Upgrade`, `applyInfrastructureUpgrade`, `applyCTMUpgrade`) plus the declared external actions |
-| CTM admin            | the CTM's `ChainAdmin`                                                                                                                                                                                                                           | operational CTM-side calls emitted by the prepare (on the v35 bootstrap edge, its half of the `ServerNotifier` handover, `[ctm_admin_calls]`)       |
-| Chain admin          | each chain's `ChainAdmin`                                                                                                                                                                                                                        | the chain's upgrade timestamp and the call that applies the cut the CTM serves                                                                      |
-| Chain operator       | the node                                                                                                                                                                                                                                         | nothing on L1; executes the L2 upgrade transaction in the next batch                                                                                |
+| Role                 | Who                                                                                                                                                                              | Signs                                                                                                                                               |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Deployer             | any funded EOA                                                                                                                                                                   | the CREATE2 deployments (implementations and the write-once objects) and bytecode publication                                                       |
+| Post-governance      | any funded EOA (not necessarily the deployer)                                                                                                                                    | release-specific post-governance steps, if the release has any (v34 has none)                                                                       |
+| Ecosystem governance | the owner of the upgrade executors, which own the core and CTM-domain `ProxyAdmin`s and the CTMs; `ProtocolUpgradeHandler` on the public ecosystems, `Governance` on a fresh one | the one governance bundle: the executor legs (`applyL1Upgrade`, `applyInfrastructureUpgrade`, `applyCTMUpgrade`) plus the declared external actions |
+| CTM admin            | the CTM's `ChainAdmin`                                                                                                                                                           | operational CTM-side calls a release declares as `admin`-phase external actions, if any                                                             |
+| Chain admin          | each chain's `ChainAdmin`                                                                                                                                                        | the chain's upgrade timestamp and the call that applies the cut the CTM serves                                                                      |
+| Chain operator       | the node                                                                                                                                                                         | nothing on L1; executes the L2 upgrade transaction in the next batch                                                                                |
 
 Deployments by the deployer are inert: nothing it deploys changes anything until governance
 applies the objects that name it. What the deployer deployed is reviewed through the objects'
@@ -78,7 +83,7 @@ signs is the executor legs and the declared external actions.
 | `SystemConfig.json`                                               | the system and fee constants (batch overhead, pubdata and L1 transaction gas parameters) the scripts read                                                                                                                                           |
 | `configs/genesis/<vm>/latest.json`                                | the target protocol version and the chain creation parameters (genesis root, initial contracts) of the release                                                                                                                                      |
 | `l1-contracts/upgrade-envs/permanent-values/<env>.toml`           | the environment's fact sheet: L1 chain id, Bridgehub, CTMs (with VM type), governance kind, testnet-verifier flag, ZK token asset id; independent of the release                                                                                    |
-| `l1-contracts/upgrade-envs/<release>/<env>.toml`                  | the release × environment input: owner, Era chain id, CREATE2 salts, the release's one-off switches; `protocol_ops --env <env>` reads both files                                                                                                    |
+| `l1-contracts/upgrade-envs/<release>/<env>.toml`                  | the release × environment input: owner, CREATE2 salts, the release's one-off switches; `protocol_ops --env <env>` reads both files                                                                                                                  |
 | `l1-contracts/upgrade-envs/<release>/output/<env>/ecosystem.toml` | **the artifact**: every new address, the objects (`[core.registry]`, `[ctms.*.registry]`), the one governance bundle (`[governance_calls] calls`) and the declared `[[external_actions]]`; what reviewers diff and what every downstream tool reads |
 | `…/output/<env>/transactions.txt`                                 | the L1 transaction hashes of the deployer's broadcast, appended on every run; an operational record that verification does not read                                                                                                                 |
 | `…/output/<env>/extra-verification-logs.txt`                      | one `forge verify-contract` line per deployed contract, constructor arguments included                                                                                                                                                              |
@@ -146,10 +151,10 @@ but exactly one ZKsync OS CTM is refused). The bundles and `manifest.json` go to
 `ecosystem.toml` is written to its parent). Together they:
 
 1. deploy through CREATE2, with the salts of the release input, every implementation the release
-   changes (one already running the code the current sources produce is reused), then the
-   write-once objects: a Core-domain `ProxyUpgradeTransition`, the `CTMRelease`, the
-   `CTMTransition` and a CTM-domain `ProxyUpgradeTransition`, each only when the release changes
-   what it describes;
+   changes (an ecosystem implementation it does not declare is reused, and must already run the code
+   the current sources produce), then the write-once objects: a Core-domain
+   `ProxyUpgradeTransition`, the `CTMRelease`, the `CTMTransition` and a CTM-domain
+   `ProxyUpgradeTransition`, each only when the release changes what it describes;
 2. publish the new L2 bytecodes to the `BytecodesSupplier`; the transition derives the facet cuts
    and the L2 upgrade transaction (force deployments of the L2 built-ins plus the delegate call to
    the L2 upgrade contract) from the two releases when it is constructed;
@@ -164,10 +169,9 @@ Two properties of the prepare decide whether the rest of the pipeline can work:
 
 - **The build must be the default Foundry profile.** Verification re-derives each object's CREATE2
   address from creation code held against `AllContractsHashes.json`, and checks live runtime code
-  against it; that file is generated under that profile, so a metadata-stripped build never matches
-  and verifies nothing. The price is that the CREATE2 addresses embed path-dependent metadata, so a
-  prepare re-run from another checkout yields different but equally valid addresses. The artifact
-  is verified by re-deriving its addresses (phase 3), never by diffing them against one's own run.
+  against it; that file is generated under that profile, so a build with other compiler settings
+  never matches and verifies nothing. The artifact is verified by re-deriving its addresses
+  (phase 3), never by diffing them against one's own run.
 - **Salts and the deployer are part of the result.** CREATE2 returns the previously deployed
   contract for a repeated `(salt, init code)` pair, so the salts in the release input are rotated
   before every regeneration; they are also verification inputs, since every address is re-derived
@@ -190,8 +194,7 @@ the release's `output/<env>/` directory, sends the deployer's bundles to the rea
 transaction at a time, confirming each, and appends every mined hash to `<out>/transactions.txt`
 (only when `--out` is given; the file is an operational record, which verification does not read).
 It needs a `--key` for every signer in the manifest and refuses to send anything otherwise, so the
-manifest is first filtered down to the deployer's bundles; the CTM admin's bundle (bootstrap edge
-only) is handed to its signer, and the governance bundle is calldata in `ecosystem.toml`, not a Safe
+manifest is first filtered down to the deployer's bundles, and the governance bundle is calldata in `ecosystem.toml`, not a Safe
 bundle. The testnet README shows the filtering step.
 
 A re-run is not fully idempotent: it skips CREATE2 deployments whose target already has code and
@@ -208,7 +211,9 @@ Three independent checks, all read-only:
 
 - **Package verification** (`protocol_ops ecosystem verify-bootstrap --ecosystem-toml …
 --l1-rpc-url … --env <env> --expected-governance-owner … --executor-record … --create2-salt …`,
-  alias `verify-package`; the runbook's "Verify" has the full invocation) re-derives every
+  alias `verify-package`; the runbook's "Verify" has the full invocation) holds every package kind
+  to one reviewed Bridgehub, the `--env`'s `bridgehub_proxy_addr` (or `--expected-bridgehub`, for a
+  harness L1), so `--env` is required for every package. It re-derives every
   object's CREATE2 address from the reviewed creation code and the arguments it was constructed with
   (for a write-once object, the manifest it serves), checks live runtime code against
   `AllContractsHashes.json`, holds the genesis data and L2 bytecode table of the release the edge
@@ -216,7 +221,11 @@ Three independent checks, all read-only:
   implementation slot and implementation code at each member's fixed address), checks the
   executors' bindings and the owner the upgrade is driven by, and checks that the governance calls
   carry the executor legs once, contiguous and in canonical order, and that every other call is a
-  declared external action. It is mandatory before
+  declared external action, one for one and in declared order. When the package lands the v0.36.0
+  CTM on a CTM below v0.36.0 (the edge onto v0.36.0, or an infrastructure row swapping the CTM
+  proxy, also without a transition) it also reports an error for every chain on the CTM below
+  v0.35.0: the v0.36.0 CTM no longer serves the views such a chain's upgrade reads, so each one has
+  to be moved to v0.35.0 before the vote executes. It is mandatory before
   every vote; what it establishes and what it does not is
   [Provenance and validation](../docs/registry-driven-upgrades.md#provenance-and-validation).
 - **The transaction simulator** (`matter-labs/transaction-simulator`) replays the governance call
@@ -230,13 +239,11 @@ Three independent checks, all read-only:
 
 ### 4. The governance call
 
-Governance signs one bundle, `[governance_calls] calls` of `ecosystem.toml`. For a recurring upgrade
-it is the executor legs — `CoreUpgradeExecutor.applyL1Upgrade`,
+Governance signs one bundle, `[governance_calls] calls` of `ecosystem.toml`. For an upgrade it is
+the executor legs — `CoreUpgradeExecutor.applyL1Upgrade`,
 `CTMUpgradeExecutor.applyInfrastructureUpgrade`, `CTMUpgradeExecutor.applyCTMUpgrade`, each when
-its object exists, in that order — plus the declared external actions (the merger's PUH wiring and
-CTM `acceptOwnership` normalization, and whatever calls the release declared); on the v35
-bootstrap edge it is the run the `RegistryBootstrapSequence` derives, ending with
-`RegistryBootstrapMigration.validateApplied()`.
+its object exists, in that order — plus the declared external actions (the merger's PUH wiring when
+the release redeploys the governance set, and whatever calls the release declared).
 
 The bundle is one atomic transaction: the legs apply the ecosystem proxy rows, then the CTM-domain
 rows, then `setNewVersionUpgradeFromTransition` (which commits the transition and installs the
@@ -298,7 +305,9 @@ otherwise.
    its next block (block N) and holds every later batch until the chain's L1 version moves, so the
    cut's preconditions must already hold: if the cut then reverts, the chain is stuck. Run after
    the cut, the call reverts (`CutDataForProtocolVersionNotAvailable`), since no transition is
-   committed from the new version.
+   committed from the new version. How the node resolves the edge and its transaction is
+   [Node integration](./node-upgrade-integration.md); schedule a chain only after its nodes pass the
+   [runbook's node pre-flight](../l1-contracts/deploy-scripts/upgrade/README.md#7-chain-crossing).
 3. `tools/upgrade-readiness-checker` waits until the node has the upgrade transaction in block N
    and block N-1 is finalized, that is, every batch before the upgrade has been executed on L1. This
    is the signal that the L1 cut can be sent now, not that the upgrade is done.
@@ -307,25 +316,20 @@ otherwise.
    `--da-mode` is given, the DA validator pair and pubdata content the chain runs after the upgrade,
    in the same transaction so that the chain never commits a batch under a DA setup its new version
    does not settle. The bundle carries no cut: the chain reads it from its CTM
-   (`upgradeCutForVersion`, derived from the committed transition). A chain that predates v35
-   crosses the bootstrap edge through the legacy cut-taking entrypoint instead, which
-   `AdminFunctions.upgradeChainFromCTM` selects (`UpgradeChainCall.requiresCut`). Governance can
-   also cross a chain itself. A chain at v35 or later crosses with
-   `CTMUpgradeExecutor.upgradeChain(transition, chainId)`, which only the executor's owner or the
+   (`upgradeCutForVersion`, derived from the committed transition); `UpgradeChainCall` refuses a
+   chain below v35, which a v36 CTM no longer brings across. Governance can also cross a chain
+   itself, with `CTMUpgradeExecutor.upgradeChain(transition, chainId)`, which only the executor's owner or the
    chain's own admin may call
-   ([Flow: upgrading](../docs/registry-driven-upgrades.md#flow-upgrading)). A chain that predates
-   v35 departs from a version committed through the legacy path, which has no transition, so
-   governance hands it the committed cut (`RegistryBootstrapMigration.upgradeCut()` on the bootstrap
-   edge) through `ChainTypeManager.upgradeChainFromVersion(chainId, oldVersion, cut)`, sent through
-   `CTMUpgradeExecutor.forward`; the chain refuses a cut whose hash differs from the one its CTM
-   committed, or a version other than its own.
+   ([Flow: upgrading](../docs/registry-driven-upgrades.md#flow-upgrading)).
 5. The batch carrying the upgrade transaction is committed and executed under the new version: the
    built-ins are force-deployed and the L2 upgrade contract initializes them. The chain is on the
    new version for good once that batch has been executed on L1.
 
 `protocol_ops` checks only one of the preconditions explicitly: `chain upgrade` refuses to leave a
-validium-priced chain in an unrecommended DA state. Everything else is covered only by the fork
-replay when the bundle is prepared, which reflects the chain's state at that moment.
+chain in a DA state it should not run (the
+[runbook](../l1-contracts/deploy-scripts/upgrade/README.md#7-chain-crossing) lists them). Everything
+else is covered only by the fork replay when the bundle is prepared, which reflects the chain's
+state at that moment.
 
 ### 7. Close-out
 
@@ -347,20 +351,20 @@ does not control can move. Each check of an upgrade therefore has a home, chosen
 protocol-ops may run an on-chain check earlier, so a bad package fails at review rather than at
 execution, but it never replaces it:
 
-| Where                          | What it checks                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The contracts, live state      | State at execution that can change after review, by governance or by someone else (the CTM admin, a ChainAdmin, validators, the permissionless `migrate` caller): proxy implementations and code at every row's `implNew`, before the first swap; the CTM's `currentRelease`, `protocolVersion` and `upgradeTransition`; bytecode publication; `serverNotifierAddress` and the notifier's CTM; on the bootstrap edge, who owns the CTM, both `ProxyAdmin`s, the notifier and the executors, with no nomination pending, and whether `migrate()` already ran; each chain's batch counters, routing and fee params                                  |
-| The contracts, write-once      | Cheap construction invariants whose failure cannot be undone: the `VersionEdgeLib` edge rules; zero members, a zero genesis batch hash, an empty facet set, repeated facet rows or a wrong L2 table length in a release; a transition built over a release that does not `validate()`; zero, self-edge or duplicate rows, a wrong inventory length or no participating row in a proxy upgrade transition; zero bindings in an executor, a transition or the bootstrap edge; an ownerless executor (a zero initial owner; `renounceOwnership` reverts); code at every address bound into a release or transition when it is installed or committed |
-| protocol-ops, before the vote  | The review-time facts (`verify-package`): code identity, CREATE2 provenance, each new member's construction from its `member_deployments` record with every constructor argument held by value (code identity masks them), the ZiSK Plonk backend against its pinned codehash, the manifest contents (zero row fields, self-edges, duplicate proxies, empty inventories), executor bindings (the contracts refuse these too; protocol-ops reports them before the vote), bundle order, the arriving release's `validate()` by `eth_call`, and bytecode publication as an early readiness check                                                    |
-| protocol-ops, after the replay | The post-state `ecosystem upgrade-governance` finds on its fork: the CTM's version, release and committed transition, who holds the CTM domain and the notifier, the executors' owners, every row's proxy at its `implNew`                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| Tests                          | That the reviewed code is right, including its post-conditions within one transaction: the Foundry tests and the Anvil runners assert them, and the contracts never re-check them, except the bootstrap's `validateApplied()` and the executor's commit check                                                                                                                                                                                                                                                                                                                                                                                     |
+| Where                          | What it checks                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The contracts, live state      | State at execution that can change after review, by governance or by someone else (the CTM admin, a ChainAdmin, validators): proxy implementations and code at every row's `implNew`, before the first swap; the CTM's `currentRelease`, `protocolVersion` and `upgradeTransition`; bytecode publication; `serverNotifierAddress` and the notifier's CTM; each chain's batch counters, routing and fee params                                                                                                                                                                                                                                                       |
+| The contracts, write-once      | Cheap construction invariants whose failure cannot be undone: the `VersionEdgeLib` edge rules; zero members, a zero genesis batch hash, an empty facet set, repeated facet rows or a wrong L2 table length in a release; a transition built over a release that does not `validate()`; zero, self-edge or duplicate rows, a wrong inventory length or no participating row in a proxy upgrade transition; zero bindings in an executor or a transition; an ownerless executor (a zero initial owner; `renounceOwnership` reverts); code at every address bound into a release or transition when it is installed or committed                                       |
+| protocol-ops, before the vote  | The review-time facts (`verify-package`): code identity, CREATE2 provenance, each new member's construction from its `member_deployments` record with every constructor argument held by value (code identity masks them), the ZiSK Plonk backend against its pinned codehash, the manifest contents (zero row fields, self-edges, duplicate proxies, empty inventories), executor bindings (the contracts refuse these too; protocol-ops reports them before the vote), bundle order, the arriving release's `validate()` by `eth_call`, bytecode publication as an early readiness check, and when a v0.36.0 CTM lands every chain on the CTM at v0.35.0 or later |
+| protocol-ops, after the replay | The post-state `ecosystem upgrade-governance` finds on its fork: the CTM's version, release and committed transition, who holds the CTM domain and the notifier, the executors' owners, every row's proxy at its `implNew`                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Tests                          | That the reviewed code is right, including its post-conditions within one transaction: the Foundry tests and the Anvil runners assert them, and the contracts never re-check them, except the row swaps' post-state reads and the executor's commit check                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 Three rules decide where a check lives:
 
 - **A write-once object checks its own shape before anything is built from it.** A release refuses
   zero members and repeated facet rows at construction. Its `validate()` runs before anything is
-  derived from it or installed: in a transition's constructor, in the bootstrap's `validate()`, and
-  when `ChainTypeManager._setCurrentRelease` installs it. It depends only on the code at the
+  derived from it or installed: in a transition's constructor and when
+  `ChainTypeManager._setCurrentRelease` installs it. It depends only on the code at the
   addresses it names, so its `eth_call` before the vote predicts the install. Once a release is
   installed, nothing validates it again: chain creation, and the `validate()` of a transition
   departing from it, rely on the install-time run.
@@ -396,24 +400,36 @@ The scripts under `l1-contracts/deploy-scripts/upgrade/` are split into what eve
 and what one release adds:
 
 - `default-upgrade/DefaultCoreUpgrade.s.sol` and `DefaultCTMUpgrade.s.sol` are the
-  version-independent prepare pipeline: they deploy or reuse each implementation by code identity,
-  build the release and the transitions, and record every other call a version needs
-  as a declared external action (`declareExternalAction`).
+  version-independent prepare pipeline: they deploy each ecosystem implementation and release
+  member the version declares changed (reusing the others, which must already run the code the
+  current sources produce), build the release and the transitions, deploy each proxy upgrade
+  transition's `DefaultProxyUpgradeEngine` (`deployProxyUpgradeEngine()`), and record every other
+  call a version needs as a declared external action (`declareExternalAction`).
 - `v<N>/CoreUpgrade_v<N>.s.sol` and `CTMUpgrade_v<N>.s.sol` override only what the release changes:
   the implementations it deploys (`deployNew*Contracts`), the release members it replaces
   (`changedReleaseMembers()`), its kind (`upgradeKind()`: a chain release or an
-  infrastructure-only upgrade that moves no version), and its L2 side when L2 built-ins change
-  (`authorL2Side`). `yarn new-release` creates them, together with the release's
+  infrastructure-only upgrade that moves no version), its L2 side when L2 built-ins change
+  (`authorL2Side`), and its follow-up calls when it has any (`deployProxyUpgradeEngine()` returning
+  a subclass of `DefaultProxyUpgradeEngine`). `yarn new-release` creates them, together with the release's
   `upgrade-envs/<release>/` inputs, and moves protocol-ops' defaults to them.
 - `AdminFunctions.s.sol` drives the per-chain crossing in `protocol_ops`;
-  `default-upgrade/DefaultChainUpgrade.s.sol` is the legacy cut-taking leg the tests use.
+  `default-upgrade/DefaultChainUpgrade.s.sol` is the per-chain leg the tests use (the chain reads
+  its cut from the CTM).
 - `SystemContractsProcessing.s.sol` is the list of L2 built-ins a release force-deploys or
   neutralizes; new ones also go into the genesis generator, so that upgraded and freshly created
   chains match.
 
-The on-chain side is generic: a transition pins an upgrade engine (`DefaultUpgrade`, unless the
-version script overrides `deployUsedUpgradeContract`, as v35's bootstrap edge does with
-`BootstrapUpgrade`), and `l1-contracts/contracts/l2-upgrades/` holds `L2ComplexUpgrader`, which
+The on-chain side is generic. Each kind of transition pins the engine that applies it, and the two
+are run by different callers:
+
+- a `CTMTransition`'s `chainUpgradeEngine` is the diamond upgrade every chain delegatecalls when it
+  crosses the version: `DefaultUpgrade`, unless the version script overrides
+  `deployUsedUpgradeContract`;
+- a `ProxyUpgradeTransition`'s `proxyUpgradeEngine` is what the domain's executor delegatecalls to
+  swap that domain's L1 proxies and run the release's follow-up calls: `DefaultProxyUpgradeEngine`
+  or a release's subclass of it.
+
+`l1-contracts/contracts/l2-upgrades/` holds `L2ComplexUpgrader`, which
 executes the L2 upgrade transaction, and the L2 upgrade contracts. A release also regenerates the
 genesis config and `AllContractsHashes.json`.
 
@@ -433,12 +449,13 @@ The steps, the rules preparation enforces and the tests every release ships with
   wait for and `upgrade-readiness-checker` does not apply. The ZKsync OS node switches its protocol
   version only on the chain's `UpgradeTimestampUpdated` event, so `chain set-upgrade-timestamp` is
   still needed. The cut still reverts (`NotAllBatchesExecuted`) unless every committed batch has
-  been executed on L1. A minor bump without an L2 upgrade transaction has no working path on ZKsync
-  OS today: for any minor bump the node expects an upgrade transaction.
+  been executed on L1. A minor bump without an L2 upgrade transaction needs a node that accepts the
+  all-zero transaction ([Node integration](./node-upgrade-integration.md#requirements), requirement
+  3); until the server meets it, such a bump has no working path on ZKsync OS.
 - **Emergency.** Governance can freeze a chain (`freezeChain`, `unfreezeChain`) and execute an
   arbitrary cut for it (`ChainTypeManager.executeUpgrade(chainId, cut)`); both are CTM owner
   methods, reached through `CTMUpgradeExecutor.forward`
-  ([authority matrix](../docs/registry-driven-upgrades.md#authority-matrix-after-bootstrap)), and the
+  ([authority matrix](../docs/registry-driven-upgrades.md#authority-matrix)), and the
   Bridgehub's owner may also freeze and unfreeze directly, which is how the Security Council's freeze
   reaches the chains ([freezing a chain](./ecosystem-upgrade-coordination.md#freezing-a-chain)). On a
   `ProtocolUpgradeHandler` ecosystem a prepared package can also run at once through the emergency

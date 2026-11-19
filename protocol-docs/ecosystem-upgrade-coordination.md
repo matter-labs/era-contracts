@@ -86,10 +86,16 @@ external action.
 Each leg is owner-only and checks its object before acting:
 
 - `applyL1Upgrade` and `applyInfrastructureUpgrade` require the object to have code and to be of the
-  executor's own domain (`ProxyUpgradeDomainMismatch`), and every row's `implNew` to have code
-  before the first swap. They apply its rows through the executor's bound `ProxyAdmin`, each
-  departing from its `expectedOldImpl` or already at its `implNew`, then require every row's proxy
-  to run its `implNew`, and emit `L1UpgradeApplied` / `CTMInfrastructureUpgradeApplied`.
+  executor's own domain (`ProxyUpgradeDomainMismatch`), and the `proxyUpgradeEngine` it pins to have
+  code. They delegatecall that engine's `executeUpgrade` with a context built from the executor's
+  own bindings; the engine requires every row's `implNew` to have code before the first swap,
+  applies the rows through the executor's bound `ProxyAdmin`, each departing from its
+  `expectedOldImpl` or already at its `implNew`, runs the release's follow-up hooks and their
+  postconditions
+  ([the pinned upgrade engine](../docs/registry-driven-upgrades.md#follow-up-calls-the-pinned-upgrade-engine)).
+  The executor then requires its own ownership and the holders of the domain it lent unchanged and
+  every row's proxy to run its `implNew`, and emits `L1UpgradeApplied` /
+  `CTMInfrastructureUpgradeApplied`.
 - `applyCTMUpgrade` requires the transition to have code and commits it
   (`setNewVersionUpgradeFromTransition`: transition, version and target release together). The
   commit's checks are the CTM's, so a commit sent through `forward` gets them too
@@ -141,7 +147,10 @@ The three entrypoints and `forward` are owner-only, and governance owns both exe
 the only authorization; there is no binding between executors to configure or keep in sync. Every
 other owner operation of a domain — freezing a chain, moving a deadline, replacing a committed
 transition — is an ordinary call through the executor's owner-gated, event-logged `forward`; the
-executors carry no typed passthroughs for them. Freezing has a second route,
+executors carry no typed passthroughs for them. A release's pinned upgrade engine can make the same
+calls inside its domain's proxy leg; they are reviewed with the release, are not logged as
+`CallForwarded`, and cannot transfer or nominate the domain's holders through their setters
+([what the executor checks](../docs/registry-driven-upgrades.md#follow-up-calls-the-pinned-upgrade-engine)). Freezing has a second route,
 [below](#freezing-a-chain). An urgent fix of one domain is a proposal of the one leg it needs.
 
 A domain moves to a successor executor through the predecessor's `forward`; nothing else names an
@@ -157,12 +166,12 @@ so governance through `forward`) and the Bridgehub's owner, directly. On a `Prot
 ecosystem the Bridgehub's owner is the handler, which freezes and unfreezes chains by calling their
 CTM itself: the Security Council's soft freeze, hard freeze and unfreeze, the `reinforce*` variants,
 and the unfreeze that opens every emergency upgrade. Without the second caller they would stop
-reaching a CTM's chains once the bootstrap hands that CTM to its executor. The direct route leaves no
+reaching a CTM's chains, since the CTM is owned by its executor. The direct route leaves no
 `CallForwarded` entry; the chain's own `Freeze` / `Unfreeze` events remain.
 
-The second caller is safe only while the Bridgehub's owner is the executors' governance, so
-`verify-bootstrap` holds `bridgehub.owner()` to the bootstrap manifest's governance before the edge
-is signed. The handler wraps each chain's call in `try/catch`, so a chain it failed to freeze goes
+The second caller is safe only while the Bridgehub's owner is the executors' governance. Package
+verification no longer checks `bridgehub.owner()`: that check belonged to the v34 -> v35 bootstrap
+edge, removed in v36. The handler wraps each chain's call in `try/catch`, so a chain it failed to freeze goes
 unreported: after a freeze, check `isDiamondStorageFrozen()` on every chain and use the handler's
 `reinforceFreezeOneChain`, which reverts visibly, for any that is not.
 
@@ -194,9 +203,14 @@ Consequences:
 - A chain that already crossed keeps the state it reached and continues on its own onward edge: the
   chain-side version check refuses to replay the replacement from the earlier source.
 - A deadline change stays a separate `setProtocolVersionDeadline`, which may ride the same `forward`.
-- Legacy-committed departures (pre-registry chains crossing the v35 bootstrap) are repaired by the
-  legacy cut setter, which refuses a registry-committed departure and a version nothing was
-  committed for.
+- A chain that scheduled its crossing before the replacement still crosses the replacement, so its
+  node must resolve the edge at execution
+  ([node integration](./node-upgrade-integration.md#requirements), requirement 4). The runbook
+  checks before the replacement that no such chain's schedule has already passed, and re-runs their
+  schedules after it
+  ([chain crossing](../l1-contracts/deploy-scripts/upgrade/README.md#7-chain-crossing)).
+- Legacy-committed departures (pre-registry chains crossing the v35 bootstrap) cannot be repaired:
+  the legacy cut setter `setUpgradeDiamondCut` was removed in v36 with the rest of that edge.
 
 ### Preparing and verifying a replacement
 
@@ -244,15 +258,17 @@ introduce placeholder lists, loops or a second CTM today solely for this extensi
 - `CTMExecutorDomains.t.sol` adds a second real CTM with its own executor: each executor commits on
   its own CTM only and applies rows through its own `ProxyAdmin` only, and a same-CTM successor
   takes over through `forward`.
-- protocol-ops: the merge derives the legs in canonical order, each alone, and none for a bootstrap
-  or a replacement (`commands/ecosystem/upgrade.rs`); the package loader refuses mixed kinds and
+- protocol-ops: the merge derives the legs in canonical order, each alone, and none for a
+  replacement (`commands/ecosystem/upgrade.rs`); the package loader refuses mixed kinds and
   missing, duplicated, substituted or value-carrying legs and unknown executor selectors
   (`upgrade_verification/registry/package.rs`); `verify_upgrade_calls` refuses a swapped or
-  interrupted run, undeclared, duplicated, missing or reordered external actions, and any other call
-  reaching an upgrade authority (`upgrade_verification/registry/upgrade.rs`).
+  interrupted run and any other call reaching an upgrade authority
+  (`upgrade_verification/registry/upgrade.rs`); `judge_declared_calls` holds every package kind's
+  calls other than the legs to its declarations one for one and in declared order, refusing
+  undeclared, duplicated, missing or reordered ones (`upgrade_verification/registry/declared_calls.rs`).
 - Production preparation and both Anvil pipelines: `UpgradeTestRecurring_Local.t.sol` prepares the
   infrastructure-only, chain-release, mixed and three-leg shapes and the refused ones, and runs each
-  as its ordered bundle; `yarn test:upgrade` drives the bootstrap and then recurring hops, verifying
+  as its ordered bundle; `yarn test:upgrade` drives the release's edge and then a patch hop, verifying
   each merged package, asserting that one transaction emitted every leg's domain event in order and
   checking the state each bundle left;
   `yarn test:upgrade-recurring` runs a hop over objects the harness deploys.

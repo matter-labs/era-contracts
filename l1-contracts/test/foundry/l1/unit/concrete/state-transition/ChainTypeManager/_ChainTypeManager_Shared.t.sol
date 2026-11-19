@@ -5,6 +5,10 @@ pragma solidity ^0.8.21;
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
+import {Call} from "contracts/governance/Common.sol";
+import {IUpgradeExecutorBase} from "contracts/governance/IUpgradeExecutorBase.sol";
+import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
@@ -26,6 +30,9 @@ import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
+import {ICommittedUpgrade} from "contracts/upgrades/registry/objects/ICommittedUpgrade.sol";
+import {L2UpgradePlan} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 
@@ -257,11 +264,71 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         return Utils.TEST_GENESIS_REGISTRY;
     }
 
-    /// @dev A mocked release pinning `_protocolVersion` (see {mockReleaseAt}): what a version edge
-    ///      committed through the cut-taking entrypoint names and installs.
+    /// @dev A mocked release pinning `_protocolVersion` (see {mockReleaseAt}): what a mocked
+    ///      transition ({_mockTransition}) names and installs.
     function _releaseAt(uint256 _protocolVersion) internal returns (address release) {
         release = makeAddr(string.concat("release-", vm.toString(_protocolVersion)));
         mockReleaseAt(release, _protocolVersion);
+    }
+
+    /// @dev A stand-in transition answering exactly the reads `setNewVersionUpgradeFromTransition`
+    ///      makes, so each test can make one of them disagree with the CTM. A real `CTMTransition`
+    ///      is covered in `Upgrades/registry/CTMUpgradeExecutor.t.sol`; here the subject is the
+    ///      CTM's bookkeeping, not the object.
+    function _mockTransition(
+        address _fromRelease,
+        uint256 _oldVersion,
+        uint256 _newVersion,
+        address _newRelease,
+        uint256 _oldVersionDeadline
+    ) internal returns (ICTMTransition transition) {
+        transition = ICTMTransition(
+            makeAddr(string.concat("transition-", vm.toString(_oldVersion), "-", vm.toString(_newVersion)))
+        );
+        vm.etch(address(transition), hex"00");
+        vm.mockCall(address(transition), abi.encodeCall(ICTMTransition.fromRelease, ()), abi.encode(_fromRelease));
+        vm.mockCall(
+            address(transition),
+            abi.encodeCall(ICTMTransition.oldProtocolVersion, ()),
+            abi.encode(_oldVersion)
+        );
+        vm.mockCall(
+            address(transition),
+            abi.encodeCall(ICTMTransition.newProtocolVersion, ()),
+            abi.encode(_newVersion)
+        );
+        vm.mockCall(address(transition), abi.encodeCall(ICTMTransition.newRelease, ()), abi.encode(_newRelease));
+        vm.mockCall(
+            address(transition),
+            abi.encodeCall(ICTMTransition.oldProtocolVersionDeadline, ()),
+            abi.encode(_oldVersionDeadline)
+        );
+        vm.mockCall(
+            address(transition),
+            abi.encodeCall(ICTMTransition.chainUpgradeEngine, ()),
+            abi.encode(makeAddr("chainUpgradeEngine"))
+        );
+        // The commit's own checks: the code the transition names, and an L2 plan with nothing to
+        // publish.
+        vm.mockCall(address(transition), abi.encodeCall(ICTMTransition.validate, ()), "");
+        L2UpgradePlan memory emptyPlan;
+        vm.mockCall(address(transition), abi.encodeCall(ICommittedUpgrade.l2Plan, ()), abi.encode(emptyPlan));
+    }
+
+    /// @dev Moves the fixture CTM from its current version to `_newVersion` through a mocked
+    ///      transition departing its current release, with `_oldVersionDeadline` pinned for the
+    ///      departed version. Returns the release it installed.
+    function _commitMockedEdge(uint256 _newVersion, uint256 _oldVersionDeadline) internal returns (address newRelease) {
+        newRelease = _releaseAt(_newVersion);
+        ICTMTransition transition = _mockTransition(
+            chainContractAddress.currentRelease(),
+            chainContractAddress.protocolVersion(),
+            _newVersion,
+            newRelease,
+            _oldVersionDeadline
+        );
+        vm.prank(governor);
+        chainContractAddress.setNewVersionUpgradeFromTransition(transition);
     }
 
     function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
@@ -399,6 +466,37 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         // So, although ideally the bridgehub SHOULD have responded with the correct address for the chain when we call getZKChain(chainId), in our case it will not
         // So, we mock that behavior again.
         vm.mockCall(address(bridgehub), abi.encodeCall(IBridgehubBase.getZKChain, chainId), abi.encode(_chainAddress));
+    }
+
+    /// @notice Points `_ctm` at a real ServerNotifier (the suite's `serverNotifier` is codeless) and
+    ///         hands it to `_executor`, as on a live CTM domain. Call while `governor` owns `_ctm`
+    ///         and `_executor`.
+    /// @param _ctm The CTM the notifier serves.
+    /// @param _executor The CTM executor that takes the notifier.
+    /// @param _proxyAdmin The admin of the notifier's proxy.
+    /// @return notifier The notifier, owned by `_executor`.
+    function _handARealServerNotifierTo(
+        ChainTypeManager _ctm,
+        IUpgradeExecutorBase _executor,
+        address _proxyAdmin
+    ) internal returns (ServerNotifier notifier) {
+        notifier = ServerNotifier(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new ServerNotifier()),
+                    _proxyAdmin,
+                    abi.encodeCall(ServerNotifier.initialize, (governor))
+                )
+            )
+        );
+        Call[] memory accept = new Call[](1);
+        accept[0] = Call({target: address(notifier), value: 0, data: abi.encodeCall(Ownable2Step.acceptOwnership, ())});
+        vm.startPrank(governor);
+        notifier.setChainTypeManager(IChainTypeManager(address(_ctm)));
+        _ctm.setServerNotifier(address(notifier));
+        notifier.transferOwnership(address(_executor));
+        _executor.forward(accept);
+        vm.stopPrank();
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////

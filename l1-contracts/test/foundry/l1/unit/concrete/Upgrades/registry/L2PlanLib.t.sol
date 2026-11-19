@@ -10,8 +10,8 @@ import {L2PlanDelegateNeedsComposer, L2PlanNeedsDelegate} from "contracts/common
 import {AuthoredL2Plan, L2UpgradePlan} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {L2PlanFixtures} from "./L2PlanFixtures.sol";
 
-/// @dev Exposes the internal builder, so its shape rules are tested on their own; the objects that
-///      call it (`CTMTransition`, `RegistryBootstrapMigration`) test the same rules at construction.
+/// @dev Exposes the internal builder, so its shape rules are tested on their own; `CTMTransition`,
+///      which calls it, tests the same rules at construction.
 contract L2PlanLibHarness {
     function build(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _derived,

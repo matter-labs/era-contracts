@@ -53,7 +53,10 @@ name = "protocol_ops"
 path = "src/main.rs"
 
 [dev-dependencies]
+# The request-keyed mock L1 of the registry verifier's full-path tests.
+alloy-json-rpc = "2.0.5"
 tempfile = "3"
+tower = "0.5"
 
 [profile.release]
 strip = true

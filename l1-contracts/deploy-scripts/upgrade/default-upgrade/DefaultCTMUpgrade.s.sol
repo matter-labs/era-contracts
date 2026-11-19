@@ -1,13 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// TODO(EVM-1644): LEGACY UPGRADE PROCESS — remove once the registry-driven upgrade process
-// (contracts/upgrades/registry: the CoreUpgradeExecutor / CTMUpgradeExecutor domain executors +
-// release/transition objects) has fully replaced off-chain
-// governance-calldata generation. Kept for the v35 bootstrap edge, which still ships a
-// script-declared governance bundle (the committed cut itself is already facet-less; only the call
-// orchestration remains script-composed).
-
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
@@ -41,7 +34,6 @@ import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {CTMUpgradeParams, UpgradeKind} from "./UpgradeParams.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
-import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {
@@ -51,7 +43,12 @@ import {
     ProxyUpgradeTransitionManifest,
     TransitionManifest
 } from "contracts/upgrades/registry/RegistryTypes.sol";
-import {CTM_CONTRACT_COUNT, CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {
+    CTM_CONTRACT_COUNT,
+    CTMContract,
+    L2EcosystemContract
+} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
 import {ExternalActionsLib} from "./ExternalActionsLib.sol";
 
 /// @notice The L2 side a version authors for its edge: the plan's authored input and the deployed
@@ -78,8 +75,7 @@ struct AuthoredL2Side {
 ///         `applyCTMUpgrade` on the CTM executor from the addresses it reports; anything a version
 ///         script still needs governance (or an admin) to do is declared as an external action and
 ///         listed in the output.
-/// @dev Version scripts inherit and override; the v35 bootstrap edge deploys no transition and
-///      declares every call of its one-time edge instead.
+/// @dev Version scripts inherit and override.
 contract DefaultCTMUpgrade is Script, DeployCTMScript {
     using stdToml for string;
     using ExternalActionsLib for ExternalActionsLib.Ledger;
@@ -88,19 +84,19 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ReleaseMemberProbe internal releaseMemberProbe;
 
     struct UpgradeDeployedAddresses {
-        /// @dev The bootstrap edge's core executor input (`CTMUpgradeParams.ecosystemUpgradeExecutor`).
-        address coreUpgradeExecutor;
         /// @dev The core prepare's Core-domain transition (an input, see `CTMUpgradeParams`).
         address coreTransition;
-        /// @dev The write-once transition this prepare deploys (zero for the bootstrap edge).
+        /// @dev The write-once transition this prepare deploys (zero for an infrastructure-only edge).
         address ctmTransition;
         /// @dev The write-once CTM-domain `ProxyUpgradeTransition` this prepare deploys, zero when
-        ///      the upgrade swaps no CTM-domain implementation (and on the bootstrap edge, whose
-        ///      migration pins its own rows).
+        ///      the upgrade swaps no CTM-domain implementation.
         address ctmInfrastructureTransition;
         /// @dev The engine this edge commits, held only until the object that pins it exists.
-        ///      Read it through {committedUpgradeEngine}, never directly.
-        address upgradeEngine;
+        ///      Read it through {committedChainUpgradeEngine}, never directly.
+        address chainUpgradeEngine;
+        /// @dev The composer of `L2DefaultUpgrade`'s arguments that {standardL2Side} pins, deployed
+        ///      on its first use (zero when the edge has no L2 leg).
+        address l2DelegateComposer;
     }
 
     struct AdditionalConfig {
@@ -170,11 +166,8 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         if (_params.chainRegistrationSender != address(0)) {
             coreAddresses.bridgehub.proxies.chainRegistrationSender = _params.chainRegistrationSender;
         }
-        setCoreUpgradeExecutor(_params.ecosystemUpgradeExecutor);
         setCoreTransition(_params.coreTransition);
         prepareCTMUpgrade();
-        // Declared before the governance calls are written, so the output lists the admin action.
-        prepareDefaultCTMAdminCalls();
         prepareDefaultGovernanceCalls();
     }
 
@@ -259,10 +252,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ) internal virtual {
         string memory toml = vm.readFile(newConfigPath);
 
-        // No `era_chain_id` read: the per-env input TOMLs still carry the key for the
-        // v31 tooling and the zk-governance PUH redeploy (PUH's real constructor arg),
-        // but nothing in this flow consumes an Era chain id.
-
         PermanentCTMConfig memory permanentConfig = PermanentCTMConfig({
             ctmProxy: ctmProxy,
             create2FactorySalt: create2FactorySalt,
@@ -274,7 +263,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         // Optional explicit target protocol version from the upgrade input. The genesis config
         // (`configs/genesis/*/latest.json`) may still declare the PREVIOUS version while an
         // upgrade to the next one is being prepared, so the upgrade-env preset can pin the
-        // packed version the emitted `setNewVersionUpgrade` must carry.
+        // packed version the published release must carry.
         if (toml.keyExists("$.contracts.latest_protocol_version")) {
             chainCreationParams.latestProtocolVersion = toml.readUint("$.contracts.latest_protocol_version");
         }
@@ -331,12 +320,11 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
 
     /// @notice The upgrade objects of the CTM side. A chain-release edge deploys the upgrade
     ///         engine the transition pins and the transition of this edge; both kinds deploy the
-    ///         CTM-domain infrastructure transition when a CTM-domain implementation changes; the
-    ///         bootstrap edge deploys its migration and its call sequence instead.
+    ///         CTM-domain infrastructure transition when a CTM-domain implementation changes.
     function deployUpgradeObjects() public virtual {
         _requireDeclaredKindHolds();
         if (upgradeKind() != UpgradeKind.InfrastructureOnly) {
-            upgradeAddresses.upgradeEngine = deployUsedUpgradeContract();
+            upgradeAddresses.chainUpgradeEngine = deployUsedUpgradeContract();
             deployCTMTransition();
         }
         deployCTMInfrastructureTransition();
@@ -379,15 +367,15 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     function deployCTMTransition() public virtual {
         address ctm = ctmAddresses.stateTransition.proxies.chainTypeManager;
         address fromRelease = IChainTypeManager(ctm).currentRelease();
-        require(fromRelease != address(0), "CTM has no current release: the bootstrap edge must run first");
+        require(fromRelease != address(0), "CTM has no current release: it predates the registry model");
         address newRelease = ctmAddresses.stateTransition.currentRelease;
         require(newRelease != address(0), "new release not deployed");
-        address engine = committedUpgradeEngine();
+        address engine = committedChainUpgradeEngine();
         upgradeAddresses.ctmTransition = deployTransition(
             TransitionManifest({
                 fromRelease: fromRelease,
                 newRelease: newRelease,
-                upgradeEngine: engine,
+                chainUpgradeEngine: engine,
                 oldProtocolVersionDeadline: UpgradeHelperLib.getOldProtocolDeadline(),
                 upgradeTimestamp: 0,
                 l2Plan: authoredL2Plan()
@@ -426,11 +414,27 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             return;
         }
         // From the build ARTIFACT, for the same reason as the transition above.
+        address proxyUpgradeEngine = deployProxyUpgradeEngine();
         upgradeAddresses.ctmInfrastructureTransition = deployViaCreate2AndNotify(
             BytecodeUtils.readBytecodeL1("ProxyUpgradeTransition.sol", "ProxyUpgradeTransition"),
-            abi.encode(ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.CTM, proxyUpgrades: inventory})),
+            abi.encode(
+                ProxyUpgradeTransitionManifest({
+                    domain: ProxyUpgradeDomain.CTM,
+                    proxyUpgrades: inventory,
+                    proxyUpgradeEngine: proxyUpgradeEngine
+                })
+            ),
             "ProxyUpgradeTransition"
         );
+    }
+
+    /// @notice The engine the infrastructure transition pins: the code `CTMUpgradeExecutor`
+    ///         delegatecalls to apply it, with the CTM, its `ProxyAdmin` and the ServerNotifier as
+    ///         its authority. The default applies the rows and nothing else; a version whose upgrade
+    ///         needs follow-up calls (CTM or notifier wiring) deploys its `DefaultProxyUpgradeEngine`
+    ///         subclass instead.
+    function deployProxyUpgradeEngine() internal virtual returns (address) {
+        return deploySimpleContract("DefaultProxyUpgradeEngine");
     }
 
     /// @notice The enum-indexed CTM-domain inventory of this edge: a source-checked row for every
@@ -575,10 +579,40 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ///         edge — no delegate, no extra bytecode, no composer, nothing to publish. A version
     ///         whose L2 built-ins change derives their rows from the release pair on-chain and MUST
     ///         author the delegate that initializes them and list every bytecode the resulting plan
-    ///         needs published (the v35 bootstrap shows the shape).
+    ///         needs published ({standardL2Side} is the standard such side).
     function authorL2Side() internal virtual returns (AuthoredL2Side memory side) {
         // The zero value is the L1-only side: an empty plan and nothing to publish.
         return side;
+    }
+
+    /// @notice The standard L2 side, which a version opts into from {authorL2Side}: the delegate
+    ///         (`L2DefaultUpgrade`), the composer for it, and every bytecode the
+    ///         composed transaction needs published — the built-ins, the ZKsync OS baselines and the
+    ///         delegate. On a same-minor patch edge it is the L1-only side, since a patch carries no
+    ///         L2 leg (`PatchCannotCarryL2Upgrade`): the version's patches need no override.
+    function standardL2Side() internal returns (AuthoredL2Side memory side) {
+        if (UpgradeHelperLib.isPatchEdge(getOldProtocolVersion(), getNewProtocolVersion())) {
+            return side;
+        }
+        // Deployed here rather than in {deployNewCTMContracts}, which a transition replacement never runs.
+        if (upgradeAddresses.l2DelegateComposer == address(0)) {
+            upgradeAddresses.l2DelegateComposer = deploySimpleContract("L2DefaultDelegateCalldataComposer");
+        }
+        side.plan = AuthoredL2Plan({
+            delegateBytecodeInfo: Utils.getZKOSBytecodeInfoForContract("L2DefaultUpgrade.sol", "L2DefaultUpgrade"),
+            extraBytecodeInfos: new bytes[](0),
+            delegateComposer: upgradeAddresses.l2DelegateComposer
+        });
+        L2EcosystemContract[] memory delegateArtifact = new L2EcosystemContract[](1);
+        delegateArtifact[0] = L2EcosystemContract.L2DefaultUpgrade;
+        side.factoryDependencies = CoreOnGatewayHelper.getFullListOfFactoryDependencies(delegateArtifact);
+    }
+
+    function getCreationCalldata(string memory _contractName) internal view virtual override returns (bytes memory) {
+        if (compareStrings(_contractName, "L2DefaultDelegateCalldataComposer")) {
+            return abi.encode();
+        }
+        return super.getCreationCalldata(_contractName);
     }
 
     /// @notice The authored L2 plan of this edge, factory dependencies published and pinned — what
@@ -588,41 +622,27 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         return abi.decode(encodedAuthoredL2Plan, (AuthoredL2Plan));
     }
 
-    /// @notice The `RegistryBootstrapMigration` this run deploys, or zero for every edge that is
-    ///         not a bootstrap.
-    /// @dev Exists so `saveOutput` can NAME the migration: the bootstrap bundle targets it, but it
-    ///      is not reachable from any other reported address, and a reviewer should not have to
-    ///      decode bundle calldata to find the object the edge runs.
     /// @notice The upgrade engine this edge commits: this prepare's own deployment until the
     ///         object that pins it exists, and that object's pin from then on. Reading it back off
     ///         the object means the output cannot name an engine the committed edge does not pin.
-    function committedUpgradeEngine() public view virtual returns (address) {
+    function committedChainUpgradeEngine() public view virtual returns (address) {
         address transition = upgradeAddresses.ctmTransition;
         if (transition != address(0)) {
-            return ICTMTransition(transition).upgradeEngine();
+            return ICTMTransition(transition).chainUpgradeEngine();
         }
         if (upgradeKind() == UpgradeKind.InfrastructureOnly) {
             // No chain crosses an infrastructure-only edge, so there is no engine to commit and
             // the output must not name one.
             return address(0);
         }
-        require(upgradeAddresses.upgradeEngine != address(0), "upgrade engine not deployed");
-        return upgradeAddresses.upgradeEngine;
-    }
-
-    function bootstrapMigrationAddress() public view virtual returns (address) {
-        return address(0);
+        require(upgradeAddresses.chainUpgradeEngine != address(0), "upgrade engine not deployed");
+        return upgradeAddresses.chainUpgradeEngine;
     }
 
     /// @notice The CTM-domain inventory of this edge, indexed by `CTMContract` — ONE definition,
     ///         which the infrastructure transition and the orphan check are rendered from.
-    /// @dev The bootstrap edge reads it back off its own pinned migration; every other edge renders
-    ///      it from this run's deployments.
+    /// @dev Rendered from this run's deployments.
     function ctmProxyInventory() internal view virtual returns (ProxyUpgradeRow[] memory) {
-        address migration = bootstrapMigrationAddress();
-        if (migration != address(0)) {
-            return RegistryBootstrapMigration(migration).getManifest().ctmProxyUpgrades;
-        }
         require(
             upgradeAddresses.ctmTransition != address(0) || upgradeKind() == UpgradeKind.InfrastructureOnly,
             "no upgrade object deployed: the CTM-domain rows are read from it"
@@ -630,12 +650,12 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         return _ctmProxyUpgradeRows();
     }
 
-    /// @notice The CTM domain's bound `CTMUpgradeExecutor`: the CTM's owner once the bootstrap edge
-    ///         has handed the domain over. This upgrade's CTM legs are applied through it.
+    /// @notice The CTM domain's bound `CTMUpgradeExecutor`: the CTM's owner. This upgrade's CTM legs
+    ///         are applied through it.
     function boundCTMUpgradeExecutor() public view virtual returns (address) {
         address ctm = ctmAddresses.stateTransition.proxies.chainTypeManager;
         address executor = IOwnable(ctm).owner();
-        require(executor.code.length != 0, "CTM owner is not a contract: run the bootstrap edge first");
+        require(executor.code.length != 0, "CTM owner is not a contract: the CTM predates the registry model");
         require(
             address(CTMUpgradeExecutor(payable(executor)).CHAIN_TYPE_MANAGER()) == ctm,
             "CTM owner is not an executor bound to it"
@@ -649,10 +669,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         ctmAddresses.admin.eip7702Checker = _eip7702Checker;
     }
 
-    /// @notice The release members this version SETS OUT to change. Everything else must come
-    ///         through unchanged, and the prepare refuses to replace anything not named here — so
-    ///         "change one contract" cannot quietly become "replace the facet set" because the
-    ///         local build differs from the one that produced the live code.
+    /// @notice The release members this version SETS OUT to change. Each is redeployed, everything
+    ///         else must come through unchanged, and the prepare refuses to replace anything not
+    ///         named here — so "change one contract" cannot quietly become "replace the facet set"
+    ///         because the local build differs from the one that produced the live code.
     /// @dev Names are the `deploySimpleContract` names of the members that pass through
     ///      {DeployCTMUtils._deployReleaseMember}: the six facets, `DiamondInit`, `L1GenesisUpgrade`
     ///      and `EIP7702Checker`. The verifier is not among them — a version that replaces it does so
@@ -665,12 +685,8 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
 
     /// @notice Refuses a replacement this version did not declare (see {changedReleaseMembers}).
     function _requireDeclaredReleaseMemberChange(string memory _name, address _live) internal virtual override {
-        string[] memory declared = changedReleaseMembers();
-        uint256 length = declared.length;
-        for (uint256 i = 0; i < length; ++i) {
-            if (compareStrings(declared[i], _name)) {
-                return;
-            }
+        if (_isDeclaredReleaseMemberChange(_name)) {
+            return;
         }
         console.log("Undeclared release member change:", _name);
         console.log("  live:", _live);
@@ -688,17 +704,19 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         );
     }
 
-    /// @notice A live release member may serve this release when it ALREADY runs the code the
-    ///         current sources produce with this run's constructor arguments — so an upgrade
-    ///         deploys only the members it changes, and one that changes none of them reuses the
-    ///         release object itself.
+    /// @notice A live release member may serve this release when this version does not declare it
+    ///         changed and it ALREADY runs the code the current sources produce with this run's
+    ///         constructor arguments — so an upgrade deploys only the members it changes, and one
+    ///         that changes none of them reuses the release object itself.
+    /// @dev A declared member is always redeployed: the build has no CBOR metadata, so a
+    ///      constructor-only change leaves the runtime codehash as it was.
     /// @dev The identity check needs a local deployment: an artifact's `deployedBytecode` carries
     ///      ZEROED immutable slots, so it cannot be compared against live code. The probe is a
     ///      plain CREATE in the script's own EVM and is never broadcast — nothing reaches the
     ///      chain — and it is exact, immutables included (the same technique
     ///      `GatewayCTMDeployerHelper` uses to predict Gateway codehashes).
     function _canReuseReleaseMember(string memory _name, address _live) internal virtual override returns (bool) {
-        if (_live == address(0) || _live.code.length == 0) {
+        if (_live == address(0) || _live.code.length == 0 || _isDeclaredReleaseMemberChange(_name)) {
             return false;
         }
         if (address(releaseMemberProbe) == address(0)) {
@@ -706,6 +724,18 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             releaseMemberProbe = new ReleaseMemberProbe();
         }
         return _live.codehash == releaseMemberProbe.codehashOf(_name, getCreationCalldata(_name));
+    }
+
+    /// @notice Whether this version names `_name` in {changedReleaseMembers}.
+    function _isDeclaredReleaseMemberChange(string memory _name) internal view returns (bool) {
+        string[] memory declared = changedReleaseMembers();
+        uint256 length = declared.length;
+        for (uint256 i = 0; i < length; ++i) {
+            if (compareStrings(declared[i], _name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// @notice Declares one governance/admin call this prepare emits that the upgrade objects do
@@ -744,17 +774,14 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         generateFixedForceDeploymentsData();
     }
 
-    /// @notice The CTM domain's governance. Once the bootstrap edge has handed the domain to the
-    ///         bound executor, the CTM's owner IS that executor and governance is its owner; the
-    ///         bootstrap prepare (which runs before that handover) overrides this with the CTM's
-    ///         owner itself.
+    /// @notice The CTM domain's governance: the owner of the bound executor that owns the CTM.
     function ctmGovernance() internal view virtual returns (address) {
         return IOwnable(boundCTMUpgradeExecutor()).owner();
     }
 
     /// @notice The step between the release deploy and the upgrade objects. Nothing on the default
     ///         path: it is where a version script hangs a deployment that needs the release to
-    ///         already exist (the bootstrap edge's engine pins it as an immutable).
+    ///         already exist.
     /// @dev The chain-CREATION cut is deliberately not recomputed here: from v35 the CTM builds it
     ///      per chain creation from its pinned release, so an upgrade prepare has nothing to say
     ///      about it (see the retired `diamond_cut_data` output field).
@@ -766,13 +793,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
 
     function getOwnerAddress() public virtual returns (address) {
         return config.ownerAddress;
-    }
-
-    /// @notice The core executor the core prepare of the bootstrap edge deployed. Set from the
-    ///         prepare params in production; in-forge harnesses that drive both prepares call it
-    ///         directly.
-    function setCoreUpgradeExecutor(address _coreUpgradeExecutor) public virtual {
-        upgradeAddresses.coreUpgradeExecutor = _coreUpgradeExecutor;
     }
 
     function setCoreTransition(address _coreTransition) public virtual {
@@ -882,7 +902,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ////////////////////////////// Preparing calls /////////////////////////////////
 
     /// @notice Writes this prepare's `[governance_calls] calls`: whatever a version script declared
-    ///         as a governance external action (the bootstrap edge declares its whole bundle). The
+    ///         as a governance external action. The
     ///         executor calls are not among them — the merge derives them from the reported objects.
     function prepareDefaultGovernanceCalls() public virtual returns (Call[] memory calls) {
         calls = prepareGovernanceCalls();
@@ -895,51 +915,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         serializeMemberDeployments();
         string memory updatedToml = vm.serializeString("root", "governance_calls", governanceCallsSerialized);
         vm.writeToml(updatedToml, upgradeConfig.outputPath);
-    }
-
-    /// @notice The CTM-ADMIN calls of this prepare — calls on authority governance does not hold —
-    ///         written to `[ctm_admin_calls]` and declared as `admin`-phase external actions. Only
-    ///         the registry bootstrap has any: the ChainAdmin's half of the one-time ServerNotifier
-    ///         handover ({serverNotifierHandoverCalls}). The section is written either way so
-    ///         tooling reads one shape.
-    function prepareDefaultCTMAdminCalls() public virtual returns (Call[] memory calls) {
-        calls = serverNotifierHandoverCalls();
-        address chainAdmin;
-        address chainAdminOwner;
-        uint256 length = calls.length;
-        if (length != 0) {
-            // The administrator the section records: the live owner of the first call's target.
-            chainAdmin = IOwnable(calls[0].target).owner();
-            chainAdminOwner = chainAdmin.code.length == 0 ? address(0) : IOwnable(chainAdmin).owner();
-        }
-        for (uint256 i = 0; i < length; ++i) {
-            declareExternalAction(
-                ExternalActionsLib.PHASE_ADMIN,
-                "ServerNotifier handover to the CTM domain (ctm_admin_calls)",
-                "the live owner of the call target (normally the ChainAdmin)",
-                calls[i]
-            );
-        }
-        vm.serializeAddress("ctm_admin_calls", "chain_admin", chainAdmin);
-        vm.serializeAddress("ctm_admin_calls", "chain_admin_owner", chainAdminOwner);
-
-        string memory ctmAdminCallsSerialized = vm.serializeBytes(
-            "ctm_admin_calls",
-            "server_notifier_handover",
-            abi.encode(calls)
-        );
-
-        // See the note in prepareDefaultGovernanceCalls on why keyed writeToml is not used here.
-        serializeMemberDeployments();
-        string memory updatedCtmAdminToml = vm.serializeString("root", "ctm_admin_calls", ctmAdminCallsSerialized);
-        vm.writeToml(updatedCtmAdminToml, upgradeConfig.outputPath);
-    }
-
-    /// @notice The ChainAdmin's half of the one-time ServerNotifier handover (see
-    ///         {docs/upgrade-operations.md}). Empty by default: once the registry bootstrap
-    ///         has run, the notifier is administered and owned like the rest of the CTM domain.
-    function serverNotifierHandoverCalls() public view virtual returns (Call[] memory calls) {
-        return calls;
     }
 
     /// @notice The governance bundle of this prepare: only what a version script declared as a
@@ -1033,7 +1008,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",
-            committedUpgradeEngine()
+            committedChainUpgradeEngine()
         );
 
         // Serialize newly deployed upgrade addresses
@@ -1077,13 +1052,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             "ctm_infrastructure_transition_addr",
             upgradeAddresses.ctmInfrastructureTransition
         );
-        address bootstrapMigrationAddr = bootstrapMigrationAddress();
-        vm.serializeAddress("registry", "bootstrap_migration_addr", bootstrapMigrationAddr);
-        // The bound executor is named whenever it is known: after a bootstrap prepare deployed it,
-        // or once the CTM's live owner is one. The merge derives this CTM's executor calls on it.
+        // The bound executor is named whenever this run deployed an object for it to apply. The
+        // merge derives this CTM's executor calls on it.
         bool executorKnown = upgradeAddresses.ctmTransition != address(0) ||
-            upgradeAddresses.ctmInfrastructureTransition != address(0) ||
-            bootstrapMigrationAddr != address(0);
+            upgradeAddresses.ctmInfrastructureTransition != address(0);
         string memory registry = vm.serializeAddress(
             "registry",
             "ctm_upgrade_executor_addr",

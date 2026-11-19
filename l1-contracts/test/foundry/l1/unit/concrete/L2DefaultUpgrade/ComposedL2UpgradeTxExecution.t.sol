@@ -81,7 +81,7 @@ contract ComposedL2UpgradeTxExecutionTest is RegistryObjectsFixture {
             extraBytecodeInfos: new bytes[](0),
             delegateComposer: address(defaultComposer)
         });
-        transition = _transition(fromRelease, newRelease, 0, _deployedStub("upgradeEngine"), plan);
+        transition = _transition(fromRelease, newRelease, 0, _deployedStub("chainUpgradeEngine"), plan);
 
         _setUpL2();
     }

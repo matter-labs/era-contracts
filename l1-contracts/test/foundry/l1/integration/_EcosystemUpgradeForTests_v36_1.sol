@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {MultiProofTestnetVerifier} from "contracts/state-transition/verifiers/MultiProofTestnetVerifier.sol";
+import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
+import {ZiskTestnetVerifier} from "contracts/state-transition/verifiers/ZiskTestnetVerifier.sol";
+import {ZiskVerifier} from "contracts/state-transition/verifiers/ZiskVerifier.sol";
+
 import {CoreUpgrade_v36} from "deploy-scripts/upgrade/v36/CoreUpgrade_v36.s.sol";
 import {CTMUpgradeForTests_v36} from "./_EcosystemUpgradeForTests_v36.sol";
 
@@ -10,7 +15,7 @@ import {CTMUpgradeForTests_v36} from "./_EcosystemUpgradeForTests_v36.sol";
 ///         to across a patch version edge. See the Patches section of
 ///         {docs/registry-driven-upgrades.md}.
 /// @dev Every other release member is byte-identical, so the prepare reuses it: the only thing this
-///      hop deploys on the CTM side is the verifier pair.
+///      hop deploys on the CTM side is the verifier tree.
 
 /// @dev A patch has no ecosystem leg at all, so nothing is deployed here and no core transition
 ///      exists for the bundle to apply.
@@ -25,6 +30,23 @@ contract CTMUpgradeForTests_v36_1 is CTMUpgradeForTests_v36 {
     ///         upgrade engine installs on every chain from the composed proposal.
     function deployNewCTMContracts() public virtual override {
         super.deployNewCTMContracts();
+        _useLiveZiskVerifier();
         deployVerifiers();
+    }
+
+    /// @dev The fixture's chains require their second proof system, so the fresh verifier must be a
+    ///      multi-proof one like the live testnet verifier
+    ///      ({protocol-docs/interop-gating.md#second-proof-system-requirement}). An upgrade prepare
+    ///      takes no multi-proof config, so this one hands it the live ZiSK side to build over.
+    function _useLiveZiskVerifier() internal {
+        MultiProofVerifier liveMultiProof = MultiProofVerifier(
+            address(MultiProofTestnetVerifier(ctmAddresses.stateTransition.verifiers.verifier).INNER_VERIFIER())
+        );
+        ZiskVerifier liveZisk = ZiskVerifier(
+            address(ZiskTestnetVerifier(address(liveMultiProof.ZISK_RANGE_VERIFIER())).INNER_VERIFIER())
+        );
+        config.multiProof.enabled = true;
+        config.multiProof.ziskRangeVerifierAddr = address(liveZisk);
+        config.multiProof.ziskPlonkVerifierAddr = address(liveZisk.PLONK_VERIFIER());
     }
 }

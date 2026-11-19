@@ -51,7 +51,7 @@ enum L2EcosystemContract {
 ///         The enum value is VM-neutral; `DeployCTML1OrGateway.resolve` maps it to
 ///         the correct Era or ZKsyncOS contract / artifact name.
 ///         Also the index space of the CTM-domain upgrade inventory: CTM-domain
-///         `ProxyUpgradeTransition` (`proxyUpgrades`) and bootstrap (`ctmProxyUpgrades`) manifests carry
+///         `ProxyUpgradeTransition` (`proxyUpgrades`) manifests carry
 ///         `ProxyUpgradeRow[]` inventories of length `CTM_CONTRACT_COUNT` indexed by this enum (same slot semantics as `L1EcosystemContract`). Only the members that are
 ///         TUPPs under the CTM-domain `ProxyAdmin` can meaningfully participate
 ///         (ChainTypeManager, ValidatorTimelock, BytecodesSupplier, PermissionlessValidator,

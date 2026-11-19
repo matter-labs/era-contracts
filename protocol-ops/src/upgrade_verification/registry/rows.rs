@@ -1,14 +1,15 @@
 //! The enum-indexed proxy inventories an upgrade carries — a Core-domain `ProxyUpgradeTransition`'s
-//! ecosystem rows, a CTM-domain one's or a bootstrap's CTM-domain rows — held against live state,
+//! ecosystem rows or a CTM-domain one's — held against live state,
 //! the same way on every path.
 //!
 //! Each participating row (a non-zero `implNew`) answers three questions:
 //!
 //! 1. Is its proxy the contract its SLOT names? Slot `i` of an inventory is enum member `i`
 //!    (`L1EcosystemContract`, `CTMContract`), and that member's proxy is discovered from live state
-//!    the package does not supply: the ecosystem's through the Bridgehub and the getters it exposes,
-//!    the CTM domain's through the CTM ([`discover_slot_proxy`]). A row whose proxy is another
-//!    contract would install the slot's implementation behind the wrong proxy.
+//!    the package does not supply: the ecosystem's through the REVIEWED Bridgehub and the getters
+//!    it exposes ([`super::ecosystem_binding`]), the CTM domain's through the CTM, which is held to
+//!    that Bridgehub's registry ([`discover_slot_proxy`]). A row whose proxy is another contract
+//!    would install the slot's implementation behind the wrong proxy.
 //! 2. Does it depart from the implementation that is LIVE? It is read through the applying
 //!    domain's bound `ProxyAdmin`, the one `ProxyUpgradeRowLib` applies it through: a transparent
 //!    proxy answers `implementation()` only to its own admin, and every proxy a row may name sits
@@ -36,6 +37,7 @@ use crate::upgrade_verification::constants::{
 use crate::upgrade_verification::report::VerificationResult;
 
 use super::construction::{ReviewedBuild, REVIEWED_PROXY};
+use super::ecosystem_binding::ReviewedBridgehub;
 use super::member_construction::{expect_member_construction, ArgContext, Member, MemberReview};
 use super::package::ReportedSingletons;
 use super::provenance::{expect_code_identity, tolerate};
@@ -49,8 +51,8 @@ pub(super) enum Inventory {
     /// `L1EcosystemContract`: a Core-domain `ProxyUpgradeTransition`'s `proxyUpgrades`, applied
     /// through the ecosystem `ProxyAdmin`.
     Ecosystem,
-    /// `CTMContract`: a CTM-domain `ProxyUpgradeTransition`'s `proxyUpgrades` or a bootstrap's
-    /// `ctmProxyUpgrades`, applied through the CTM-domain `ProxyAdmin`.
+    /// `CTMContract`: a CTM-domain `ProxyUpgradeTransition`'s `proxyUpgrades`, applied through the
+    /// CTM-domain `ProxyAdmin`.
     CtmDomain,
 }
 
@@ -269,16 +271,16 @@ pub(super) struct InventoryReview<'a> {
     pub(super) rows: &'a [ProxyUpgradeRow],
     /// The `ProxyAdmin` the domain applies its rows through.
     pub(super) domain_admin: Address,
-    /// Where the slots' proxies are discovered from: the Bridgehub for the ecosystem, the CTM for
-    /// its domain. `None` when it could not be established (already reported); every slot is
-    /// then unverified.
+    /// Where the slots' proxies are discovered from: the reviewed Bridgehub for the ecosystem, the
+    /// CTM for its domain. `None` when it could not be established (already reported); every slot
+    /// is then unverified.
     pub(super) anchor: Option<Address>,
-    /// A slot whose proxy is not yet under `domain_admin`, so its departure cannot be read through
-    /// it (the bootstrap's ServerNotifier before its handover, reported by the caller).
-    pub(super) departure_unreadable: Option<usize>,
-    /// What the package reports for the Bridgehub and the CTM domain's singletons: the last
-    /// fallbacks a new `ChainTypeManager` implementation's immutables are held against.
+    /// What the package reports for the CTM domain's singletons: the last fallbacks a new
+    /// `ChainTypeManager` implementation's immutables are held against.
     pub(super) reported: ReportedSingletons,
+    /// The reviewed Bridgehub, the value a new `ChainTypeManager` implementation's `BRIDGE_HUB`
+    /// is held against when the live CTM does not answer its own.
+    pub(super) reviewed_bridgehub: Option<&'a ReviewedBridgehub>,
 }
 
 /// An implementation whose code identity passed, for its construction check: a participating
@@ -365,15 +367,7 @@ pub(super) async fn verify_inventory<P: Provider>(
 
         expect_slot_proxy(provider, result, review, &label, member, row.proxy).await;
 
-        if review.departure_unreadable == Some(slot) {
-            result.print_info(&format!(
-                "  {label} is not source-checked: its proxy is not under {} yet, so its \
-                 implementation cannot be read through it",
-                review.domain_admin
-            ));
-        } else {
-            verify_departure(provider, result, &label, row, review.domain_admin).await;
-        }
+        verify_departure(provider, result, &label, row, review.domain_admin).await;
 
         let identified = expect_code_identity(
             provider,
@@ -527,13 +521,18 @@ impl CtmImmutable {
         }
     }
 
-    /// The value the review establishes without the live CTM: for a CTM-domain singleton the
-    /// participating inventory row of its slot, else the proxy the package reports for it. None
-    /// for the Bridgehub, which the implementation's construction record is held against the
-    /// reviewed one for ([`super::member_construction`]).
+    /// The value the review establishes without the live CTM: the reviewed Bridgehub for the
+    /// Bridgehub (never the package's `bridgehub_proxy_addr`); for a CTM-domain singleton the participating inventory row of its slot, else the proxy the
+    /// package reports for it.
     fn fallback(self, review: &InventoryReview<'_>) -> Fallback {
         match self {
-            Self::BridgeHub => Fallback::None,
+            Self::BridgeHub => match review.reviewed_bridgehub {
+                Some(reviewed) => Fallback::Known(
+                    reviewed.address,
+                    format!("the reviewed Bridgehub ({})", reviewed.source),
+                ),
+                None => Fallback::None,
+            },
             _ => {
                 let Some((member, field, reported)) = self.slot(&review.reported) else {
                     return Fallback::None;
@@ -810,7 +809,6 @@ pub(super) fn participating(rows: &[ProxyUpgradeRow]) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::upgrade_verification::constants::CTM_CONTRACT_SERVER_NOTIFIER_SLOT;
     use crate::upgrade_verification::registry::provenance::CodeIdentity;
     use alloy::primitives::Bytes;
     use alloy::providers::ProviderBuilder;
@@ -971,11 +969,7 @@ mod tests {
     /// Drives the reporting path over a mocked transport: per participating row, the slot's
     /// discovered proxy (`serverNotifierAddress()`), the live implementation through the domain
     /// admin, and the `implNew`'s code.
-    async fn run(
-        rows: &[ProxyUpgradeRow],
-        answers: &[Bytes],
-        departure_unreadable: Option<usize>,
-    ) -> VerificationResult {
+    async fn run(rows: &[ProxyUpgradeRow], answers: &[Bytes]) -> VerificationResult {
         let asserter = Asserter::new();
         for answer in answers {
             asserter.push_success(answer);
@@ -991,8 +985,8 @@ mod tests {
                 rows,
                 domain_admin: DOMAIN_ADMIN,
                 anchor: Some(CTM),
-                departure_unreadable,
                 reported: Default::default(),
+                reviewed_bridgehub: None,
             },
         )
         .await
@@ -1014,7 +1008,6 @@ mod tests {
                 addr(OLD),
                 Bytes::from_static(NOTIFIER_RUNTIME),
             ],
-            None,
         )
         .await;
         assert_eq!((result.errors, result.warnings), (0, 0));
@@ -1031,11 +1024,71 @@ mod tests {
                 addr(OLD),
                 Bytes::from_static(NOTIFIER_RUNTIME),
             ],
-            None,
         )
         .await;
         assert_eq!(result.errors, 1);
         assert!(result.ensure_success().is_err());
+    }
+
+    /// F1 (inverts the external review's forged-anchor repro): discovered through the reviewed
+    /// Bridgehub, whose `messageRoot()` answers the real MessageRoot, an `L1MessageRoot` row naming
+    /// the asset router — departing from its live implementation onto reviewed L1MessageRoot code —
+    /// fails its slot. The ecosystem twin of [`a_row_naming_another_proxy_than_its_slot_fails`].
+    #[tokio::test]
+    async fn an_ecosystem_row_relabelling_another_proxy_fails_against_the_reviewed_bridgehub() {
+        const REVIEWED_BRIDGEHUB: Address = Address::repeat_byte(0xB0);
+        const MESSAGE_ROOT: Address = Address::repeat_byte(0x3A);
+        const ASSET_ROUTER: Address = Address::repeat_byte(0xA5);
+        const LIVE_ROUTER_IMPL: Address = Address::repeat_byte(0x01);
+        const MESSAGE_ROOT_RUNTIME: &[u8] = b"the reviewed L1MessageRoot runtime";
+        let build = ReviewedBuild::from_artifacts(
+            CodeIdentity::empty(),
+            vec![(
+                "L1MessageRoot.sol",
+                "L1MessageRoot",
+                Vec::new(),
+                MESSAGE_ROOT_RUNTIME.to_vec(),
+                Vec::new(),
+            )],
+        );
+        let mut rows = vec![inert(); L1_ECOSYSTEM_CONTRACTS.len()];
+        let slot = L1_ECOSYSTEM_CONTRACTS
+            .iter()
+            .position(|m| *m == "L1MessageRoot")
+            .unwrap();
+        rows[slot] = ProxyUpgradeRow {
+            proxy: ASSET_ROUTER,
+            expectedOldImpl: LIVE_ROUTER_IMPL,
+            implNew: NEW,
+            callInitializeUpgrade: false,
+        };
+        let asserter = Asserter::new();
+        asserter.push_success(&addr(MESSAGE_ROOT)); // the reviewed Bridgehub's messageRoot()
+        asserter.push_success(&addr(LIVE_ROUTER_IMPL)); // ProxyAdmin.getProxyImplementation
+        asserter.push_success(&Bytes::from_static(MESSAGE_ROOT_RUNTIME)); // implNew's code
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        let mut result = VerificationResult::default();
+        verify_inventory(
+            &provider,
+            &build,
+            &mut result,
+            &InventoryReview {
+                inventory: Inventory::Ecosystem,
+                rows: &rows,
+                domain_admin: DOMAIN_ADMIN,
+                anchor: Some(REVIEWED_BRIDGEHUB),
+                reported: Default::default(),
+                reviewed_bridgehub: None,
+            },
+        )
+        .await
+        .unwrap();
+        assert!(asserter.read_q().is_empty());
+        assert_eq!(result.errors, 1, "{:?}", result.error_messages);
+        assert!(result.has_error(&format!(
+            "names proxy {ASSET_ROUTER}, but the live L1MessageRoot is {MESSAGE_ROOT}: the row \
+             would install L1MessageRoot's implementation behind another contract"
+        )));
     }
 
     /// The CTM's own slot is discovered as the CTM itself: no read.
@@ -1046,9 +1099,9 @@ mod tests {
             answers.extend(kept_immutables());
             answers
         };
-        let result = run(&inventory("ChainTypeManager", CTM), &answers(), None).await;
+        let result = run(&inventory("ChainTypeManager", CTM), &answers()).await;
         assert_eq!(result.errors, 0);
-        let result = run(&inventory("ChainTypeManager", OTHER), &answers(), None).await;
+        let result = run(&inventory("ChainTypeManager", OTHER), &answers()).await;
         assert_eq!(result.errors, 1);
     }
 
@@ -1085,8 +1138,9 @@ mod tests {
     }
 
     /// [`run_ctm_row_with`] for a row installing `implementation`, then — when `construction`
-    /// names the records and the reviewer's inputs — every identified implementation's
-    /// construction ([`verify_inventory_construction`]), which reads nothing here.
+    /// names the records and the reviewer's inputs, whose Bridgehub is then the reviewed one —
+    /// every identified implementation's construction ([`verify_inventory_construction`]), which
+    /// reads nothing here.
     async fn run_ctm_row_reviewed(
         validator_row: Option<Address>,
         reported: ReportedSingletons,
@@ -1143,8 +1197,8 @@ mod tests {
                 rows: &rows,
                 domain_admin: DOMAIN_ADMIN,
                 anchor: Some(CTM),
-                departure_unreadable: None,
                 reported,
+                reviewed_bridgehub: construction.and_then(|(_, env)| env.bridgehub()),
             },
         )
         .await;
@@ -1286,7 +1340,7 @@ mod tests {
         .collect()
     }
 
-    /// A singleton this upgrade introduces — the v35 bootstrap's `L1InteropFeeManager`: the live
+    /// A singleton this upgrade introduces — e.g. an `L1InteropFeeManager`: the live
     /// CTM does not name it yet and no row upgrades it — is established from the package's
     /// report only when it runs the reviewed proxy, the CTM-domain ProxyAdmin is its admin, and its
     /// implementation runs the reviewed contract of its slot.
@@ -1398,7 +1452,6 @@ mod tests {
             let result = run(
                 &inventory("ServerNotifier", NOTIFIER),
                 &[addr(NOTIFIER), addr(OLD), Bytes::copy_from_slice(code)],
-                None,
             )
             .await;
             assert_eq!(result.errors, 1);
@@ -1414,7 +1467,6 @@ mod tests {
                 addr(NEW),
                 Bytes::from_static(NOTIFIER_RUNTIME),
             ],
-            None,
         )
         .await;
         assert_eq!((result.errors, result.warnings), (0, 1));
@@ -1425,37 +1477,23 @@ mod tests {
                 addr(OTHER),
                 Bytes::from_static(NOTIFIER_RUNTIME),
             ],
-            None,
         )
         .await;
         assert_eq!(result.errors, 1);
-    }
-
-    /// The bootstrap's notifier before its handover: its departure is not read, its slot and
-    /// its implementation still are.
-    #[tokio::test]
-    async fn an_unreadable_departure_still_checks_the_slot_and_the_implementation() {
-        let result = run(
-            &inventory("ServerNotifier", NOTIFIER),
-            &[addr(NOTIFIER), Bytes::from_static(NOTIFIER_RUNTIME)],
-            Some(CTM_CONTRACT_SERVER_NOTIFIER_SLOT),
-        )
-        .await;
-        assert_eq!(result.errors, 0);
     }
 
     /// A row in a slot that names no proxy of the domain can never apply, and nothing is read
     /// for it.
     #[tokio::test]
     async fn a_row_in_a_non_proxy_slot_fails() {
-        let result = run(&inventory("MailboxFacet", OTHER), &[], None).await;
+        let result = run(&inventory("MailboxFacet", OTHER), &[]).await;
         assert_eq!(result.errors, 1);
     }
 
     /// An inventory whose length is not the enum's.
     #[tokio::test]
     async fn an_inventory_of_the_wrong_length_fails() {
-        let result = run(&vec![inert(); 3], &[], None).await;
+        let result = run(&vec![inert(); 3], &[]).await;
         assert_eq!(result.errors, 1);
         assert!(result.has_error("constructor refuses such an inventory"));
     }
@@ -1490,8 +1528,8 @@ mod tests {
             ),
         ] {
             let mut rows = inventory("ServerNotifier", NOTIFIER);
-            rows[CTM_CONTRACT_SERVER_NOTIFIER_SLOT] = bad;
-            let result = run(&rows, &[], None).await;
+            rows[slot_of("ServerNotifier")] = bad;
+            let result = run(&rows, &[]).await;
             assert_eq!(result.errors, 1, "{needle}: {:?}", result.error_messages);
             assert!(result.has_error(needle), "{:?}", result.error_messages);
         }
@@ -1513,7 +1551,6 @@ mod tests {
                 addr(OLD),
                 Bytes::from_static(NOTIFIER_RUNTIME),
             ],
-            None,
         )
         .await;
         assert_eq!(result.errors, 1, "{:?}", result.error_messages);
@@ -1537,8 +1574,8 @@ mod tests {
                 rows: &inventory("ServerNotifier", NOTIFIER),
                 domain_admin: DOMAIN_ADMIN,
                 anchor: None,
-                departure_unreadable: None,
                 reported: Default::default(),
+                reviewed_bridgehub: None,
             },
         )
         .await
@@ -1604,8 +1641,8 @@ mod tests {
                         rows: &rows,
                         domain_admin: DOMAIN_ADMIN,
                         anchor: Some(DISCOVERED),
-                        departure_unreadable: None,
                         reported: Default::default(),
+                        reviewed_bridgehub: None,
                     },
                 )
                 .await
@@ -1677,7 +1714,7 @@ mod tests {
         records: &MemberDeployments,
     ) -> VerificationResult {
         let mut rows = inventory("ServerNotifier", NOTIFIER);
-        rows[CTM_CONTRACT_SERVER_NOTIFIER_SLOT].implNew = implementation;
+        rows[slot_of("ServerNotifier")].implNew = implementation;
         let asserter = Asserter::new();
         for answer in [
             addr(NOTIFIER),
@@ -1697,8 +1734,8 @@ mod tests {
                 rows: &rows,
                 domain_admin: DOMAIN_ADMIN,
                 anchor: Some(CTM),
-                departure_unreadable: None,
                 reported: Default::default(),
+                reviewed_bridgehub: None,
             },
         )
         .await
@@ -1777,7 +1814,58 @@ mod tests {
         assert!(result.has_error("ChainTypeManager._permissionlessValidator is"));
     }
 
-    /// The implementation behind a proxy only the package reports — the v35 bootstrap's
+    /// F1: a live CTM that does not answer its `BRIDGE_HUB()` leaves the new implementation's held
+    /// to the reviewed Bridgehub — never the package's `bridgehub_proxy_addr` — through its getter
+    /// and through its record alike.
+    #[tokio::test]
+    async fn an_unanswered_bridge_hub_falls_back_to_the_reviewed_bridgehub() {
+        let env = ReviewedEnv::for_test(None, Some(VALIDATOR));
+        let unanswered = |arriving: Address| {
+            move |immutable: CtmImmutable| match immutable {
+                CtmImmutable::BridgeHub => (Some(arriving), None),
+                _ => (Some(VALIDATOR), Some(VALIDATOR)),
+            }
+        };
+        let reported = ReportedSingletons {
+            bridgehub: Some(OTHER),
+            ..Default::default()
+        };
+        let (implementation, records) =
+            recorded("ChainTypeManager", ctm_args(VALIDATOR, VALIDATOR));
+        let result = run_ctm_row_reviewed(
+            None,
+            reported,
+            unanswered(VALIDATOR),
+            &[],
+            implementation,
+            Some((&records, &env)),
+        )
+        .await;
+        assert_eq!(result.errors, 0, "{:?}", result.error_messages);
+
+        // Built over the package's Bridgehub instead.
+        let (implementation, records) = recorded(
+            "ChainTypeManager",
+            (OTHER, VALIDATOR, VALIDATOR, VALIDATOR).abi_encode_params(),
+        );
+        let result = run_ctm_row_reviewed(
+            None,
+            reported,
+            unanswered(OTHER),
+            &[],
+            implementation,
+            Some((&records, &env)),
+        )
+        .await;
+        assert_eq!(result.errors, 2, "{:?}", result.error_messages);
+        assert!(result.has_error(&format!(
+            "the new implementation's BRIDGE_HUB is {OTHER}, but the reviewed Bridgehub (env \
+             test's bridgehub_proxy_addr) is {VALIDATOR}"
+        )));
+        assert!(result.has_error("ChainTypeManager._bridgehub is"));
+    }
+
+    /// The implementation behind a proxy only the package reports — e.g. an
     /// `L1InteropFeeManager` — is the prepare's deployment like a row's `implNew`: held to its
     /// record, with its `_bridgehub` the reviewed Bridgehub.
     #[tokio::test]

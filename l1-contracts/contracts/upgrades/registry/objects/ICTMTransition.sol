@@ -27,15 +27,14 @@ interface ICTMTransition is ICommittedUpgrade, IManifestHash {
     /// @notice The version chains land on: `newRelease`'s own, read at construction.
     function newProtocolVersion() external view returns (uint256);
 
-    /// @notice The release this transition departs from. Never zero — bootstrapping a pre-registry
-    ///         CTM is one-time migration code, not a permanent special case.
+    /// @notice The release this transition departs from. Never zero.
     function fromRelease() external view returns (address);
 
     function newRelease() external view returns (address);
 
     /// @notice The upgrade-execution contract the committed cut delegatecalls
     ///         (`upgradeFromTransition`). Transition-scoped machinery — named explicitly.
-    function upgradeEngine() external view returns (address);
+    function chainUpgradeEngine() external view returns (address);
 
     function oldProtocolVersionDeadline() external view returns (uint256);
 

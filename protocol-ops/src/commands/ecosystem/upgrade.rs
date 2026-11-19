@@ -4,10 +4,8 @@
 //!
 //!   `upgrade-prepare-all` deploys new ecosystem contracts (deployer EOA signs)
 //!                         by running the release's `CoreUpgrade_v<N>` once + `CTMUpgrade_v<N>`
-//!                         once for the target `--ctm-proxy` on a single anvil fork, then
-//!                         executes the CTM-admin calls the CTM prepare emits (the
-//!                         registry bootstrap's ServerNotifier handover; none on a
-//!                         recurring upgrade). Emits per-script governance TOMLs.
+//!                         once for the target `--ctm-proxy` on a single anvil fork.
+//!                         Emits per-script governance TOMLs.
 //!   `upgrade-governance`  replays the package's one governance bundle
 //!                         (`[governance_calls] calls`) on an anvil fork, holds a
 //!                         registry package's fork state against what it must
@@ -29,10 +27,9 @@ use crate::commands::ecosystem::upgrade_full::UpgradeFull;
 use crate::commands::ecosystem::upgrade_inner::{CtmInputs, PrepareInputs, UpgradeInner};
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::env_config::EnvConfig;
-use crate::common::external_actions::{ExternalAction, GOVERNANCE_PHASE};
+use crate::common::external_actions::{Accounted, DeclaredCalls, ExternalAction};
 use crate::common::forge::scripts::{
-    ADMIN_FUNCTIONS_INVOCATION, CURRENT_CORE_UPGRADE_SCRIPT_PATH, CURRENT_CTM_UPGRADE_SCRIPT_PATH,
-    CURRENT_UPGRADE_LOCAL_INPUT_PATH, UPGRADE_CORE_OUTPUT_PATH,
+    current_release, CurrentRelease, ADMIN_FUNCTIONS_INVOCATION, UPGRADE_CORE_OUTPUT_PATH,
 };
 use crate::common::forge::ForgeRunner;
 use crate::common::governance_calls::GovernanceCallsTable;
@@ -216,25 +213,10 @@ fn check_bundle_provenance(
     use crate::common::governance_calls::decode_calls;
     let calls =
         decode_calls(&gov.calls).with_context(|| format!("{source}: decode governance calls"))?;
-    let for_phase: Vec<&ExternalAction> = declared
-        .iter()
-        .filter(|a| a.phase == GOVERNANCE_PHASE)
-        .collect();
-    // Matched one-for-one rather than by set membership, so a bundle cannot carry a declared call
-    // twice over while a second declaration goes unemitted.
-    let mut claimed = vec![false; for_phase.len()];
-    let mut order = Vec::with_capacity(calls.len());
-    for call in &calls {
-        let matched = for_phase
-            .iter()
-            .enumerate()
-            .position(|(i, action)| !claimed[i] && action.is_call(call));
-        match matched {
-            Some(i) => {
-                claimed[i] = true;
-                order.push(i);
-            }
-            None => anyhow::bail!(
+    let account = DeclaredCalls::match_calls(&calls, declared);
+    for (call, accounted) in calls.iter().zip(&account.calls) {
+        if !matches!(accounted, Accounted::Declared(_)) {
+            anyhow::bail!(
                 "{source}: the governance bundle carries a call no declared external action \
                  accounts for — target {:#x}, value {}, selector 0x{}. Every emitted call must be \
                  a declared action (see ExternalActionsLib); the executor legs are derived by the \
@@ -242,19 +224,19 @@ fn check_bundle_provenance(
                 call.target,
                 call.value,
                 hex::encode(&call.data[..call.data.len().min(4)])
-            ),
+            );
         }
     }
-    if let Some(i) = claimed.iter().position(|c| !c) {
+    if let Some(&i) = account.unclaimed.first() {
         anyhow::bail!(
             "{source}: declares a governance external action it never emits — {}",
-            for_phase[i].describe()
+            account.actions[i].describe()
         );
     }
     // The verifier holds the merged bundle's external actions to their declared order, so a
     // prepare that emits them in another one is refused here rather than there.
     anyhow::ensure!(
-        order.windows(2).all(|pair| pair[0] < pair[1]),
+        account.in_order,
         "{source}: emits its declared governance external actions in another order than it \
          declares them"
     );
@@ -296,11 +278,9 @@ fn executor_leg(
 ///    `ctm_upgrade_executor_addr`;
 /// 3. `CTMUpgradeExecutor.applyCTMUpgrade(ctm_transition_addr)` on `ctm_upgrade_executor_addr`.
 ///
-/// A bootstrap edge (`bootstrap_migration_addr` nonzero) and a transition replacement
-/// (`replacement_transition_addr` nonzero) derive none: the bootstrap's core transition rides its
-/// own derived sequence, and a replacement is one declared `forward`. Either one reporting an
-/// object only a leg would apply is refused, as is a leg whose executor is missing or zero and a
-/// package that is none of the three kinds yet derives no leg.
+/// A transition replacement (`replacement_transition_addr` nonzero) derives none: it is one
+/// declared `forward`. A replacement reporting an object only a leg would apply is refused, as is
+/// a leg whose executor is missing or zero and a package that is neither kind yet derives no leg.
 fn derive_executor_legs(
     core: &toml::value::Table,
     ctms: &[(Address, &toml::value::Table)],
@@ -312,7 +292,6 @@ fn derive_executor_legs(
     let mut infrastructure = None;
     let mut transition = None;
     let mut ctm_executor = None;
-    let mut bootstrap = None;
     let mut replacement = None;
     for (proxy, body) in ctms {
         let read = |key: &str| {
@@ -322,7 +301,6 @@ fn derive_executor_legs(
             (&mut infrastructure, "ctm_infrastructure_transition_addr"),
             (&mut transition, "ctm_transition_addr"),
             (&mut ctm_executor, "ctm_upgrade_executor_addr"),
-            (&mut bootstrap, "bootstrap_migration_addr"),
             (&mut replacement, "replacement_transition_addr"),
         ] {
             if let Some(address) = read(key)? {
@@ -335,25 +313,6 @@ fn derive_executor_legs(
         }
     }
 
-    if let Some(migration) = bootstrap {
-        anyhow::ensure!(
-            replacement.is_none(),
-            "the CTM prepare reports both a bootstrap migration ({migration:#x}) and a \
-             replacement transition: one package is one kind"
-        );
-        for (key, object) in [
-            ("ctm_infrastructure_transition_addr", infrastructure),
-            ("ctm_transition_addr", transition),
-        ] {
-            if let Some(object) = object {
-                anyhow::bail!(
-                    "the bootstrap edge {migration:#x} derives no executor leg, but its CTM \
-                     prepare reports {key} {object:#x}, which nothing in the edge would apply"
-                );
-            }
-        }
-        return Ok(Vec::new());
-    }
     if let Some(replacement) = replacement {
         for (key, object) in [
             ("core_transition_addr", core_transition),
@@ -411,8 +370,7 @@ fn derive_executor_legs(
     anyhow::ensure!(
         !legs.is_empty(),
         "the prepares report no core transition, no CTM infrastructure transition and no CTM \
-         transition, and the package is neither a bootstrap edge nor a transition replacement: \
-         it upgrades nothing"
+         transition, and the package is not a transition replacement: it upgrades nothing"
     );
     Ok(legs)
 }
@@ -421,9 +379,7 @@ fn derive_executor_legs(
 ///
 /// Each TOML's `[governance_calls] calls` is one `governanceExecuteCalls` (legacy Governance) or
 /// `governanceExecuteCallsDirect` (PUH) invocation signed by `sender` (the governance owner), so
-/// they merge into one governance Safe bundle. A bootstrap bundle's last call is
-/// `RegistryBootstrapMigration.validateApplied()`, so an incomplete edge reverts the replay
-/// itself. Right after a registry package's bundle runs, the fork is also held against the whole
+/// they merge into one governance Safe bundle. Right after a registry package's bundle runs, the fork is also held against the whole
 /// state it must have left ([`expect_applied`]), so a bundle that executes without landing fails
 /// the command here.
 /// Returns the resolved governance contract address for diagnostics.
@@ -450,7 +406,7 @@ pub async fn replay_governance_calls(
         )
         .await
         .with_context(|| format!("governance bundle ({})", toml_path.display()))?;
-        expect_applied(&runner.rpc_url, toml_path, governance_addr)
+        expect_applied(&runner.rpc_url, toml_path, governance_addr, bridgehub)
             .await
             .with_context(|| format!("governance bundle ({})", toml_path.display()))?;
     }
@@ -458,12 +414,14 @@ pub async fn replay_governance_calls(
 }
 
 /// When `governance_toml` is a registry package, holds the fork state after its bundle against
-/// everything the package must have left ([`applied::verify_applied`]); any unmet expectation
-/// fails. A TOML that is not a registry package is left alone.
+/// everything the package must have left ([`applied::verify_applied`]), its core rows' slots
+/// discovered through `bridgehub`; any unmet expectation fails. A TOML that is not a registry
+/// package is left alone.
 async fn expect_applied(
     rpc_url: &str,
     governance_toml: &Path,
     governance: Address,
+    bridgehub: Address,
 ) -> anyhow::Result<()> {
     let Some(package) = RegistryPackage::load_if_registry(governance_toml)? else {
         logger::info(format!(
@@ -475,7 +433,7 @@ async fn expect_applied(
     logger::step("Checking the state the bundle left");
     let provider = crate::common::ethereum::get_provider(rpc_url)?;
     let mut result = VerificationResult::default();
-    applied::verify_applied(&provider, &package, governance, &mut result).await;
+    applied::verify_applied(&provider, &package, governance, bridgehub, &mut result).await;
     result
         .ensure_success()
         .context("the replayed bundle executed but did not leave the state its package describes")
@@ -600,24 +558,25 @@ pub struct UpgradePrepareAllArgs {
     #[clap(long)]
     pub create2_factory_salt: Option<B256>,
 
-    #[clap(
-        long,
-        default_value = CURRENT_UPGRADE_LOCAL_INPUT_PATH
-    )]
-    pub upgrade_input_path: String,
+    /// Upgrade input TOML (relative to l1-contracts root). Defaults to the current release's
+    /// `local.toml`, or with `--env` to the release dir's `<env>.toml`.
+    #[clap(long)]
+    pub upgrade_input_path: Option<String>,
 
     /// Override the core-prepare output TOML path (relative to l1-contracts
     /// root). Defaults to the canonical `script-out/upgrade-core.toml`.
     #[clap(long, default_value = UPGRADE_CORE_OUTPUT_PATH, hide = true)]
     pub core_output_path: String,
 
-    /// Core upgrade script; historical releases must select their own script and input.
-    #[clap(long, default_value = CURRENT_CORE_UPGRADE_SCRIPT_PATH)]
-    pub core_script_path: String,
+    /// Core upgrade script. Defaults to the current release's; historical releases must select their own
+    /// script and input.
+    #[clap(long)]
+    pub core_script_path: Option<String>,
 
-    /// CTM upgrade script; historical releases must select their own script and input.
-    #[clap(long, default_value = CURRENT_CTM_UPGRADE_SCRIPT_PATH)]
-    pub ctm_script_path: String,
+    /// CTM upgrade script. Defaults to the current release's; historical releases must select their own
+    /// script and input.
+    #[clap(long)]
+    pub ctm_script_path: Option<String>,
 
     /// Path to a TOML file describing the CTM inputs (proxy + optional
     /// overrides). Mutually exclusive with the direct CTM flags
@@ -643,6 +602,12 @@ pub struct UpgradePrepareAllArgs {
     /// `L1_BYTECODES_SUPPLIER()` immutable.
     #[clap(long)]
     pub rollup_da_manager_address: Option<Address>,
+
+    /// The ZK token asset id the release's genesis force deployments pin, in place of the env's
+    /// `zk_token_asset_id` (or the local network's without `--env`). Only for an ecosystem the
+    /// env file does not describe — a harness's scratch L1, whose live release must keep its own.
+    #[clap(long)]
+    pub zk_token_asset_id: Option<B256>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -754,9 +719,9 @@ fn prepare_env_config(args: &UpgradePrepareAllArgs) -> anyhow::Result<Option<Env
     let Some(cfg) = args.topology.env_config()? else {
         return Ok(None);
     };
-    if args.upgrade_input_path != CURRENT_UPGRADE_LOCAL_INPUT_PATH {
+    if let Some(upgrade_input_path) = &args.upgrade_input_path {
         let input_dir = paths::resolve_l1_contracts_path()?
-            .join(args.upgrade_input_path.trim_start_matches('/'))
+            .join(upgrade_input_path.trim_start_matches('/'))
             .parent()
             .map(Path::to_path_buf)
             .context("--upgrade-input-path has no parent directory")?;
@@ -768,7 +733,7 @@ fn prepare_env_config(args: &UpgradePrepareAllArgs) -> anyhow::Result<Option<Env
             input_dir == env_dir,
             "--upgrade-input-path {} is not in the release dir {} that --env {} reads its salts and owner from; \
              select that release with --upgrade-env-dir instead",
-            args.upgrade_input_path,
+            upgrade_input_path,
             env_dir.display(),
             cfg.env
         );
@@ -776,19 +741,31 @@ fn prepare_env_config(args: &UpgradePrepareAllArgs) -> anyhow::Result<Option<Env
     Ok(Some(cfg))
 }
 
+/// `explicit`, or the current release's value when it is unset (see [`current_release`]). The release is read
+/// only then, so a historical edge that names its own input and scripts does not depend on it.
+fn or_current_release(
+    explicit: &Option<String>,
+    current: impl FnOnce(&CurrentRelease) -> String,
+) -> anyhow::Result<String> {
+    match explicit {
+        Some(value) => Ok(value.clone()),
+        None => Ok(current(current_release()?)),
+    }
+}
+
 /// The env's upgrade input (`/<release dir>/<env>.toml`, relative to `l1-contracts/`) from the release dir
 /// `cfg` was loaded from, so the input, the salts and the output dir belong to the same release.
 ///
 /// Fails closed on a missing file rather than keeping the CLI default. The default is the *local* input, so a
 /// silent fallback would hand a real environment local's values for the keys the input does supply —
-/// `era_chain_id`, for one. Failing here also catches a mistyped `--env`.
+/// the owner, for one. Failing here also catches a mistyped `--env`.
 fn per_env_upgrade_input(cfg: &EnvConfig) -> anyhow::Result<String> {
     let per_env_abs = &cfg.upgrade_input_path;
     anyhow::ensure!(
         per_env_abs.exists(),
         "no upgrade input for --env {} at {}. Add it — an empty file is fine if the environment needs \
          nothing from the input — because this command will not fall back to the local default, which \
-         would silently give this environment local's `era_chain_id`.",
+         would silently give this environment local's owner and salts.",
         cfg.env,
         per_env_abs.display()
     );
@@ -817,12 +794,20 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // signer's private key with `cast wallet address`).
         // Resolve --upgrade-input-path from --env, unless the caller passed one explicitly
         // (see `per_env_upgrade_input`).
-        if args.upgrade_input_path == CURRENT_UPGRADE_LOCAL_INPUT_PATH {
+        if args.upgrade_input_path.is_none() {
             let per_env_rel = per_env_upgrade_input(cfg)?;
             logger::info(format!("Using per-env upgrade input: {per_env_rel}"));
-            args.upgrade_input_path = per_env_rel;
+            args.upgrade_input_path = Some(per_env_rel);
         }
     }
+    let upgrade_input_path =
+        or_current_release(&args.upgrade_input_path, CurrentRelease::local_input_path)?;
+    let core_script_path = or_current_release(&args.core_script_path, |release| {
+        release.core_script_path.clone()
+    })?;
+    let ctm_script_path = or_current_release(&args.ctm_script_path, |release| {
+        release.ctm_script_path.clone()
+    })?;
     // Auto-fill the CREATE2 salt from the per-version upgrade input
     // (`<current upgrade-env dir>/<env>.toml [contracts]
     // create2_factory_salt`). Recording the salt in version control makes
@@ -903,9 +888,10 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     }
 
     let bridgehub = args.topology.resolve()?;
-    let zk_token_asset_id = match env_cfg.as_ref() {
-        Some(cfg) => cfg.require_zk_token_asset_id()?,
-        None => {
+    let zk_token_asset_id = match (args.zk_token_asset_id, env_cfg.as_ref()) {
+        (Some(zk_token_asset_id), _) => zk_token_asset_id,
+        (None, Some(cfg)) => cfg.require_zk_token_asset_id()?,
+        (None, None) => {
             crate::types::L1Network::from_l1_rpc(&args.shared.l1_rpc_url)?.zk_token_asset_id()?
         }
     };
@@ -954,10 +940,10 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         ctms,
         create2_factory_salt: args.create2_factory_salt,
         create2_factory_salt_per_ctm,
-        upgrade_input_path: args.upgrade_input_path.clone(),
+        upgrade_input_path,
         core_output_path: args.core_output_path.clone(),
-        core_script_path: args.core_script_path.clone(),
-        ctm_script_path: args.ctm_script_path.clone(),
+        core_script_path,
+        ctm_script_path,
         zk_token_asset_id,
         testnet_verifier,
     };
@@ -1151,10 +1137,9 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 /// (the in-memory PUH/Guardians wiring and the CTM `acceptOwnership()` normalization) into a
 /// single ecosystem TOML at `dst`.
 ///
-/// The merger COMPOSES nothing. The one bundle is, in order: the extras (they must precede a
-/// bootstrap's `ctm.transferOwnership(migration)`, which assumes governance already owns the
-/// CTM), the core prepare's declared calls, the DERIVED executor legs ([`derive_executor_legs`]:
-/// one contiguous run in canonical order, none for a bootstrap or a replacement), then the CTM
+/// The merger COMPOSES nothing. The one bundle is, in order: the extras, the core prepare's
+/// declared calls, the DERIVED executor legs ([`derive_executor_legs`]: one contiguous run in
+/// canonical order, none for a replacement), then the CTM
 /// prepare's declared calls. Every call other than a leg is declared in `external_actions` with
 /// phase `governance`; a prepare bundle carrying a call the artifact does not name fails the
 /// merge (`check_bundle_provenance`). The legs need no summary table of their own: the verifier
@@ -1589,6 +1574,7 @@ pub fn run_execution_script(
 mod tests {
     use super::*;
     use crate::common::env_config::GovernanceKind;
+    use crate::common::external_actions::GOVERNANCE_PHASE;
 
     /// A PUH-governed env is not by itself a reason to replace its governance set: only the
     /// release's own declaration is. Every recurring preparation used to take the first for the
@@ -1747,7 +1733,6 @@ mod tests {
         let mut all: Vec<(&str, Address)> = vec![
             ("ctm_transition_addr", Address::ZERO),
             ("ctm_infrastructure_transition_addr", Address::ZERO),
-            ("bootstrap_migration_addr", Address::ZERO),
             ("ctm_upgrade_executor_addr", CTM_EXECUTOR),
         ];
         for (key, address) in entries {
@@ -1832,37 +1817,6 @@ mod tests {
         );
     }
 
-    /// A bootstrap edge derives no leg: its core transition rides the bootstrap's own sequence.
-    #[test]
-    fn a_bootstrap_derives_no_leg() {
-        let legs = derive(
-            core_body(Some(CORE_TRANSITION)),
-            Some(ctm_body(&[(
-                "bootstrap_migration_addr",
-                Address::repeat_byte(0x55),
-            )])),
-        )
-        .unwrap();
-        assert!(legs.is_empty());
-    }
-
-    /// A bootstrap reporting a CTM-domain object would ship an object nothing applies.
-    #[test]
-    fn a_bootstrap_with_a_ctm_object_is_refused() {
-        for key in ["ctm_transition_addr", "ctm_infrastructure_transition_addr"] {
-            let err = derive(
-                core_body(None),
-                Some(ctm_body(&[
-                    ("bootstrap_migration_addr", Address::repeat_byte(0x55)),
-                    (key, TRANSITION),
-                ])),
-            )
-            .unwrap_err();
-            assert!(err.to_string().contains("derives no executor leg"), "{err}");
-            assert!(err.to_string().contains(key), "{err}");
-        }
-    }
-
     /// A replacement derives no leg: its `ctm_transition_addr` is the replacement, which its one
     /// declared `forward` installs.
     #[test]
@@ -1907,19 +1861,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn a_bootstrap_beside_a_replacement_is_refused() {
-        let err = derive(
-            core_body(None),
-            Some(ctm_body(&[
-                ("bootstrap_migration_addr", Address::repeat_byte(0x55)),
-                ("replacement_transition_addr", TRANSITION),
-            ])),
-        )
-        .unwrap_err();
-        assert!(err.to_string().contains("one package is one kind"), "{err}");
-    }
-
     /// A leg whose executor is missing or zero has nowhere to be sent.
     #[test]
     fn a_leg_without_its_executor_is_refused() {
@@ -1949,7 +1890,7 @@ mod tests {
         );
     }
 
-    /// Neither a bootstrap nor a replacement, and no object to apply: it upgrades nothing.
+    /// Not a replacement, and no object to apply: it upgrades nothing.
     #[test]
     fn a_package_with_no_leg_is_refused() {
         let err = derive(core_body(None), Some(ctm_body(&[]))).unwrap_err();
@@ -1984,9 +1925,7 @@ mod tests {
         crate::common::governance_calls::decode_calls(hex).unwrap()
     }
 
-    /// The one bundle's order: the merger's extras first — a bootstrap's
-    /// `ctm.transferOwnership(migration)` assumes governance already accepted the CTM — then the
-    /// core prepare's calls, the derived legs as one contiguous run, then the CTM prepare's calls.
+    /// The one bundle's order: the merger's extras first, then the core prepare's calls, the derived legs as one contiguous run, then the CTM prepare's calls.
     /// Every call but the legs is declared, the extras included, and no summary table is added.
     #[test]
     fn the_merged_bundle_runs_extras_core_legs_then_ctm() {
@@ -2040,6 +1979,15 @@ mod tests {
             let is_declared = declared.iter().any(|a| a.is_call(c));
             assert_eq!(is_declared, !(2..5).contains(&i), "call {i}");
         }
+        // The calls beside the legs ARE the declarations, one for one and in declared order: the
+        // rule the verifier holds every package kind to.
+        let beside_the_legs: Vec<&GovernanceCall> = bundle
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !(2..5).contains(i))
+            .map(|(_, call)| call)
+            .collect();
+        assert!(DeclaredCalls::match_calls(beside_the_legs, &declared).is_exact());
         assert!(doc.get("operation").is_none());
     }
 
@@ -2091,7 +2039,7 @@ mod tests {
             ),
         )
         .unwrap();
-        expect_applied(UNREACHABLE, &plain, Address::ZERO)
+        expect_applied(UNREACHABLE, &plain, Address::ZERO, Address::ZERO)
             .await
             .expect("a TOML that is no registry package is not read back");
 
@@ -2103,7 +2051,7 @@ mod tests {
         .unwrap();
         let package = dir.path().join("ecosystem.toml");
         fs::write(&package, toml::to_string(&doc).unwrap()).unwrap();
-        let err = expect_applied(UNREACHABLE, &package, Address::ZERO)
+        let err = expect_applied(UNREACHABLE, &package, Address::ZERO, Address::ZERO)
             .await
             .expect_err("an unreadable post-state is not a landed one");
         assert!(
@@ -2148,46 +2096,30 @@ mod tests {
             ]
         );
     }
-
-    /// A bootstrap merge derives no leg, so the bundle is the extras followed by the prepares'
-    /// declared calls.
-    #[test]
-    fn a_bootstrap_merge_derives_no_executor_leg() {
-        let extra = call(0xe1, &[0x01]);
-        let ctm = call(0xd1, &[0x03]);
-        let doc = merge_prepare_outputs(
-            prepare_output(core_body(Some(CORE_TRANSITION)), &[]),
-            vec![(
-                Address::repeat_byte(0x77),
-                prepare_output(
-                    ctm_body(&[("bootstrap_migration_addr", Address::repeat_byte(0x55))]),
-                    std::slice::from_ref(&ctm),
-                ),
-            )],
-            &[ExtraGovernanceCall {
-                label: "extra",
-                authority: "protocol governance",
-                call: extra.clone(),
-            }],
-        )
-        .unwrap();
-        let bundle = merged_bundle(&doc);
-        assert_eq!(targets_and_data(&bundle), targets_and_data(&[extra, ctm]));
-    }
 }
 
 #[cfg(test)]
 mod release_script_tests {
     use super::*;
-    use crate::common::forge::scripts::{CURRENT_UPGRADE_ENV_DIR, UPGRADE_V33_ENV_DIR};
+    use crate::common::forge::scripts::UPGRADE_V33_ENV_DIR;
     use clap::CommandFactory;
 
     #[test]
     fn prepare_defaults_to_current_release() {
         let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
-        assert_eq!(args.ctm_script_path, CURRENT_CTM_UPGRADE_SCRIPT_PATH);
-        assert_eq!(args.core_script_path, CURRENT_CORE_UPGRADE_SCRIPT_PATH);
-        assert_eq!(args.upgrade_input_path, CURRENT_UPGRADE_LOCAL_INPUT_PATH);
+        let release = current_release().unwrap();
+        assert_eq!(
+            or_current_release(&args.ctm_script_path, |r| r.ctm_script_path.clone()).unwrap(),
+            release.ctm_script_path
+        );
+        assert_eq!(
+            or_current_release(&args.core_script_path, |r| r.core_script_path.clone()).unwrap(),
+            release.core_script_path
+        );
+        assert_eq!(
+            or_current_release(&args.upgrade_input_path, CurrentRelease::local_input_path).unwrap(),
+            release.local_input_path()
+        );
         let help = UpgradePrepareAllArgs::command()
             .render_long_help()
             .to_string();
@@ -2195,8 +2127,7 @@ mod release_script_tests {
         assert!(help.contains("--upgrade-input-path"));
     }
 
-    /// The Foundry full-flow upgrade test of the default edge (`UpgradeTest_Local`, the registry
-    /// bootstrap) must run the scripts this command prepares with by default: its CTM test subclass
+    /// The Foundry full-flow upgrade test of the default edge (`UpgradeTest_Local`) must run the scripts this command prepares with by default: its CTM test subclass
     /// extends the default CTM script, and it runs the default core script (or a subclass). A
     /// release that changes a default here fails this until that test is moved onto the new
     /// scripts too.
@@ -2209,15 +2140,15 @@ mod release_script_tests {
         let read = |relative: &str| {
             std::fs::read_to_string(crate::common::paths::path_from_root(relative)).unwrap()
         };
-        let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
+        let release = current_release().unwrap();
 
         let local_test = read("l1-contracts/test/foundry/l1/integration/UpgradeTest_Local.t.sol");
-        let ctm = contract_name(&args.ctm_script_path);
+        let ctm = contract_name(&release.ctm_script_path);
         assert!(
             local_test.contains(&format!(" is {ctm} {{")),
             "UpgradeTest_Local's CTM test subclass must extend the default CTM script {ctm}"
         );
-        let core = contract_name(&args.core_script_path);
+        let core = contract_name(&release.core_script_path);
         assert!(
             local_test.contains(&format!(" is {core} {{"))
                 || local_test.contains(&format!("new {core}()")),
@@ -2225,26 +2156,19 @@ mod release_script_tests {
         );
     }
 
-    /// The default scripts must be the current release's: `yarn new-release` moves them together with the
-    /// upgrade-env dir, so a hand edit of one without the other would prepare a release with another
-    /// release's scripts.
+    /// The current release (`latest.json`'s version) has its local input and its core and CTM upgrade scripts,
+    /// so a prepare with the defaults runs. `yarn new-release` creates all three.
     #[test]
-    fn release_specific_defaults_belong_to_the_current_release() {
-        let current_minor = CURRENT_UPGRADE_ENV_DIR
-            .split("/v0.")
-            .nth(1)
-            .and_then(|rest| rest.split('.').next())
-            .unwrap();
-        let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
-        for script in [&args.ctm_script_path, &args.core_script_path] {
-            let script_minor = script
-                .strip_prefix("deploy-scripts/upgrade/v")
-                .and_then(|rest| rest.split('/').next());
-            assert_eq!(
-                script_minor,
-                Some(current_minor),
-                "{script} is not the current release's script"
-            );
+    fn current_release_has_its_input_and_scripts() {
+        let release = current_release().unwrap();
+        let l1 = paths::resolve_l1_contracts_path().unwrap();
+        let local_input = release.local_input_path();
+        for path in [
+            local_input.trim_start_matches('/'),
+            &release.core_script_path,
+            &release.ctm_script_path,
+        ] {
+            assert!(l1.join(path).is_file(), "the current release has no {path}");
         }
     }
 
@@ -2270,7 +2194,7 @@ mod release_script_tests {
         let cfg = prepare_env_config(&current).unwrap().unwrap();
         assert_eq!(
             per_env_upgrade_input(&cfg).unwrap(),
-            format!("{CURRENT_UPGRADE_ENV_DIR}/stage.toml")
+            format!("/{}/stage.toml", current_release().unwrap().env_dir())
         );
     }
 

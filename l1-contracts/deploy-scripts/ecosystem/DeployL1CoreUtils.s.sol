@@ -65,6 +65,8 @@ contract DeployL1CoreUtils is DeployUtils {
     function getCreationCalldata(string memory contractName) internal view virtual override returns (bytes memory) {
         if (compareStrings(contractName, "ProxyAdmin")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "DefaultProxyUpgradeEngine")) {
+            return abi.encode();
         } else if (compareStrings(contractName, "ChainRegistrationSender")) {
             return abi.encode(coreAddresses.bridgehub.proxies.bridgehub);
         } else if (compareStrings(contractName, "InteropCenter")) {

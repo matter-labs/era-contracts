@@ -72,16 +72,6 @@ pub mod i_chain_asset_handler {
 }
 pub use i_chain_asset_handler::IChainAssetHandlerAbi;
 
-// Using IChainTypeManager for the upgradeChainFromVersion function
-pub mod chain_type_manager_upgrade_fn {
-    alloy::sol!(
-        #[sol(rpc)]
-        ChainTypeManagerUpgradeFnAbi,
-        "../l1-contracts/zkstack-out/IChainTypeManager.sol/IChainTypeManager.json"
-    );
-}
-pub use chain_type_manager_upgrade_fn::ChainTypeManagerUpgradeFnAbi;
-
 pub mod admin {
     alloy::sol!(
         #[sol(rpc)]
@@ -230,6 +220,17 @@ pub mod access_control_default_admin_rules {
     );
 }
 pub use access_control_default_admin_rules::AccessControlDefaultAdminRulesAbi;
+
+// `zkstack-out` does not export `RollupDAManager`, so only the getter protocol-ops reads is mirrored.
+pub mod rollup_da_manager {
+    alloy::sol!(
+        #[sol(rpc)]
+        interface RollupDAManagerAbi {
+            function isPairAllowed(address _l1DAValidator, uint8 _l2DACommitmentScheme) external view returns (bool);
+        }
+    );
+}
+pub use rollup_da_manager::RollupDAManagerAbi;
 
 pub mod i_core_upgrade_prepare {
     alloy::sol!(

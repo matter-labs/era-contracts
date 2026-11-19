@@ -147,8 +147,8 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
     }
 
     /// @notice Deploys the ecosystem domain's upgrade executor over the ecosystem `ProxyAdmin`, hands
-    ///         it that `ProxyAdmin` and nominates governance on it: the ecosystem half of what the v35
-    ///         bootstrap ends with (the CTM executor comes with each CTM). Constructed for the
+    ///         it that `ProxyAdmin` and nominates governance on it: the ecosystem half of the registry-era
+    ///         authority shape (the CTM executor comes with each CTM). Constructed for the
     ///         deployer, which makes the handover and the nomination; governance accepts afterwards.
     /// @dev Rides the CREATE2 factory like every deployment of this script.
     function deployUpgradeExecutor() internal {

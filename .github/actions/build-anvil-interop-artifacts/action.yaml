@@ -7,8 +7,8 @@ description: >
 
   The committed snapshots must be byte-for-byte reproducible, which pins three choices: the
   Foundry version from .github/foundry-versions.env (never a second, local pin — that drift is
-  what silently invalidates the snapshots), the anvil-interop profile (cbor_metadata=false,
-  bytecode_hash=none — path- and environment-independent bytecode), and no warm-solc-cache —
+  what silently invalidates the snapshots), the default profile's metadata-free build
+  (path- and environment-independent bytecode), and no warm-solc-cache —
   workflows that generate or verify committed snapshots build from scratch, per the trust model
   in warm-solc-cache/action.yaml.
 
@@ -28,10 +28,10 @@ runs:
       shell: bash
       run: yarn
 
-    - name: Build l1-contracts artifacts (no CBOR metadata for determinism)
+    - name: Build l1-contracts artifacts
       shell: bash
       working-directory: l1-contracts
-      run: FOUNDRY_PROFILE=anvil-interop forge build
+      run: forge build
 
     - name: Install anvil-interop dependencies
       shell: bash

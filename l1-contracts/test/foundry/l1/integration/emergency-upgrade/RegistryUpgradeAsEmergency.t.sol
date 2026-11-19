@@ -21,7 +21,7 @@ import {VerifyEmergencyUpgrade} from "deploy-scripts/upgrade/VerifyEmergencyUpgr
 import {IProtocolUpgradeHandler} from "deploy-scripts/interfaces/IProtocolUpgradeHandler.sol";
 import {Utils as DeployScriptUtils} from "deploy-scripts/utils/Utils.sol";
 
-import {UpgradeIntegrationBootstrapFixture} from "../UpgradeTest_Local.t.sol";
+import {UpgradeIntegrationReleaseFixture} from "../UpgradeTest_Local.t.sol";
 import {
     CoreUpgradeNoEcosystemLeg,
     CTMUpgradeValidatorTimelockOnly,
@@ -30,8 +30,8 @@ import {
 } from "../UpgradeTestRecurring_Local.t.sol";
 import {EmergencyUpgradeFixture, ProtocolUpgradeHandlerDouble} from "./_EmergencyGovernanceDoubles.sol";
 
-/// @notice A RECURRING registry-driven upgrade, prepared by the real pipeline on the ecosystem the v35
-///         bootstrap fixture leaves behind, executed as ONE emergency proposal through the
+/// @notice A RECURRING registry-driven upgrade, prepared by the real pipeline on the ecosystem the
+///         release fixture leaves behind, executed as ONE emergency proposal through the
 ///         EmergencyUpgradeBoard and ProtocolUpgradeHandler. The handler, board, multisigs and Safes
 ///         are doubles (`_EmergencyGovernanceDoubles.sol`); the prepare, the package and every
 ///         contract the calls reach are real.
@@ -40,7 +40,7 @@ import {EmergencyUpgradeFixture, ProtocolUpgradeHandlerDouble} from "./_Emergenc
 ///      `applyInfrastructureUpgrade`, `applyCTMUpgrade` — those the hop prepared), then the CTM
 ///      prepare's calls. Both executors are handed to the handler with a real two-step ownership
 ///      transfer, the acceptances being the handler's first emergency proposal.
-contract RegistryUpgradeAsEmergencyTest is UpgradeIntegrationBootstrapFixture, EmergencyUpgradeFixture {
+contract RegistryUpgradeAsEmergencyTest is UpgradeIntegrationReleaseFixture, EmergencyUpgradeFixture {
     using stdToml for string;
 
     /// @dev Inputs as in `UpgradeTestRecurring_Local.t.sol`.
@@ -182,7 +182,7 @@ contract RegistryUpgradeAsEmergencyTest is UpgradeIntegrationBootstrapFixture, E
             _input,
             string.concat("/script-out/foundry-upgrade/", _name, "-ctm.toml"),
             governance,
-            bytes32(uint256(1)),
+            previousRelease.zkTokenAssetId,
             true
         );
         _hop.setEIP7702Checker(eip7702Checker);

@@ -6,8 +6,6 @@ import {Utils} from "../Utils/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {IAdminWithCut} from "deploy-scripts/utils/UpgradeChainCall.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfoZKsyncOS, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
@@ -18,6 +16,7 @@ import {
     ExecutionDelayNotIncreased,
     ExecutionDelayTooLarge,
     NotAZKChain,
+    ProtocolIdMismatch,
     RoleAccessDenied,
     TimeNotReached
 } from "contracts/common/L1ContractErrors.sol";
@@ -210,6 +209,27 @@ contract ValidatorTimelockTest is Test {
         _assertAllRoles(chainId, bob, false);
     }
 
+    function test_addValidator() public {
+        _assertAllRoles(chainId, bob, false);
+
+        vm.prank(owner);
+        validator.addValidator(zkSync, bob);
+
+        _assertAllRoles(chainId, bob, true);
+        assertFalse(validator.hasRoleForChainId(chainId, precommitterRole, bob));
+    }
+
+    function test_removeValidator() public {
+        vm.prank(owner);
+        validator.addValidator(zkSync, bob);
+        _assertAllRoles(chainId, bob, true);
+
+        vm.prank(owner);
+        validator.removeValidator(zkSync, bob);
+
+        _assertAllRoles(chainId, bob, false);
+    }
+
     function test_validatorCanMakeCall() public {
         // Setup Mock call to executor
         vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector), "");
@@ -327,32 +347,15 @@ contract ValidatorTimelockTest is Test {
         validator.upgradeChainFromVersion(zkSync, oldProtocolVersion);
     }
 
-    /// @dev A chain below v35 still serves only the cut-taking form; the timelock forwards it unchanged.
-    function test_upgradeChainFromVersionWithCut_PropagatesToDiamondProxy() public {
+    /// @notice The chain's revert reaches the caller with its data unchanged.
+    function test_RevertWhen_upgradeChainFromVersionRevertsInTheChain() public {
         uint256 oldProtocolVersion = 1;
-        Diamond.DiamondCutData memory cut = Diamond.DiamondCutData({
-            facetCuts: new Diamond.FacetCut[](0),
-            initAddress: makeAddr("upgradeEngine"),
-            initCalldata: hex"1234"
-        });
-        bytes memory forwarded = abi.encodeCall(
-            IAdminWithCut.upgradeChainFromVersion,
-            (zkSync, oldProtocolVersion, cut)
-        );
-
-        vm.mockCall(zkSync, forwarded, "");
-        vm.expectCall(zkSync, forwarded);
+        bytes memory reason = abi.encodeWithSelector(ProtocolIdMismatch.selector, 2, oldProtocolVersion);
+        vm.mockCallRevert(zkSync, abi.encodeCall(IAdmin.upgradeChainFromVersion, (zkSync, oldProtocolVersion)), reason);
 
         vm.prank(alice);
-        validator.upgradeChainFromVersion(zkSync, oldProtocolVersion, cut);
-    }
-
-    function test_RevertWhen_upgradeChainFromVersionWithCutNotUpgrader() public {
-        Diamond.DiamondCutData memory cut;
-
-        vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, upgraderRole, bob));
-        validator.upgradeChainFromVersion(zkSync, 1, cut);
+        vm.expectRevert(reason);
+        validator.upgradeChainFromVersion(zkSync, oldProtocolVersion);
     }
 
     function test_executeBatchesSharedBridge() public {

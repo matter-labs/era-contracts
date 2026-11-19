@@ -112,7 +112,7 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
     function test_everyTransitionMemberIsRequiredToHaveCode() public {
         TransitionManifest memory m = fullTransition.getManifest();
         assertTrue(m.l2Plan.delegateComposer != address(0), "the fixture transition names a composer");
-        address[2] memory members = [m.upgradeEngine, m.l2Plan.delegateComposer];
+        address[2] memory members = [m.chainUpgradeEngine, m.l2Plan.delegateComposer];
         for (uint256 i = 0; i < members.length; ++i) {
             _assertCodelessMemberIsRefused(
                 IValidatable(address(fullTransition)),

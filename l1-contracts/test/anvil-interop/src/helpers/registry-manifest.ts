@@ -154,9 +154,14 @@ export function l2BytecodeInfoRows(slots: string[]): Record<string, string> {
 
 /**
  * `ProxyUpgradeTransitionManifest` of `domain` from manifest rows keyed by the domain's contract
- * enum member names; unknown keys are refused at encode time.
+ * enum member names, pinning `proxyUpgradeEngine` (the engine the executor delegatecalls to apply it);
+ * unknown keys are refused at encode time.
  */
-function proxyUpgradeTransitionArgs(domain: ProxyUpgradeDomainName, contracts: Record<string, any>): any {
+function proxyUpgradeTransitionArgs(
+  domain: ProxyUpgradeDomainName,
+  contracts: Record<string, any>,
+  proxyUpgradeEngine: string
+): any {
   const rows = Object.fromEntries(
     Object.entries(contracts).map(([name, e]) => [
       name,
@@ -171,6 +176,7 @@ function proxyUpgradeTransitionArgs(domain: ProxyUpgradeDomainName, contracts: R
   return {
     domain: proxyUpgradeDomain(domain),
     proxyUpgrades: proxyUpgradeSlots(PROXY_UPGRADE_DOMAIN_INVENTORY[domain], rows),
+    proxyUpgradeEngine,
   };
 }
 
@@ -179,8 +185,8 @@ function proxyUpgradeTransitionArgs(domain: ProxyUpgradeDomainName, contracts: R
  * under `core.contracts` ARE `L1EcosystemContract` member names — one naming scheme for deployment
  * and upgrades alike.
  */
-export function coreInitArgs(manifest: any): any {
-  return proxyUpgradeTransitionArgs("Core", manifest.core.contracts);
+export function coreInitArgs(manifest: any, proxyUpgradeEngine: string): any {
+  return proxyUpgradeTransitionArgs("Core", manifest.core.contracts, proxyUpgradeEngine);
 }
 
 /**
@@ -189,12 +195,12 @@ export function coreInitArgs(manifest: any): any {
  * changes no CTM-domain proxy: the object refuses an empty participating set, and a bundle leaves
  * the leg out instead.
  */
-export function ctmInfrastructureInitArgs(ctm: any): any | undefined {
+export function ctmInfrastructureInitArgs(ctm: any, proxyUpgradeEngine: string): any | undefined {
   const contracts: Record<string, any> = ctm.infrastructure?.contracts ?? {};
   if (Object.keys(contracts).length === 0) {
     return undefined;
   }
-  return proxyUpgradeTransitionArgs("CTM", contracts);
+  return proxyUpgradeTransitionArgs("CTM", contracts, proxyUpgradeEngine);
 }
 
 /**
@@ -260,7 +266,7 @@ export function transitionInitArgs(manifest: any, ctm: any, newRelease: string, 
   return {
     fromRelease: transition.fromRelease,
     newRelease,
-    upgradeEngine: transition.upgradeEngine.address,
+    chainUpgradeEngine: transition.chainUpgradeEngine.address,
     oldProtocolVersionDeadline: ethers.BigNumber.from(transition.oldProtocolVersionDeadline),
     upgradeTimestamp: transition.upgradeTimestamp,
     l2Plan: {

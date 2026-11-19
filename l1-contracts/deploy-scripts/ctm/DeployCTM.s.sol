@@ -50,7 +50,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     /// @dev The reusable upgrade engine this deployment publishes. Not part of the CTM's address
     ///      set: the CTM holds no pointer to an engine, every transition pins the one it commits.
-    address internal deployedUpgradeEngine;
+    address internal deployedChainUpgradeEngine;
 
     /// @dev The CTM executor this deployment created (see {deployCTMUpgradeExecutor}).
     CTMExecutorDeployment internal ctmUpgradeExecutorDeployment;
@@ -158,7 +158,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         // the same code through the CREATE2 factory lands on this very address. It must therefore
         // be the reusable implementation — a one-shot migration like `V32UpgradeZKsyncOS` would be
         // replayed by every upgrade that reused it.
-        deployedUpgradeEngine = deploySimpleContract("DefaultUpgrade");
+        deployedChainUpgradeEngine = deploySimpleContract("DefaultUpgrade");
 
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
@@ -361,7 +361,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     /// @notice Deploys the CTM executor and hands it the whole CTM domain — the CTM (whose nomination
     ///         its `acceptCTMOwnership` completes), the CTM-domain ProxyAdmin and the
     ///         ServerNotifier (accepted through `forward`) — then nominates the ecosystem governance on
-    ///         it: the CTM half of what the v35 bootstrap ends with. Constructed for the deployer,
+    ///         it: the CTM half of the registry-era authority shape. Constructed for the deployer,
     ///         which performs the handover; governance accepts afterwards.
     /// @dev Rides the CREATE2 factory like every deployment of this script.
     function deployCTMUpgradeExecutor() internal {
@@ -464,7 +464,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         }
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "current_release_addr", ctmAddresses.stateTransition.currentRelease);
-        vm.serializeAddress("state_transition", "default_upgrade_addr", deployedUpgradeEngine);
+        vm.serializeAddress("state_transition", "default_upgrade_addr", deployedChainUpgradeEngine);
         vm.serializeAddress("state_transition", "eip7702_checker_addr", ctmAddresses.admin.eip7702Checker);
         vm.serializeAddress(
             "state_transition",

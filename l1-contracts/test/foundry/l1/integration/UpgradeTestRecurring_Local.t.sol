@@ -24,38 +24,57 @@ import {ProxyUpgradeDomain, ProxyUpgradeRow} from "contracts/upgrades/registry/R
 import {ProxyUpgradeRowLib} from "contracts/upgrades/registry/libraries/ProxyUpgradeRowLib.sol";
 import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {
-    CTMContract,
-    L1EcosystemContract,
-    L2_ECOSYSTEM_CONTRACT_COUNT
-} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {CTMContract, L1EcosystemContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 import {IServerNotifier} from "contracts/governance/IServerNotifier.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IChainAdminMulticall} from "deploy-scripts/AdminFunctions.s.sol";
 
-import {UpgradeIntegrationBootstrapFixture} from "./UpgradeTest_Local.t.sol";
+import {UpgradeIntegrationReleaseFixture} from "./UpgradeTest_Local.t.sol";
+import {LiveL2Table} from "./UpgradeTestFresh_Local.t.sol";
+import {RegistryPostState} from "../unit/concrete/Upgrades/registry/RegistryPostState.sol";
 
 /*//////////////////////////////////////////////////////////////
             THE VERSION SCRIPTS THE RECURRING HOPS RUN
 //////////////////////////////////////////////////////////////*/
 
 /// @notice The shared base of every recurring hop in this file: the real `DefaultCTMUpgrade`
-///         pipeline with the two bytecode-table reads the local fixture cannot afford substituted,
-///         plus read access to the objects the prepare deployed.
-/// @dev The substitution is not a convenience: the fixture's LIVE release was pinned with the same
-///      empty table (see `CTMUpgradeForLocalTest`), so a hop reading the real one would pin a
-///      different manifest and publish a new release for a hop that changes nothing. Everything
-///      this file tests — the declaration, the objects, the version and release invariants — runs
-///      unmocked.
+///         pipeline with the L2 table read off the live release, as the local fixture cannot afford
+///         rebuilding it from every L2 artifact (see `CTMUpgradeForLocalTest`), plus read access to the
+///         objects the prepare deployed. Everything this file tests — the declaration, the objects, the
+///         version and release invariants — runs unmocked.
 abstract contract RecurringCTMUpgradeForTests is DefaultCTMUpgrade {
-    function getL2BytecodeInfoTable() internal pure override returns (bytes[] memory) {
-        return new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
+    function getL2BytecodeInfoTable() internal view override returns (bytes[] memory) {
+        return LiveL2Table.table(newConfig.ctm);
     }
 
-    function getL2SystemProxyBytecodeInfo() internal pure override returns (bytes memory) {
-        return "";
+    function getL2SystemProxyBytecodeInfo() internal view override returns (bytes memory) {
+        return LiveL2Table.shell(newConfig.ctm);
+    }
+
+    /// @dev Keeps the live genesis batch with the live table: the genesis config may already describe new L2 code.
+    function initializeConfigFromArgs(
+        address _ctmProxy,
+        address _rollupDAManager,
+        bytes32 _create2FactorySalt,
+        string memory _newConfigPath,
+        address _governance,
+        bytes32 _zkTokenAssetId,
+        bool _testnetVerifier
+    ) internal override {
+        super.initializeConfigFromArgs({
+            ctmProxy: _ctmProxy,
+            rollupDAManager: _rollupDAManager,
+            create2FactorySalt: _create2FactorySalt,
+            newConfigPath: _newConfigPath,
+            governance: _governance,
+            zkTokenAssetId: _zkTokenAssetId,
+            testnetVerifier: _testnetVerifier
+        });
+        (bytes32 batchHash, uint64 leafIndex) = LiveL2Table.genesisBatch(_ctmProxy);
+        config.contracts.chainCreationParams.genesisRoot = batchHash;
+        config.contracts.chainCreationParams.genesisRollupLeafIndex = leafIndex;
     }
 
     /// @notice The transition this prepare deployed, zero when it deployed none.
@@ -69,14 +88,14 @@ abstract contract RecurringCTMUpgradeForTests is DefaultCTMUpgrade {
     }
 
     /// @notice The engine this prepare DEPLOYED, before any object pinned it — zero when the hop
-    ///         deployed none. Distinct from `committedUpgradeEngine`, which reads the pin back.
-    function preparedUpgradeEngine() external view returns (address) {
-        return upgradeAddresses.upgradeEngine;
+    ///         deployed none. Distinct from `committedChainUpgradeEngine`, which reads the pin back.
+    function preparedChainUpgradeEngine() external view returns (address) {
+        return upgradeAddresses.chainUpgradeEngine;
     }
 
     /// @notice Where `deploySimpleContract("DefaultUpgrade")` WOULD land this run, so a test can
     ///         assert that an infrastructure-only hop left that address codeless.
-    function predictedUpgradeEngineAddress() external view returns (address) {
+    function predictedChainUpgradeEngineAddress() external view returns (address) {
         (address factory, bytes32 salt) = getCreate2FactoryParams();
         bytes memory bytecode = abi.encodePacked(
             getCreationCode("DefaultUpgrade"),
@@ -175,8 +194,9 @@ contract CoreUpgradeUndeclaredChange is CoreUpgradeNoEcosystemLeg {
     }
 }
 
-/// @notice The same differing build, declared as this version's change.
-contract CoreUpgradeDeclaredChange is CoreUpgradeUndeclaredChange {
+/// @notice `L1MessageRoot` declared as this version's change. The fixture's live one already runs
+///         this build, the shape of a constructor-only change: the declaration alone decides.
+contract CoreUpgradeDeclaredChange is CoreUpgradeNoEcosystemLeg {
     function changedEcosystemImplementations() internal pure override returns (string[] memory names) {
         names = new string[](1);
         names[0] = "L1MessageRoot";
@@ -184,25 +204,12 @@ contract CoreUpgradeDeclaredChange is CoreUpgradeUndeclaredChange {
 }
 
 /// @notice The two ecosystem proxies that gained row builders last (`L1InteropHandler`,
-///         `ChainRegistrationSender`), their local builds differing from the live ones (simulated:
-///         the fixture's live code is this build) and declared as this version's changes.
+///         `ChainRegistrationSender`), declared as this version's changes.
 contract CoreUpgradeDeclaredInteropAndRegistration is CoreUpgradeNoEcosystemLeg {
-    function _canReuseEcosystemImplementation(string memory _name, address _live) internal override returns (bool) {
-        if (_isOneOfTheTwo(_name)) {
-            return false;
-        }
-        return super._canReuseEcosystemImplementation(_name, _live);
-    }
-
     function changedEcosystemImplementations() internal pure override returns (string[] memory names) {
         names = new string[](2);
         names[0] = "L1InteropHandler";
         names[1] = "ChainRegistrationSender";
-    }
-
-    function _isOneOfTheTwo(string memory _name) private pure returns (bool) {
-        bytes32 name = keccak256(bytes(_name));
-        return name == keccak256(bytes("L1InteropHandler")) || name == keccak256(bytes("ChainRegistrationSender"));
     }
 }
 
@@ -227,7 +234,7 @@ contract CoreUpgradeOrphanedDeployment is DefaultCoreUpgrade {
 //////////////////////////////////////////////////////////////*/
 
 /// @notice RECURRING prepares run through the real production pipeline, on the registry-driven
-///         ecosystem the v35 bootstrap fixture leaves behind. The subject is what preparation can
+///         ecosystem the release fixture leaves behind. The subject is what preparation can
 ///         EMIT: an infrastructure-only upgrade (the fleet-wide saving the model exists for — see
 ///         "Infrastructure-only upgrades" in {protocol-docs/ecosystem-upgrade-coordination.md}),
 ///         a chain-release one, a mixed one, and the shapes it must refuse. Each prepared hop is
@@ -235,10 +242,10 @@ contract CoreUpgradeOrphanedDeployment is DefaultCoreUpgrade {
 /// @dev Everything here drives `DefaultCoreUpgrade`/`DefaultCTMUpgrade` themselves; the object
 ///      layer is covered separately by `RegistryIndividualUpgrade.t.sol`, which cannot show that
 ///      PREPARATION can produce these shapes.
-contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixture {
+contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationReleaseFixture, RegistryPostState {
     using stdToml for string;
 
-    /// @dev The upgrade input whose target EQUALS the version the bootstrap left live (the genesis
+    /// @dev The upgrade input whose target EQUALS the version the release edge left live (the genesis
     ///      version, as it names none): what an infrastructure-only hop must be given.
     string internal constant SAME_VERSION_INPUT = RELEASE_UPGRADE_INPUT;
     /// @dev The upgrade input naming the next minor: what a chain-release hop is given.
@@ -324,10 +331,10 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
 
         // ── No chain-version machinery was deployed at all ──
         assertEq(hop.preparedTransition(), address(0), "an infrastructure-only hop deploys no transition");
-        assertEq(hop.preparedUpgradeEngine(), address(0), "an infrastructure-only hop deploys no upgrade engine");
-        assertEq(hop.committedUpgradeEngine(), address(0), "no engine is committed, so none may be reported");
+        assertEq(hop.preparedChainUpgradeEngine(), address(0), "an infrastructure-only hop deploys no upgrade engine");
+        assertEq(hop.committedChainUpgradeEngine(), address(0), "no engine is committed, so none may be reported");
         assertEq(
-            hop.predictedUpgradeEngineAddress().code.length,
+            hop.predictedChainUpgradeEngineAddress().code.length,
             0,
             "nothing was deployed at the address an engine would have taken"
         );
@@ -424,8 +431,12 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
 
         address transition = hop.preparedTransition();
         assertTrue(transition != address(0), "a chain-release hop deploys a transition");
-        assertTrue(hop.preparedUpgradeEngine() != address(0), "a chain-release hop deploys an upgrade engine");
-        assertEq(hop.committedUpgradeEngine(), hop.preparedUpgradeEngine(), "the transition pins that engine");
+        assertTrue(hop.preparedChainUpgradeEngine() != address(0), "a chain-release hop deploys an upgrade engine");
+        assertEq(
+            hop.committedChainUpgradeEngine(),
+            hop.preparedChainUpgradeEngine(),
+            "the transition pins that engine"
+        );
         assertTrue(hop.getChainUpgradeDiamondCutData().length != 0, "chains crossing the edge take a cut");
         assertEq(
             ICTMTransition(transition).oldProtocolVersion(),
@@ -455,13 +466,13 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
     /// @notice A validator holding `UPGRADER_ROLE` crosses a registry-driven edge through the
     ///         timelock once the chain's upgrade timestamp has passed: the timelock forwards the
     ///         cut-reading call the v35+ Admin facet serves.
-    /// @dev The fixture's pre-bootstrap timelock is built from current source, so this shows the
-    ///      forwarding, not that the bootstrap's timelock swap is needed; `UpgradeTest_Local`
-    ///      asserts the swap row.
+    /// @dev The fixture's timelock is the previous release's, so this shows that a timelock of that
+    ///      release forwards the cut-reading call. The hop keeps the live verifier: the fixture's
+    ///      chains require their second proof system, which the hops' single-proof verifier lacks.
     function test_chainReleaseEdge_isCrossedByAValidatorThroughTheTimelock() public {
         uint256 liveVersion = IChainTypeManager(inputs.ctm).protocolVersion();
         CoreUpgradeNoEcosystemLeg core = new CoreUpgradeNoEcosystemLeg();
-        RecurringCTMUpgradeForTests hop = new CTMUpgradeVerifierRelease();
+        RecurringCTMUpgradeForTests hop = new CTMUpgradeVersionOnly();
         _prepareHop(core, hop, NEXT_VERSION_INPUT, "recurring-validator-crossing");
         _runUpgrade(core, hop);
 
@@ -616,9 +627,8 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
     }
 
     /// @notice `L1InteropHandler` and `ChainRegistrationSender` are installable like every other
-    ///         ecosystem singleton: declared and differing, each is deployed, pinned as a row departing
-    ///         from its live implementation, and swapped by the core executor when the core leg
-    ///         executes.
+    ///         ecosystem singleton: declared, each is deployed, pinned as a row departing from its
+    ///         live implementation, and swapped by the core executor when the core leg executes.
     function test_corePrepare_installsTheInteropHandlerAndRegistrationSender() public {
         CoreUpgradeDeclaredInteropAndRegistration core = new CoreUpgradeDeclaredInteropAndRegistration();
         RecurringCTMUpgradeForTests hop = new CTMUpgradeEmpty();
@@ -669,7 +679,9 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
     }
 
     /// @notice A declared replacement is deployed and pinned as the core leg's only row, departing
-    ///         from what the proxy runs today; every undeclared implementation is reused.
+    ///         from what the proxy runs today, even when its runtime code is unchanged (a
+    ///         constructor-only change does not show in the codehash); every undeclared
+    ///         implementation is reused.
     function test_corePrepare_deploysAndInstallsADeclaredReplacement() public {
         CoreUpgradeDeclaredChange core = new CoreUpgradeDeclaredChange();
         core.initializeWithArgs(
@@ -689,16 +701,15 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
         assertEq(rows[0].expectedOldImpl, DeployScriptUtils.getImplementation(messageRootProxy), "from live");
         assertEq(rows[0].implNew, core.getDiscoveredBridgehub().implementations.messageRoot, "to this run's");
         assertTrue(rows[0].implNew != rows[0].expectedOldImpl, "a real replacement");
+        assertEq(rows[0].implNew.codehash, rows[0].expectedOldImpl.codehash, "of the same runtime code");
     }
 
-    /// @notice A recurring CTM prepare finds its executor on the CTM (the CTM's owner, bound to it)
-    ///         and ignores the core executor input, which only the bootstrap edge reads; the output
-    ///         names both objects the merge derives the executor call from.
+    /// @notice A recurring CTM prepare finds its executor on the CTM (the CTM's owner, bound to it);
+    ///         the output names both objects the merge derives the executor call from.
     function test_recurringPrepare_findsItsExecutorOnTheCTM() public {
         CoreUpgradeNoEcosystemLeg core = new CoreUpgradeNoEcosystemLeg();
         RecurringCTMUpgradeForTests hop = new CTMUpgradeValidatorTimelockOnly();
         _initHop(core, hop, SAME_VERSION_INPUT, "recurring-found-executor");
-        hop.setCoreUpgradeExecutor(makeAddr("staleCoreExecutorInput"));
         _finishPrepare(core, hop);
 
         address ctmExecutor = IOwnable(inputs.ctm).owner();
@@ -845,7 +856,7 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
 
     // ───────────────────────────── helpers ─────────────────────────────
 
-    /// @dev Initializes the CTM side of a hop against the live (post-bootstrap) ecosystem exactly
+    /// @dev Initializes the CTM side of a hop against the live (upgraded) ecosystem exactly
     ///      as `protocol-ops` does. Kept separate from `_initHop` so a test can put
     ///      `vm.expectRevert` immediately before THIS call.
     function _initCTMHop(
@@ -870,7 +881,7 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
             _input,
             string.concat("/script-out/foundry-upgrade/", _outName, "-ctm.toml"),
             inputs.governance,
-            bytes32(uint256(1)),
+            previousRelease.zkTokenAssetId,
             true
         );
         _hop.setEIP7702Checker(inputs.eip7702Checker);
