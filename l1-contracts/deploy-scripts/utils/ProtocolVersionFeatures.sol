@@ -15,6 +15,9 @@ library ProtocolVersionFeatures {
     /// @dev The CTM exposes the L1 interop fee manager (`L1_INTEROP_FEE_MANAGER()`).
     uint32 internal constant CTM_INTEROP_FEE_MANAGER = 35;
 
+    /// @dev The CTM, its ValidatorTimelock and its ServerNotifier upgrade chains only through committed transitions.
+    uint32 internal constant CTM_COMMITTED_TRANSITIONS_ONLY = 36;
+
     /// @notice Whether contracts on `_protocolVersion` have `_feature`.
     /// @param _protocolVersion A packed protocol version, as the CTM and the chains report it.
     /// @param _feature One of the constants above.

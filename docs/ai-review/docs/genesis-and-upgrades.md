@@ -59,6 +59,11 @@ longer exists).
 
 - Reintroducing Era-generation patterns (`forceDeployOnAddresses`, Era bytecode-hash
   computation) into scripts or contracts: nothing in the current tree may depend on them.
+- An address a deploy or upgrade script deploys kept in a standalone state variable of the
+  script. It belongs in the script's address struct (`UpgradeDeployedAddresses` in
+  `DefaultCTMUpgrade`, `ctmAddresses`, ...), so no address value floats around on its own.
+  Helpers that only live in the script's simulation and are never broadcast (`ReleaseMemberProbe`)
+  are exempt.
 - Deviations between genesis and upgrades (mentioned above). Please review the code and verify exhaustively that the contracts/state force deployed, upgraded, initialized, or assumed during the upgrade correctly correspond to the genesis gen, and vice versa.
 
 Do a bidirectional inventory check:

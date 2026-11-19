@@ -29,9 +29,11 @@ runPipelineUpgradeScenario({
       expectedProtocolVersion: packProtocolVersion(genesis),
       coreScriptPath: "test/foundry/l1/integration/_EcosystemUpgradeForTests_v36.sol:CoreUpgradeForTests_v36",
       carriesL2Upgrade: true,
+      expectsCtmInfrastructureLeg: true,
     },
     // A same-minor PATCH: one fresh verifier, published as a release that copies the live one except that member.
-    // Its routing is identical on both edges, so it must derive no facet cut.
+    // Its routing is identical on both edges, so it must derive no facet cut. It runs with the release's L2
+    // upgrade transaction still pending, which it must leave untouched.
     {
       label: "patch",
       upgradeInputTemplatePath: "test/anvil-interop/config/patch-upgrade.toml",
@@ -39,6 +41,7 @@ runPipelineUpgradeScenario({
       coreScriptPath: "test/foundry/l1/integration/_EcosystemUpgradeForTests_v36_1.sol:CoreUpgradeForTests_v36_1",
       ctmScriptPath: "test/foundry/l1/integration/_EcosystemUpgradeForTests_v36_1.sol:CTMUpgradeForTests_v36_1",
       expectsEmptyFacetDelta: true,
+      keepsPendingL2Upgrade: true,
     },
   ],
 })

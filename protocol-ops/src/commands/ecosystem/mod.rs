@@ -48,11 +48,12 @@ pub enum EcosystemCommands {
     /// `--env` is set, or pass `--governance-toml` explicitly.
     #[command(name = "upgrade-governance")]
     UpgradeGovernance(UpgradeGovernanceArgs),
-    /// Verify a v35 registry-driven upgrade package — an upgrade of 1..3 executor legs, the
-    /// one-time bootstrap edge or a transition replacement, decided from its calldata. Checks
+    /// Verify a registry-driven upgrade package — an upgrade of 1..3 executor legs or a
+    /// transition replacement, decided from its calldata. Checks
     /// object provenance and construction, the authority binding and the owner it lands on, every
     /// proxy row's slot and departing implementation, readiness, and that the governance calldata
-    /// invokes the reviewed legs as one contiguous run in canonical order. Read-only.
+    /// invokes the reviewed legs as one contiguous run in canonical order. Read-only. (The name
+    /// predates the retirement of the one-time bootstrap edge; `verify-package` is an alias.)
     #[command(name = "verify-bootstrap", visible_alias = "verify-package")]
     VerifyBootstrap(VerifyBootstrapArgs),
     /// Broadcast the bundles produced by `upgrade-prepare-all` to a real (or

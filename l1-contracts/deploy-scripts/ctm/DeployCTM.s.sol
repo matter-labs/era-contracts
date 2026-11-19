@@ -361,7 +361,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     /// @notice Deploys the CTM executor and hands it the whole CTM domain — the CTM (whose nomination
     ///         its `acceptCTMOwnership` completes), the CTM-domain ProxyAdmin and the
     ///         ServerNotifier (accepted through `forward`) — then nominates the ecosystem governance on
-    ///         it: the CTM half of what the v35 bootstrap ends with. Constructed for the deployer,
+    ///         it: the CTM half of the registry-era authority shape. Constructed for the deployer,
     ///         which performs the handover; governance accepts afterwards.
     /// @dev Rides the CREATE2 factory like every deployment of this script.
     function deployCTMUpgradeExecutor() internal {

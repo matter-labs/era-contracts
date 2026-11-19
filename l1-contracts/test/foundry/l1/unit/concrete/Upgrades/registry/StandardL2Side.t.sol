@@ -6,7 +6,8 @@ import {Test} from "forge-std/Test.sol";
 
 import {AuthoredL2Side, DefaultCTMUpgrade} from "deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
-import {BytecodeUtils} from "deploy-scripts/utils/bytecode/BytecodeUtils.s.sol";
+import {CoreOnGatewayHelper} from "deploy-scripts/ecosystem/CoreOnGatewayHelper.sol";
+import {L2EcosystemContract} from "deploy-scripts/ecosystem/CoreContract.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {AuthoredL2Plan} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
@@ -25,7 +26,11 @@ contract StandardL2SideHarness is DefaultCTMUpgrade {
     }
 
     function setL2DelegateComposer(address _composer) external {
-        l2DelegateComposer = _composer;
+        upgradeAddresses.l2DelegateComposer = _composer;
+    }
+
+    function l2DelegateComposer() external view returns (address) {
+        return upgradeAddresses.l2DelegateComposer;
     }
 
     function preparedPlan() external view returns (AuthoredL2Plan memory) {
@@ -72,8 +77,35 @@ contract StandardL2SideTest is Test {
         );
         assertEq(plan.extraBytecodeInfos.length, 0, "no extras");
         assertEq(plan.delegateComposer, composer, "the pinned composer");
-        bytes memory delegateCode = BytecodeUtils.readDeployedBytecodeL1("L2DefaultUpgrade.sol", "L2DefaultUpgrade");
-        assertTrue(supplier.evmPublishingBlock(keccak256(delegateCode)) != 0, "the delegate is published");
+
+        L2EcosystemContract[] memory delegateArtifact = new L2EcosystemContract[](1);
+        delegateArtifact[0] = L2EcosystemContract.L2DefaultUpgrade;
+        bytes[] memory factoryDependencies = CoreOnGatewayHelper.getFullListOfFactoryDependencies(delegateArtifact);
+        for (uint256 i = 0; i < factoryDependencies.length; ++i) {
+            assertTrue(
+                supplier.evmPublishingBlock(keccak256(factoryDependencies[i])) != 0,
+                "every factory dependency is published"
+            );
+        }
+    }
+
+    /// @dev The gate reads the minor alone: a minor edge carries the leg whatever patch either side is at.
+    ///      Few runs, since each one republishes every factory dependency.
+    /// forge-config: default.fuzz.runs = 16
+    function testFuzz_minorEdgeCarriesTheLegAtAnyPatch(uint32 _oldPatch, uint32 _newPatch) public {
+        address composer = makeAddr("composer");
+        harness.setL2DelegateComposer(composer);
+        harness.setEdge(SemVer.packSemVer(0, MINOR - 1, _oldPatch), SemVer.packSemVer(0, MINOR, _newPatch));
+
+        harness.prepareL2Side();
+
+        AuthoredL2Plan memory plan = harness.preparedPlan();
+        assertEq(
+            plan.delegateBytecodeInfo,
+            Utils.getZKOSBytecodeInfoForContract("L2DefaultUpgrade.sol", "L2DefaultUpgrade"),
+            "the delegate is L2DefaultUpgrade"
+        );
+        assertEq(plan.delegateComposer, composer, "the pinned composer");
     }
 
     // ─────────────────────────────── same-minor edge ───────────────────────────────

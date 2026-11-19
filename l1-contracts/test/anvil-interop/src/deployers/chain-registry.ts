@@ -13,11 +13,7 @@ import { L2GenesisUpgradeDeployer } from "./l2-genesis-upgrade-deployer";
 import { runForgeScript } from "../core/forge";
 import { GENESIS_UPGRADE_EVENT_SIG } from "../core/const";
 import { getAbi } from "../core/contracts";
-import {
-  ANVIL_INTEROP_CTM_OUTPUT_RELATIVE,
-  ANVIL_INTEROP_PERMANENT_VALUES_RELATIVE,
-  ANVIL_INTEROP_REGISTER_CHAIN_SCRIPT,
-} from "../core/paths";
+import { ANVIL_INTEROP_PERMANENT_VALUES_RELATIVE, ANVIL_INTEROP_REGISTER_CHAIN_SCRIPT } from "../core/paths";
 
 export class ChainRegistry {
   private l1RpcUrl: string;
@@ -227,7 +223,6 @@ export class ChainRegistry {
       CHAIN_OUTPUT: outputPath,
       BRIDGEHUB_ADDR: this.l1Addresses.bridgehub,
       CTM_ADDR: this.ctmAddresses.chainTypeManager,
-      CTM_OUTPUT: ANVIL_INTEROP_CTM_OUTPUT_RELATIVE,
       ZK_CHAIN_CONFIG: configPath.replace(this.projectRoot, ""),
       ZK_CHAIN_OUT: outputPath.replace(this.projectRoot, ""),
       PERMANENT_VALUES_INPUT: ANVIL_INTEROP_PERMANENT_VALUES_RELATIVE,
@@ -236,7 +231,6 @@ export class ChainRegistry {
 
   private buildBatchRegisterChainEnv(): Record<string, string> {
     return {
-      CTM_OUTPUT: ANVIL_INTEROP_CTM_OUTPUT_RELATIVE,
       PERMANENT_VALUES_INPUT: ANVIL_INTEROP_PERMANENT_VALUES_RELATIVE,
     };
   }
