@@ -218,10 +218,10 @@
   {
     "contractName": "l1-contracts/ChainRegistrationSender",
     "evmBytecodePath": "/l1-contracts/out/ChainRegistrationSender.sol/ChainRegistrationSender.json",
-    "evmBytecodeHash": "0x1db9b2e59ba8035382918b3997a3176a6f084f9119466c0cb2e6a9b0e3b863b9",
-    "evmDeployedBytecodeHash": "0x586a60f49c8227d1a6ecb527c410b0c66c6d9d2a32a4c7e778dadfa97536efa6",
-    "evmDeployedBytecodeBlakeHash": "0xfda3833148dfd1e815e174c6060dd26792df5e86f942f794f10f9f13f1bbd415",
-    "evmDeployedBytecodeLength": 7283
+    "evmBytecodeHash": "0x2bf49bfa8932fe2a9e865aa080a0c4fbb0f19c61555a9e9aacd6f8882c846988",
+    "evmDeployedBytecodeHash": "0xaf90c93a42fade9421432cd5349d94d58d63addb145cf1efac703fd12ae0bca8",
+    "evmDeployedBytecodeBlakeHash": "0xc024332225c2741a97eca4c90810ebd4393cfe3d5f7ff2b872ca9fda1c9b5c5d",
+    "evmDeployedBytecodeLength": 8810
   },
   {
     "contractName": "l1-contracts/ChainTypeManager",
@@ -682,10 +682,10 @@
   {
     "contractName": "l1-contracts/L2Bridgehub",
     "evmBytecodePath": "/l1-contracts/out/L2Bridgehub.sol/L2Bridgehub.json",
-    "evmBytecodeHash": "0xf74ed43b63579da0b2a44acfc585c18cf8fa58dbd7447eb678f9ce99cd70e7e6",
-    "evmDeployedBytecodeHash": "0xb178a1e4c8c703780ee86e335f26a4edaef8a9897ab1319994182e913dae1d26",
-    "evmDeployedBytecodeBlakeHash": "0xef461640ef38075e16ede6524fdd1c7dfcf6dbdfcbebe31fbe8322d93b688a76",
-    "evmDeployedBytecodeLength": 11039
+    "evmBytecodeHash": "0xd069b03825b01f8fcd9fb45f9cfa1a71c7947c4dea2fbcaaead9a38f0c0889f3",
+    "evmDeployedBytecodeHash": "0x3341371c0c231b359d96ab3dc28b73aa4656ace6d80d4ead6302fa4b19f24d3c",
+    "evmDeployedBytecodeBlakeHash": "0x8daaedb6c0756874ff5f9859eabfa3d06b6998505b90f21feb941359904c09b7",
+    "evmDeployedBytecodeLength": 11348
   },
   {
     "contractName": "l1-contracts/L2CanonicalTransactionLib",
