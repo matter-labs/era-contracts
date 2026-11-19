@@ -314,6 +314,7 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
         uint128 _newNominator,
         uint128 _newDenominator
     ) internal pure {
+        // An unset multiplier is left only on a chain that allowed Priority Mode before v36; it prices at 0 here.
         uint256 oldPrice = _safeDerivedL2GasPrice(_oldFeeParams, _oldNominator, _oldDenominator);
         uint256 newPrice = _safeDerivedL2GasPrice(_newFeeParams, _newNominator, _newDenominator);
 

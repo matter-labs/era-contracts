@@ -56,7 +56,7 @@ constrains.
 For the same reason the base token multiplier must be set at opt-in. Until it is, every new request
 reverts, and after opt-in the
 [price-change limit](#fee-accounting-and-base-token-moves-price-modifications) would keep it from
-ever being set: an unset multiplier prices requests at zero. The pending priority operation the
+ever being set to a non-zero price: the limit treats an unset multiplier as a zero price. The pending priority operation the
 opt-in requires can be a free service transaction, which is not priced, so it does not show that the
 multiplier is set.
 
