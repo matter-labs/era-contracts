@@ -4,17 +4,17 @@ The `l1-contracts/contracts/atomic-interop/` module makes a multi-leg interop fl
 destination may execute unless _every_ leg was committed in time, and otherwise the committed legs
 become refundable — **without a central L1 coordinator**. (Atomicity gates whether execution is
 _permitted_, not whether every destination actually runs; see
-{protocol-docs/atomicity/security.md#guarantees}.) It rides on the normal interop bundle
+{docs/atomicity/security.md#guarantees}.) It rides on the normal interop bundle
 path (`InteropCenter.sendBundle`/`sendMessage` -> `InteropHandler.executeAtomicBundle`, hopping through
 `L2AssetRouter` only for indirect asset-transfer calls — a direct call never touches it) — and is in
 fact the _only_ L2->L2 path: the `atomicBundle` attribute is mandatory on every L2->L2 send, since
 L1-published (non-atomic) L2->L2 interop was removed; the only non-atomic send left is an L2->L1
-withdrawal (see {protocol-docs/interop.md#atomic-bundles}). The only addition to that path is an
+withdrawal (see {docs/interop.md#atomic-bundles}). The only addition to that path is an
 **Indexed Merkle Tree (IMT)** per chain that records each leg's commitment, plus per-leg
 **IMT proofs** authenticated against the regular **interop-root channel**. There is no extra L1
 contract, no global-root registry, and no L2->L1 finality message — finality is proven, not dispatched.
 (Each inserted IMT leaf _is_ mirrored into an L2->L1 log, but purely so the tree stays reconstructible
-from L1 data; nothing reads it on L1. See {protocol-docs/atomicity/security.md#data-availability}.)
+from L1 data; nothing reads it on L1. See {docs/atomicity/security.md#data-availability}.)
 
 ## How to read these docs
 
@@ -32,9 +32,9 @@ with an engineer-facing summary and defers the rigorous arguments to clearly-mar
 
 The atomic protocol's **integration** with the surrounding stack is documented where that stack lives,
 and referenced from here rather than restated: the interop send/execute wiring in
-{protocol-docs/interop.md#atomic-bundles}, the asset-router recovery hook in
-{protocol-docs/bridging.md#atomic-recovery-hook}, and the generic IMT / chain-batch-root / interop-root
-machinery in {protocol-docs/message-root.md}.
+{docs/interop.md#atomic-bundles}, the asset-router recovery hook in
+{docs/bridging.md#atomic-recovery-hook}, and the generic IMT / chain-batch-root / interop-root
+machinery in {docs/message-root.md}.
 
 ## Key values
 
@@ -43,12 +43,12 @@ machinery in {protocol-docs/message-root.md}.
 - `flowId = keccak256(abi.encode(preimage))` — binds the preimage `version`, all legs, each leg's source
   chain, the deadline, and the settlement layer. `legBundleHashes` is strictly ascending (a canonical,
   deduplicated order); `legSourceChainIds` is positional (aligned 1:1, may repeat); `deadline` is a
-  settlement-layer timestamp. See {protocol-docs/atomicity/flow.md#data-structures}.
+  settlement-layer timestamp. See {docs/atomicity/flow.md#data-structures}.
 - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))` — the IMT
   leaf value for a leg. It bakes in `flowId` (hence all legs) and the chain-specific `bundleHash`, so a
   leg's commit value can only ever be inserted into its own source chain's IMT. This self-binding is
   what lets an **inclusion** proof stand on its own while a **non-inclusion** proof must additionally be
-  bound to the source chain (see {protocol-docs/atomicity/proofs.md}).
+  bound to the source chain (see {docs/atomicity/proofs.md}).
 
 The atomic-send parameters (the full `flowId` **preimage** — `version`, `deadline`,
 `settlementLayerChainId`, `legBundleHashes`, `legSourceChainIds` — plus `lowNullifierIndex`) travel
@@ -57,7 +57,7 @@ out-of-band as the ERC-7786
 part of the bundle, so `bundleHash` does not depend on the preimage (which would be circular: the
 preimage's leg hashes include the bundle's own hash). The attribute carries the preimage rather than an
 opaque `flowId` so that `AtomicFlowManager.append` can recompute the id on-chain and verify the sent
-bundle is actually one of the flow's legs. See {protocol-docs/interop.md#atomic-bundles} for the
+bundle is actually one of the flow's legs. See {docs/interop.md#atomic-bundles} for the
 interop-side send wiring.
 
 ## Lifecycle at a glance
@@ -76,7 +76,7 @@ interop-side send wiring.
 
 Steps 1 and 3–4 are detailed in [flow.md](./flow.md); the proof mechanics of steps 3–4 in
 [proofs.md](./proofs.md); the refund in [recovery.md](./recovery.md); step 2's channel in
-{protocol-docs/message-root.md}.
+{docs/message-root.md}.
 
 Leg state machine (`LegState`): `Unset -> Committed` (send) `-> Revertable -> Reverted` (timeout path).
 
@@ -95,7 +95,7 @@ The flow's entry points live outside this directory: `InteropCenter`
 (`l1-contracts/contracts/bridge/asset-router/`, `0x10003`) does the burn / mint and implements
 `IAtomicRecoverable.recoverAtomicCall` for the timeout recovery. The underlying IMT data structure is
 `l1-contracts/contracts/common/libraries/IndexedMerkleTree.sol`, documented generically in
-{protocol-docs/message-root.md#indexed-merkle-tree-indexedmerkletree}.
+{docs/message-root.md#indexed-merkle-tree-indexedmerkletree}.
 
 > Address `0x10013` is intentionally reserved/empty — it formerly held a global-root importer that was
 > removed when atomic interop moved to the interop-root channel.
@@ -123,7 +123,7 @@ asset router recognises the manager via `_atomicFlowManagerAddr()`. For recovery
 when that sender is the canonical L2 asset router (`from == L2_ASSET_ROUTER_ADDR`) — the interface is not
 dispatched generically, and not to the call's target. Send-time validation makes the asset router the
 only possible indirect call sender (`IndirectCallOnlyToAssetRouter`, see
-{protocol-docs/interop.md#restrictions}), so the pinned dispatch reaches every indirect burn — see
+{docs/interop.md#restrictions}), so the pinned dispatch reaches every indirect burn — see
 [recovery.md](./recovery.md) for the recovery mechanisms.
 
 ## Off-chain tooling

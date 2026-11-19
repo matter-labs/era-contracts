@@ -22,5 +22,5 @@ The three active cross-layer routes are:
 3. **L2 -> L2:** an atomic interop bundle commits on the source chain and is proven to the destination
    handler before the destination asset router mints or unlocks.
 
-See {protocol-docs/bridging.md} for the current asset IDs, registration, burn/mint, base-token,
+See {docs/bridging.md} for the current asset IDs, registration, burn/mint, base-token,
 failure-recovery, legacy-compatibility, native-token-vault, and L2-asset-tracker rules.

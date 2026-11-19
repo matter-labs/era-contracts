@@ -6,11 +6,11 @@ current release). Contract doc comments reference this file instead of restating
 
 Related documents, which are the source of truth for their own topics:
 
-- {protocol-docs/message-root.md} — the `MessageRoot` tree structure, the v31 vs v33 batch-root
+- {docs/message-root.md} — the `MessageRoot` tree structure, the v31 vs v33 batch-root
   flows (`addChainBatchRoot` vs `addChainBatchRootV32`), and interop-root import/verification.
-- {protocol-docs/interop.md} — the interop message path (`InteropCenter`, `InteropHandler`,
+- {docs/interop.md} — the interop message path (`InteropCenter`, `InteropHandler`,
   bundles, interop roots).
-- {protocol-docs/atomicity/README.md} — the atomic (IMT-based) interop protocol, its proofs, and the
+- {docs/atomicity/README.md} — the atomic (IMT-based) interop protocol, its proofs, and the
   full statement of the timeout-protocol preconditions.
 
 ## Chain creation (`createNewChain`)
@@ -65,7 +65,7 @@ the first real batch continues at 1 exactly as without the genesis leaf.
 Why this exists: the atomic-interop timeout protocol requires that every chain interop can target
 has **at least one batch leaf inside the settlement layer's message root** — otherwise a leg on a
 chain that halts before ever settling could neither finalize nor be proven timed out. Seeding at
-creation satisfies this for fresh chains; see {protocol-docs/atomicity/proofs.md#completeness} for the proof-level
+creation satisfies this for fresh chains; see {docs/atomicity/proofs.md#completeness} for the proof-level
 reasoning.
 
 Chains added to a message root with a **non-zero** starting batch number (already-deployed chains
@@ -187,12 +187,12 @@ not follow from swapping implementations are:
   has to precede this upgrade.
 - **`L1NativeTokenVault.bridgedOut`** starts empty on an upgraded vault, which would reject every
   withdrawal of an L1-native asset. See
-  {protocol-docs/bridging.md#populating-bridgedout-during-an-in-place-upgrade}.
+  {docs/bridging.md#populating-bridgedout-during-an-in-place-upgrade}.
 - **Atomic-interop built-ins** exist on ZKsync OS chains only. New chains get them from genesis and
   pre-existing ones from this upgrade's force deployments (next section).
 - **`L2InteropHandler` storage** shifts on an ecosystem whose v31 handler inherits `PausableUpgradeable`
   (mainnet): v33 does not read that handler's bundle and call statuses. See
-  {protocol-docs/interop/architecture.md#l2interophandler-storage-across-the-v31--v33-upgrade}.
+  {docs/interop/architecture.md#l2interophandler-storage-across-the-v31--v33-upgrade}.
 
 Scope of this release's upgrade: **ZKsync OS chains that settle on L1**. Non-L1-settled chains are not
 included; their upgrade takes
@@ -214,7 +214,7 @@ current code) states the answer explicitly with `pre_v32_introspection` in the u
 ## ZKsync OS genesis force deployments: atomic-interop built-ins
 
 Two new L2 built-ins support atomic interop (protocol details in
-{protocol-docs/atomicity/README.md}):
+{docs/atomicity/README.md}):
 
 - `L2InteropCommitmentTree` at `0x10012` (`L2_INTEROP_COMMITMENT_TREE_ADDR`) — the per-chain
   append-only Indexed Merkle Tree of leg commitments. Its storage layout is consensus-critical:

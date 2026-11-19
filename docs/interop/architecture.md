@@ -2,8 +2,8 @@
 
 This page describes the interop architecture of this release: messages, calls, bundles, execution,
 fees, proof transport, bridging, retries, cancellation, and atomicity. The
-normative field-by-field behavior remains in {protocol-docs/interop.md}; the atomic proof and recovery
-arguments remain in {protocol-docs/atomicity/README.md}.
+normative field-by-field behavior remains in {docs/interop.md}; the atomic proof and recovery
+arguments remain in {docs/atomicity/README.md}.
 
 ## System map
 
@@ -99,8 +99,8 @@ The final dispatch is a strict route split:
   tree.
 
 No L1 -> L2 or L1-initiated interop send exists. Bridgehub priority transactions remain the separate
-L1 -> L2 deposit/deployment mechanism documented in {protocol-docs/bridging.md} and
-{protocol-docs/chain-lifecycle.md}.
+L1 -> L2 deposit/deployment mechanism documented in {docs/bridging.md} and
+{docs/chain-lifecycle.md}.
 
 ## Settlement and proof transport
 
@@ -208,7 +208,7 @@ changing bundle encoding.
 Native integration matters for timeout: the canonical router implements `recoverAtomicCall`, recognizes
 the historical `finalizeDeposit` payload, and asks the relevant handler to restore the original caller.
 Rotating handlers or changing historical calldata recognition can strand in-flight recovery, so the
-constraints in {protocol-docs/atomicity/security.md} and {protocol-docs/bridging.md} are part of the
+constraints in {docs/atomicity/security.md} and {docs/bridging.md} are part of the
 architecture, not optional bridge behavior.
 
 ## Atomicity and failure paths
@@ -228,7 +228,7 @@ In particular:
 
 Recovery reverses recognized source-side burns best-effort. It is not compensation for a destination
 call that was permitted and then failed, and it is not available after the flow finalized. Full proof,
-soundness, liveness, and recovery limitations are documented in {protocol-docs/atomicity/README.md}.
+soundness, liveness, and recovery limitations are documented in {docs/atomicity/README.md}.
 
 ## Deployment and platform scope
 

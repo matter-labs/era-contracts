@@ -20,7 +20,7 @@ If the flow times out, the source `AtomicFlowManager` passes the stored destinat
 `L2AssetRouter.recoverAtomicCall`. The router recognizes the historical `finalizeDeposit` encoding and
 uses the asset handler's failed-transfer path to restore the original caller's balance. Recovery is
 best-effort and a refund claim is all-or-nothing if an attempted recovery reverts; see
-{protocol-docs/atomicity/recovery.md}.
+{docs/atomicity/recovery.md}.
 
 ## L2 -> L1 withdrawal
 
@@ -29,4 +29,4 @@ zero-`interopCallValue` asset-router call. `InteropCenter` publishes the bundle 
 after settlement, `L1InteropHandler.executeBundle` proves the message and invokes only the canonical
 L1 asset router. L2 -> L1 bundles pay no interop protocol fee and cannot use `atomicBundle`.
 
-The complete burn/mint and failed-transfer accounting is documented in {protocol-docs/bridging.md}.
+The complete burn/mint and failed-transfer accounting is documented in {docs/bridging.md}.

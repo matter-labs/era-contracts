@@ -14,7 +14,7 @@ transactions. It records:
 `createNewChain` is restricted to the Bridgehub owner or admin. It validates that the chain ID is new,
 records the CTM/base-token/settlement data, asks the CTM to deploy the diamond, registers the result,
 and adds the chain to the L1 `MessageRoot`. ZKsync OS chains also seed their batch-0 chain root. The
-complete ordering and guards are in {protocol-docs/chain-lifecycle.md#chain-creation-createnewchain}.
+complete ordering and guards are in {docs/chain-lifecycle.md#chain-creation-createnewchain}.
 
 ## L1 -> L2 requests
 
@@ -24,7 +24,7 @@ complete ordering and guards are in {protocol-docs/chain-lifecycle.md#chain-crea
 - Service-transaction entry points are reserved for protocol components such as chain registration.
 
 The Bridgehub does not itself mint bridged assets. It authenticates the route and coordinates the
-asset router with the destination chain. See {protocol-docs/bridging.md}.
+asset router with the destination chain. See {docs/bridging.md}.
 
 ## L2 variant
 

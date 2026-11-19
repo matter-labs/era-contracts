@@ -5,7 +5,7 @@ two-call, permissionless sequence on each committed leg's source chain, driven b
 `AtomicFlowManager`, and it is **best-effort by design** — see [Non-guarantees](#non-guarantees).
 
 The proof that authorizes the unwind — that a leg is genuinely absent past the deadline and the flow can
-never finalize — is specified in {protocol-docs/atomicity/proofs.md#timeout}. This page covers what
+never finalize — is specified in {docs/atomicity/proofs.md#timeout}. This page covers what
 happens _after_ the proof checks out.
 
 ## `authorizeRefund` → `claimRefund`
@@ -38,7 +38,7 @@ depositor. There are two disjoint mechanisms, selected per call by testing its l
   burn was reversed, `false` (an unrecognized call) is skipped without reverting. The asset-router side
   of this hook — selector-pinned to `finalizeDeposit`, refunding the mint data's `originalCaller`
   through the failed-transfer path of the asset handler registered for the asset — is documented in
-  {protocol-docs/bridging.md#atomic-recovery-hook}.
+  {docs/bridging.md#atomic-recovery-hook}.
   Indirect calls force `interopCallValue == 0`, so router-produced calls never also carry native value.
 - **Native base-token value on direct calls (`from != L2_ASSET_ROUTER_ADDR` and `value != 0`).**
   Only a direct call can carry base-token `value` (indirect calls force it to zero and are always
@@ -50,7 +50,7 @@ The manager is agnostic to call/encoding formats — it forwards `(destChainId, 
 sender own its reversal — but the dispatch is pinned to the L2 asset router, the only
 `IAtomicRecoverable` sender the manager ever invokes. The pin is exhaustive: send-time validation
 restricts every indirect call to the asset router (`IndirectCallOnlyToAssetRouter`, see
-{protocol-docs/interop.md#restrictions}), so the hook reaches every burn-producing call.
+{docs/interop.md#restrictions}), so the hook reaches every burn-producing call.
 Implementations **must** gate both hooks to the canonical `AtomicFlowManager`
 (`onlyAtomicFlowManager`) and **must** return `false` rather than revert for calls they do not
 recognize.
@@ -86,7 +86,7 @@ rejected at send time (`AtomicBundleToL1NotSupported`), so this is belt-and-susp
 load-bearing one: it keeps recovery from ever reaching the append-only L1 deposit/withdrawal counters
 in `L2AssetTracker`, whose settlement-layer-conditional updates are only correct when evaluated at
 send time, not recovery time. The full accounting reason is in
-{protocol-docs/bridging.md#security-notes} ("L2 -> L1 withdrawals are never revertable").
+{docs/bridging.md#security-notes} ("L2 -> L1 withdrawals are never revertable").
 
 ## Non-guarantees
 
@@ -107,4 +107,4 @@ Recovery is best-effort, and the protocol is explicit about what it does **not**
   rejected at send). Recovery refunds a call's `value` to its `InteropCall.from`, which for an indirect
   call is the sender contract (the asset router), not the payer — the funds would be stranded. Direct
   calls _may_ carry value; that is exactly the second mechanism above. See
-  {protocol-docs/atomicity/security.md#non-guarantees}.
+  {docs/atomicity/security.md#non-guarantees}.

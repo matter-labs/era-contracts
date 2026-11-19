@@ -2,9 +2,9 @@
 
 This page follows one atomic flow from send to finalize (or timeout), and documents the
 `AtomicFlowManager` — the L2 built-in at `0x10014` that orchestrates every step and holds each leg's
-state. The proof mechanics invoked in steps 3–4 live in {protocol-docs/atomicity/proofs.md}; the refund
-in {protocol-docs/atomicity/recovery.md}; the interop-side send/execute wiring in
-{protocol-docs/interop.md#atomic-bundles}.
+state. The proof mechanics invoked in steps 3–4 live in {docs/atomicity/proofs.md}; the refund
+in {docs/atomicity/recovery.md}; the interop-side send/execute wiring in
+{docs/interop.md#atomic-bundles}.
 
 ## Data structures
 
@@ -37,7 +37,7 @@ ordering is what makes `flowId` canonical (any permutation would hash differentl
 is **positional**: entry `i` is the source chain of leg `i`, aligned 1:1 with `legBundleHashes`. It may
 repeat and need not be sorted, so only its length is validated. It is deliberately _not_ a set: if it
 were, a sibling chain present in the set could authorize a wrong-chain refund (see the source-chain
-binding in {protocol-docs/atomicity/recovery.md} and proofs.md).
+binding in {docs/atomicity/recovery.md} and proofs.md).
 
 ### `ImtProof`, briefly
 
@@ -46,7 +46,7 @@ specific chain's batch begin/end IMT leaf inside an imported interop root, and `
 leaf under `chainImtRoot`. The batch's `l1Timestamp` is **not** a struct field — it would be spoofable;
 it is read from the verified `settlementProof` words (it is folded into the chain batch leaf). `provesAgainstBeginRoot`
 is a bool (not a raw leaf index) selecting the timeout branch, so authentication can never be aimed at
-the logs/multichain leaves. Full mechanics in {protocol-docs/atomicity/proofs.md}.
+the logs/multichain leaves. Full mechanics in {docs/atomicity/proofs.md}.
 
 ## Lifecycle
 
@@ -63,7 +63,7 @@ lowNullifierIndex, preimage)`. `append`:
    (`ManagerTooManyLegs` — appending is cheap, but finalization verifies one Merkle proof per leg),
    `legBundleHashes` strictly ascending, `legSourceChainIds` length matching.
 2. **Requires L1 settlement** (`_checkSettlementLayerIsL1`) — this release anchors proofs only on the L1
-   message root (see {protocol-docs/atomicity/security.md#trust-assumptions}).
+   message root (see {docs/atomicity/security.md#trust-assumptions}).
 3. **Rejects flows whose deadline verifiably passed** (`ManagerFlowDeadlinePassed`): if a
    settlement-layer root with creation timestamp `> deadline` has been imported on this chain (tracked
    as a monotone maximum by `L2InteropRootStorage.latestInteropRootTimestamp`), the flow can already be
@@ -77,19 +77,19 @@ lowNullifierIndex, preimage)`. `append`:
 5. **Requires every _other_ leg to declare a Bridgehub-registered source chain**
    (`L2_BRIDGEHUB.baseTokenAssetId(chainId) != 0`). Registration guarantees MessageRoot presence,
    without which the leg could never be proven committed _or_ absent and the flow would be stranded (see
-   {protocol-docs/atomicity/security.md#timeout-protocol-preconditions}). This also rejects L1 as a
+   {docs/atomicity/security.md#timeout-protocol-preconditions}). This also rejects L1 as a
    declared leg source (L1 is never a registered interop chain).
 6. **Marks the leg `Committed`** — rejecting a re-commit of the same `(flowId, bundleHash)` with
    `ManagerLegAlreadyCommitted` — and then, effects before interaction, **inserts** the leg's
    `commitValue` into this chain's `L2InteropCommitmentTree`, emitting
    `FlowCommitted(flowId, bundleHash, deadline, leafIndex)`. The tree additionally mirrors the inserted
-   value into an L2->L1 log for data availability (see {protocol-docs/atomicity/imt.md} and
-   {protocol-docs/atomicity/security.md#data-availability}).
+   value into an L2->L1 log for data availability (see {docs/atomicity/imt.md} and
+   {docs/atomicity/security.md#data-availability}).
 
 ### 2. Root settlement + import
 
-Covered by the interop-root channel — see {protocol-docs/atomicity/imt.md#the-root-is-read-from-storage-never-published}
-and {protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}. Nothing
+Covered by the interop-root channel — see {docs/atomicity/imt.md#the-root-is-read-from-storage-never-published}
+and {docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}. Nothing
 atomic-specific happens here; the same channel carries all interop roots.
 
 ### 3. Finalize — `requireFlowFinalized`
@@ -117,8 +117,8 @@ If a leg never commits in time, `authorizeRefund` takes one absence proof and fl
 `Committed` legs to `Revertable`; `claimRefund` then _attempts_ to reverse the recoverable burns — it
 succeeds as long as no attempted recovery reverts (a claim that recovers nothing still consumes the
 leg). Detailed in
-{protocol-docs/atomicity/recovery.md}; the absence-proof conditions in
-{protocol-docs/atomicity/proofs.md#timeout}.
+{docs/atomicity/recovery.md}; the absence-proof conditions in
+{docs/atomicity/proofs.md#timeout}.
 
 ## The `AtomicFlowManager`
 

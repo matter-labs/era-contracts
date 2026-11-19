@@ -8,5 +8,5 @@ L2 → L1 communication is proof-driven: after a batch is proven and executed, a
 message or log against the recorded chain batch root. Deposits, withdrawals, failure recovery, and
 cross-chain asset routing build on these two directions.
 
-The current flows are specified in {protocol-docs/bridging.md}, while the root hierarchy and proof
-rules are specified in {protocol-docs/message-root.md}.
+The current flows are specified in {docs/bridging.md}, while the root hierarchy and proof
+rules are specified in {docs/message-root.md}.

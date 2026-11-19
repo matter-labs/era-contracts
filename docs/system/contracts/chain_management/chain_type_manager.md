@@ -29,4 +29,4 @@ the relevant deadline cannot continue normal batch processing until it reaches a
 
 Upgrade creation and operational sequencing are described in [upgrade process](./upgrade_process.md)
 and [creating upgrades](./creating_upgrades.md). Current chain creation and in-place upgrade state are
-documented in {protocol-docs/chain-lifecycle.md}.
+documented in {docs/chain-lifecycle.md}.

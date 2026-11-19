@@ -2,7 +2,7 @@
 
 These examples illustrate how to compose the current protocol. They intentionally omit ABI encoding
 and proof-construction code; the normative entry points and restrictions live in
-{protocol-docs/interop.md}.
+{docs/interop.md}.
 
 - [Cross-chain message](./cross_chain_message.md) — a single ERC-7786 call in a one-leg atomic flow.
 - [Asset transfer](./asset_transfer.md) — an indirect call through the L2 asset router.

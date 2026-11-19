@@ -18,7 +18,7 @@ consumes the corresponding queue or priority-tree entries and rejects the batch 
 does not match the committed value.
 
 The direct and two-bridges entry points differ in the authenticated L2 sender and asset-routing step.
-The current end-to-end deposit flow is specified in {protocol-docs/bridging.md}.
+The current end-to-end deposit flow is specified in {docs/bridging.md}.
 
 ## Upgrade transactions
 

@@ -13,7 +13,7 @@ incorporates the chain batch root into `MessageRoot`, and other L2s import the a
 `L2InteropHandler.executeAtomicBundle` or `verifyAtomicBundle` receives one inclusion proof per flow
 leg. `AtomicFlowManager.requireFlowFinalized` authenticates each source-chain tree root against an
 imported interop root and checks that every leg was committed no later than the flow deadline. See
-{protocol-docs/atomicity/proofs.md} for the proof format and its soundness argument.
+{docs/atomicity/proofs.md} for the proof format and its soundness argument.
 
 The proof shows commitment-tree membership. It is not the older public-bundle design in which an L2 -> L1 message was proven separately for each L2 -> L2 call.
 

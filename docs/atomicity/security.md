@@ -3,7 +3,7 @@
 This page collects the properties the atomic-interop flow provides, the ones it deliberately does not,
 the on-chain preconditions the timeout proof relies on, and the trust assumptions of the current
 release. The proof-level soundness/completeness arguments live in
-{protocol-docs/atomicity/proofs.md#soundness}.
+{docs/atomicity/proofs.md#soundness}.
 
 ## Guarantees
 
@@ -11,7 +11,7 @@ release. The proof-level soundness/completeness arguments live in
   outcomes is ever provable: either every leg is proven committed before the deadline (so any leg's
   destination _may_ execute), or a leg is proven absent past it (so committed legs _may_ be refunded) —
   never both. This follows from the mutual exclusivity of the finality and timeout conditions
-  ({protocol-docs/atomicity/proofs.md#soundness}), and it is the guarantee the protocol actually
+  ({docs/atomicity/proofs.md#soundness}), and it is the guarantee the protocol actually
   enforces.
 
   This is deliberately weaker than "every destination call executes". The atomicity gate governs
@@ -19,7 +19,7 @@ release. The proof-level soundness/completeness arguments live in
   committed, but each destination is then driven independently by whoever submits
   `executeAtomicBundle`, and a bundle that only reached `Verified` can still be partially executed or
   have individual calls `Cancelled` through `unbundleBundle`
-  ({protocol-docs/interop.md#unbundling-unbundlebundle}). What atomicity rules out is the dangerous
+  ({docs/interop.md#unbundling-unbundlebundle}). What atomicity rules out is the dangerous
   asymmetry — a leg being burned on one chain while the flow is refunded on another — not
   under-execution by a passive or adversarial destination caller.
 
@@ -27,7 +27,7 @@ release. The proof-level soundness/completeness arguments live in
   late cannot be made to look in-time; the deadline check is monotone.
 - **Timeout-proof liveness.** If a flow genuinely times out, a valid timeout proof can always be
   produced from any post-deadline aggregated root — including for a source chain that halts
-  ({protocol-docs/atomicity/proofs.md#completeness}), provided the preconditions below hold. Note this is
+  ({docs/atomicity/proofs.md#completeness}), provided the preconditions below hold. Note this is
   liveness of the _proof_, hence of `authorizeRefund`: it guarantees the legs become `Revertable`, not
   that `claimRefund` then succeeds in returning the assets (see the recovery non-guarantees below).
 - **No trusted coordinator.** There is no L1 atomic contract and no global-root registry; finality and
@@ -44,17 +44,17 @@ release. The proof-level soundness/completeness arguments live in
   calls. Full refundability of an arbitrary bundle is not guaranteed, and a deterministically-reverting
   recovery can leave a leg permanently stuck at `Revertable`. Making a fund-moving leg recoverable, and
   its recovery robust, is the flow author's responsibility. See
-  {protocol-docs/atomicity/recovery.md#non-guarantees}.
+  {docs/atomicity/recovery.md#non-guarantees}.
 - **Indirect calls may not carry destination-side value.** `interopCallValue != 0` on an indirect call
   is rejected at send (`IndirectCallCannotCarryValue`): on the recovery path native value is returned to
   `InteropCall.from`, which for an indirect call is the asset router — the only allowed indirect call
   target (`IndirectCallOnlyToAssetRouter`) — rather than the payer, so allowing it would strand funds.
   Direct calls may carry value — theirs is refunded to their own `from` through the base-token recovery
   path (see
-  {protocol-docs/atomicity/recovery.md#\_recoverbundle-reversing-the-burns}).
+  {docs/atomicity/recovery.md#\_recoverbundle-reversing-the-burns}).
 - **L1 destinations are rejected.** An atomic bundle is never published to L1, so it could only ever
   time out; and L2->L1 withdrawal accounting must stay append-only and never revertable (see
-  {protocol-docs/bridging.md#security-notes}).
+  {docs/bridging.md#security-notes}).
 
 ## Timeout-protocol preconditions
 
@@ -67,7 +67,7 @@ The timeout proof relies on three preconditions, each enforced on chain:
      `ChainBatchRootTree.genesisChainBatchRoot()` (batch 0 has no logs and a freshly seeded IMT, so the
      value is exact) as the batch-0 `l2LogsRootHash`, and the Bridgehub calls
      `MessageRootBase.seedGenesisRoot`, which pulls it from the chain's getters (once-only, fresh ZKsync
-     OS chains only). See {protocol-docs/message-root.md#genesis-root-and-seedgenesisroot}.
+     OS chains only). See {docs/message-root.md#genesis-root-and-seedgenesisroot}.
    - Already-deployed chains onboarded with a non-zero starting batch number are NOT seeded (a real
      batch with that number exists elsewhere, and a synthetic leaf would diverge from it); instead
      `ChainRegistrationSender` refuses to register a chain for interop until it has settled at least one
@@ -88,7 +88,7 @@ The timeout proof relies on three preconditions, each enforced on chain:
    an imported aggregation root. Interop towards a chain must therefore only be enabled once the chain is
    registered (has its `sharedTree` leaf) AND has a batch in its chain tree (precondition 1) — exactly
    what the `ChainRegistrationSender` gate checks, and what `AtomicFlowManager.append` re-checks for
-   every co-leg's declared source chain (see {protocol-docs/atomicity/flow.md#1-atomic-send-append}).
+   every co-leg's declared source chain (see {docs/atomicity/flow.md#1-atomic-send-append}).
 
 3. **Every batch leaf carries the timestamp at which it entered the shared root.** Enforced by
    `MessageRootBase.addChainBatchRootV32`, which folds the settlement-layer `block.timestamp` into the
@@ -98,7 +98,7 @@ The timeout proof relies on three preconditions, each enforced on chain:
    `MessageRootBase.historicalRoot` on the settlement layer, imported into
    `L2InteropRootStorage.interopRoots` and double-checked at batch execution — which anchors the "root
    from after the deadline" requirement. See the two clocks in
-   {protocol-docs/atomicity/proofs.md#two-authenticated-clocks}.
+   {docs/atomicity/proofs.md#two-authenticated-clocks}.
 
 ## Known issues (to be fixed in this release)
 
@@ -165,7 +165,7 @@ The timeout proof relies on three preconditions, each enforced on chain:
 - **Honest majority / valid settlement.** The proofs are only as trustworthy as the imported interop
   roots and the settlement-layer batch execution that double-checks them; atomic interop adds no trust
   assumption beyond what the interop-root channel already requires
-  ({protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}).
+  ({docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}).
 
 ## Data availability
 
@@ -176,7 +176,7 @@ halted chain could strand flows precisely in the case the timeout protocol exist
 
 The IMT leaves are therefore published unconditionally: every `L2InteropCommitmentTree.insert` records
 the inserted value as an L2->L1 log through `INTEROP_COMMITMENT_LEAF_HOOK`
-({protocol-docs/atomicity/imt.md#the-root-is-read-from-storage-never-published}). The mandatory L2->L1
+({docs/atomicity/imt.md#the-root-is-read-from-storage-never-published}). The mandatory L2->L1
 log region is part of every batch's committed pubdata, so this does not depend on the chain's DA
 configuration — neither on the commitment _mechanism_ (`L2DACommitmentScheme`: calldata-keccak vs blobs)
 nor on the committed _scope_ (`PubdataContent`). Even a chain running `PubdataContent.LOGS_ONLY`, which
@@ -202,4 +202,4 @@ logs reproduces the tree — and hence every root snapshot the proofs authentica
   when atomic interop moved to the interop-root channel. It must stay reserved.
 - **Stale bundle-hash prediction.** If an off-chain `bundleHash` preview goes stale (e.g. an upgrade
   changes bundle encoding), `append` reverts the send with the burn included, rather than committing an
-  unfinalizable/unrefundable leg (see {protocol-docs/atomicity/flow.md#1-atomic-send-append}).
+  unfinalizable/unrefundable leg (see {docs/atomicity/flow.md#1-atomic-send-append}).

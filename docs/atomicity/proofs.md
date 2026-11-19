@@ -5,7 +5,7 @@
 > (`atomic-interop/libraries/AtomicInteropProof.sol`) implements it and its header points here.
 
 Cross-chain authentication for the atomic flow reduces to one question asked against a source chain's
-commitment tree (see {protocol-docs/atomicity/imt.md}): **is a leg's `commitValue` present in
+commitment tree (see {docs/atomicity/imt.md}): **is a leg's `commitValue` present in
 (finality) or absent from (timeout) the tree, as of a batch that settled within / past the deadline?**
 Both directions authenticate the claimed IMT root the same way; they differ in which IMT root leaf they
 target, which timestamp comparison they make, and — for the timeout end branch alone — one extra
@@ -19,7 +19,7 @@ to it, and both are as trustworthy as the root they ride with — neither is a c
 - **`t` (`l1BatchTimestamp`)** — when the batch root was aggregated into the settlement layer's shared
   root. It is folded into the chain batch leaf, so it is proven by the _same_ inclusion proof that
   authenticates the IMT root, and read positionally from the verified `settlementProof` words
-  (see {protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}).
+  (see {docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}).
 - **`T`** — the imported aggregation root's own creation time, stored alongside the root in
   `L2InteropRootStorage.interopRoots(slChainId, slBlock)` and double-checked on the settlement layer at
   batch execution.
@@ -27,7 +27,7 @@ to it, and both are as trustworthy as the root they ride with — neither is a c
 **Invariant — atomic interop is L1-only in this release.** Every chain participating in a flow settles
 on L1: `AtomicFlowManager` rejects any flow whose `settlementLayerChainId` is not the L1 chain id
 (`ManagerSettlementLayerNotL1`), on `append`, finality and refund alike — see
-{protocol-docs/atomicity/security.md#trust-assumptions}. `deadline`, `t` and `T` are therefore all
+{docs/atomicity/security.md#trust-assumptions}. `deadline`, `t` and `T` are therefore all
 timestamps of an L1 block. The proof library itself stays layer-agnostic: `verifyInclusion` /
 `verifyTimeoutAbsence` only require each proof's resolved `slChainId` to equal the flow's
 `settlementLayerChainId` (else `ProofSettlementLayerMismatch`), which under the invariant pins every
@@ -76,7 +76,7 @@ check on the finality path is therefore defense-in-depth; on the timeout path it
 
 Throughout this page, "times out" means a valid timeout proof exists, so `authorizeRefund` will mark the
 flow's committed legs `Revertable`. Whether the assets are then actually returned is a separate,
-conditional step (`claimRefund`) — see {protocol-docs/atomicity/recovery.md#non-guarantees}.
+conditional step (`claimRefund`) — see {docs/atomicity/recovery.md#non-guarantees}.
 
 The prover declares the branch (`ImtProof.provesAgainstBeginRoot`), which `verifyTimeoutAbsence`
 validates against the authenticated `t` — no unverified value drives control flow. Both branches first
@@ -93,7 +93,7 @@ imported) and `slChainId == settlementLayerChainId`, then a non-inclusion (low-n
   zero cascade), and the value is absent from its batch-**end** IMT root (leaf 3) — the final IMT state
   reachable in time, since any later batch has `t' >= T > deadline`. This branch keeps a timeout proof
   producible for a source chain that **halts** and never settles a post-deadline batch; the required
-  "last batch" always exists (see {protocol-docs/atomicity/security.md#timeout-protocol-preconditions}).
+  "last batch" always exists (see {docs/atomicity/security.md#timeout-protocol-preconditions}).
 
 The absence proof is bound to the missing leg's declared source chain by the caller
 (`authorizeRefund` checks `sourceChainId == legSourceChainIds[i]`). This binding is essential: a
@@ -126,12 +126,12 @@ root with `T > deadline`, even if the source chain inserts the value later:
 
 So this liveness — of the _proof_, hence of `authorizeRefund` — does not depend on catching any
 particular root; any post-deadline root suffices. It does not extend to `claimRefund` returning the
-assets ({protocol-docs/atomicity/recovery.md#non-guarantees}).
+assets ({docs/atomicity/recovery.md#non-guarantees}).
 
 ## Error surface
 
 All revert reasons are declared in `atomic-interop/AtomicInteropErrors.sol`, which also holds the
-manager-side `Manager*` errors (see {protocol-docs/atomicity/flow.md#the-atomicflowmanager}). The
+manager-side `Manager*` errors (see {docs/atomicity/flow.md#the-atomicflowmanager}). The
 `Proof*` set is raised entirely from `AtomicInteropProof`, one per check above:
 
 - `ProofInvalidChainBatchRootDepth` — the exact-depth guard on the chain-batch-root path;

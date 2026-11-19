@@ -29,7 +29,7 @@ function proveL2LeafInclusionShared(
 
 The proof connects the message or log leaf to the chain batch root recorded during execution. The
 second form also supports the recursive message-root proofs used by interop. See
-{protocol-docs/message-root.md} for the exact root hierarchy and proof formats.
+{docs/message-root.md} for the exact root hierarchy and proof formats.
 
 ## Withdrawals and failed deposits
 
@@ -38,4 +38,4 @@ asset handler. Those contracts authenticate the sender, prove inclusion against 
 and enforce replay protection before releasing the asset. A failed L1 → L2 deposit uses the recorded
 priority-operation result and the L1 nullifier's recovery path.
 
-The normative asset flows and failure cases are specified in {protocol-docs/bridging.md}.
+The normative asset flows and failure cases are specified in {docs/bridging.md}.
