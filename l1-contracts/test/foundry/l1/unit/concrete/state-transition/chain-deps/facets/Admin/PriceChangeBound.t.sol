@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
 import {FeeParamsChangeTooLarge} from "contracts/common/L1ContractErrors.sol";
-import {PRICE_REFERENCE_L1_GAS} from "contracts/common/Config.sol";
+import {DEFAULT_MAX_L2_GAS_PER_BATCH, PRICE_REFERENCE_L1_GAS} from "contracts/common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 
 /// @notice The price-change bound of `setTokenMultiplier` and `changeFeeParams` once Priority Mode can be
@@ -13,7 +13,6 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 /// the denominator turns the reference L1 gas price into `nominator`, the batch overhead adds exactly that
 /// to the L2 gas price, and the pubdata term stays below it.
 contract PriceChangeBoundTest is AdminTest {
-    uint32 internal constant MAX_L2_GAS_PER_BATCH = 80_000_000;
     uint128 internal constant DENOMINATOR = uint128(PRICE_REFERENCE_L1_GAS);
 
     address internal chainTypeManager;
@@ -31,9 +30,9 @@ contract PriceChangeBoundTest is AdminTest {
         return
             FeeParams({
                 pubdataPricingMode: PubdataPricingMode.Rollup,
-                batchOverheadL1Gas: MAX_L2_GAS_PER_BATCH,
+                batchOverheadL1Gas: DEFAULT_MAX_L2_GAS_PER_BATCH,
                 maxPubdataPerBatch: 110_000,
-                maxL2GasPerBatch: MAX_L2_GAS_PER_BATCH,
+                maxL2GasPerBatch: DEFAULT_MAX_L2_GAS_PER_BATCH,
                 priorityTxMaxPubdata: 99_000,
                 minimalL2GasPrice: _minimalL2GasPrice
             });
