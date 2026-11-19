@@ -12,7 +12,10 @@ import {
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 // import {IInteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
-import {AtomicFlowPreimage, ATOMIC_FLOW_PREIMAGE_VERSION} from "contracts/atomic-interop/IAtomicInterop.sol";
+import {
+    AtomicFlowPreimage,
+    ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY
+} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {AmountMustBeGreaterThanZero, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -161,11 +164,11 @@ library InteropLibrary {
             IERC7786Attributes.atomicBundle,
             (
                 AtomicFlowPreimage({
-                    version: ATOMIC_FLOW_PREIMAGE_VERSION,
+                    version: ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY,
                     deadline: type(uint64).max,
                     settlementLayerChainId: 0,
                     legBundleHashes: new bytes32[](0),
-                    legSourceChainIds: new uint256[](0)
+                    legChainIds: new uint256[](0)
                 }),
                 uint256(0)
             )

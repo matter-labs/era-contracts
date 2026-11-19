@@ -12,29 +12,31 @@ All defined in `atomic-interop/IAtomicInterop.sol` unless noted.
 
 | Type                  | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AtomicFlowPreimage`  | The hashed field set that defines a flow: `version` (a `bytes1` format tag), `deadline` (a settlement-layer timestamp), `settlementLayerChainId`, `legBundleHashes[]`, `legSourceChainIds[]`.                                                                                                                                                                                                                                           |
+| `AtomicFlowPreimage`  | The hashed field set that defines a flow: `version` (a `bytes1` format tag), `deadline` (a settlement-layer timestamp), `settlementLayerChainId`, `legBundleHashes[]`, `legChainIds[]`.                                                                                                                                                                                                                                                 |
 | `AtomicFlow`          | `{ flowId, preimage }`. `flowId` is always recomputed from `preimage` and matched before use, so it is a convenience field, never a trust anchor.                                                                                                                                                                                                                                                                                       |
 | `ImtProof`            | One IMT proof against a source chain's commitment tree — used for both inclusion (finality) and non-inclusion (timeout). See below and proofs.md.                                                                                                                                                                                                                                                                                       |
-| `AtomicFinalityProof` | `{ flow, proofs[] }` — the flow definition plus one inclusion proof per leg, in `legBundleHashes` order. The whole thing a destination needs to execute.                                                                                                                                                                                                                                                                                |
+| `AtomicFinalityProof` | `{ flow, proofs[] }` — the flow definition plus one inclusion proof per entry of `legChainIds`, in that order. The whole thing a destination needs to execute.                                                                                                                                                                                                                                                                          |
 | `LegState`            | Per-`(flowId, bundleHash)` source-leg lifecycle: `Unset -> Committed -> Revertable -> Reverted`.                                                                                                                                                                                                                                                                                                                                        |
 | `AtomicSend`          | Out-of-band send metadata (`interop/IInteropCenter.sol`): `{ flowPreimage, lowNullifierIndex, isAtomic }`, parsed from the `atomicBundle` ERC-7786 attribute by `InteropAttributeParser.parseAtomicSend`. `isAtomic` is simply "the attribute was present" — the `InteropCenter` requires it for every L2->L2 send and forbids it for an L2->L1 withdrawal. Never enters the bundle, so `bundleHash` stays independent of the preimage. |
 
 ### The preimage `version`
 
 `AtomicFlowPreimage.version` is a `bytes1` format tag, following the same convention as
-`INTEROP_BUNDLE_VERSION` / `INTEROP_CALL_VERSION`. The only value the manager accepts today is
-`ATOMIC_FLOW_PREIMAGE_VERSION` (`0x01`); anything else reverts with `ManagerFlowPreimageVersionMismatch`.
+`INTEROP_BUNDLE_VERSION` / `INTEROP_CALL_VERSION`. The manager accepts `ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY`
+(`0x01`) and `ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED` (`0x02`, see {protocol-docs/atomicity/acceptance.md});
+anything else reverts with `ManagerFlowPreimageVersionMismatch`.
 Because `version` is a hashed field, a preimage of one version can never collide with — or be
 reinterpreted under the rules of — another. A new value is introduced whenever the field set or its
 canonicalization changes, and introducing one does not retire the old: the manager is expected to accept
 every live version on **all** paths (append, finalize, refund), so flows sent under a prior version stay
 finalizable and refundable while in flight.
 
-### `legBundleHashes` vs `legSourceChainIds`
+### `legBundleHashes` vs `legChainIds`
 
 `legBundleHashes` is **strictly ascending** — it is the canonical, deduplicated set of legs, and its
-ordering is what makes `flowId` canonical (any permutation would hash differently). `legSourceChainIds`
-is **positional**: entry `i` is the source chain of leg `i`, aligned 1:1 with `legBundleHashes`. It may
+ordering is what makes `flowId` canonical (any permutation would hash differently). `legChainIds`
+is **positional**: entry `i` is the source chain of leg `i`, aligned 1:1 with `legBundleHashes` (an accepted flow
+appends the `n` destination chains, see {protocol-docs/atomicity/acceptance.md#commitments}). It may
 repeat and need not be sorted, so only its length is validated. It is deliberately _not_ a set: if it
 were, a sibling chain present in the set could authorize a wrong-chain refund (see the source-chain
 binding in {protocol-docs/atomicity/recovery.md} and proofs.md).
@@ -61,7 +63,7 @@ lowNullifierIndex, preimage)`. `append`:
 1. **Recomputes and validates `flowId`** from the preimage (`_validateAndComputeFlowId`): `version`
    manager-supported (`ManagerFlowPreimageVersionMismatch`), at most `MAX_ATOMIC_FLOW_LEGS` (8) legs
    (`ManagerTooManyLegs` — appending is cheap, but finalization verifies one Merkle proof per leg),
-   `legBundleHashes` strictly ascending, `legSourceChainIds` length matching.
+   `legBundleHashes` strictly ascending, `legChainIds` length matching.
 2. **Requires L1 settlement** (`_checkSettlementLayerIsL1`) — this release anchors proofs only on the L1
    message root (see {protocol-docs/atomicity/security.md#trust-assumptions}).
 3. **Rejects flows whose deadline verifiably passed** (`ManagerFlowDeadlinePassed`): if a
@@ -71,7 +73,7 @@ lowNullifierIndex, preimage)`. `append`:
    expired-flow guard (imported roots lag the SL clock); what it enforces unconditionally is ordering:
    once a leg of the flow was reverted on this chain, no new leg can ever be committed here.
 4. **Requires the committing bundle to be one of the legs**, declared with **this** chain as its source
-   (`legSourceChainIds[legIndex] == block.chainid`). A wrong or stale preimage — e.g. an off-chain
+   (`legChainIds[legIndex] == block.chainid`). A wrong or stale preimage — e.g. an off-chain
    bundle-hash prediction invalidated by an encoding change — reverts the whole send, burn included,
    rather than committing a leg under a `flowId` that could neither finalize nor be refunded.
 5. **Requires every _other_ leg to declare a Bridgehub-registered source chain**
@@ -98,8 +100,9 @@ atomic-specific happens here; the same channel carries all interop roots.
 finality)`, which:
 
 - re-checks `flowId` and L1 settlement;
-- requires exactly one proof per leg (`ManagerProofCountMismatch`);
-- for **every** leg, checks the proof's `sourceChainId` equals the declared `legSourceChainIds[i]`, that this
+- requires exactly one proof per entry of `legChainIds` (`ManagerProofCountMismatch`): per leg, plus per
+  acceptance in an accepted flow;
+- for **every** leg, checks the proof's `sourceChainId` equals the declared `legChainIds[i]`, that this
   chain accepts that source ({protocol-docs/interop-gating.md#receive-filter}), and runs
   `AtomicInteropProof.verifyInclusion` against the leg's `commitValue`, the flow `deadline`, and the
   settlement layer;
@@ -129,14 +132,16 @@ recorded at `initL2`.
 
 ### Entry points
 
-| Function                                          | Caller            | Effect                                                                                    |
-| ------------------------------------------------- | ----------------- | ----------------------------------------------------------------------------------------- |
-| `append(bundleHash, lowNullifierIndex, preimage)` | `InteropCenter`   | Validate + commit a leg (step 1). `Unset -> Committed`.                                   |
-| `requireFlowFinalized(bundleHash, finality)`      | `InteropHandler`  | `view`. Prove every leg committed in time (step 3). No state change.                      |
-| `authorizeRefund(flow, missingLegIndex, absence)` | anyone            | Prove a leg absent past the deadline; flip this chain's `Committed` legs `-> Revertable`. |
-| `claimRefund(flowId, bundle)`                     | anyone            | Reverse a `Revertable` leg's burn; `-> Reverted`. See recovery.md.                        |
-| `legState(flowId, bundleHash)`                    | anyone            | `view` accessor.                                                                          |
-| `initL2(l1ChainId)`                               | `ComplexUpgrader` | One-time genesis wiring: records `L1_CHAIN_ID`. Rejects a zero id and a second call.      |
+| Function                                                              | Caller            | Effect                                                                                    |
+| --------------------------------------------------------------------- | ----------------- | ----------------------------------------------------------------------------------------- |
+| `append(bundleHash, destinationChainId, lowNullifierIndex, preimage)` | `InteropCenter`   | Validate + commit a leg (step 1). `Unset -> Committed`.                                   |
+| `accept(bundleHash, lowNullifierIndex, preimage)`                     | `InteropHandler`  | Accepted flows: insert this chain's acceptance of a leg. See acceptance.md.               |
+| `requireFlowFinalized(bundleHash, finality)`                          | `InteropHandler`  | `view`. Prove every leg committed in time (step 3). No state change.                      |
+| `authorizeRefund(flow, missingLegIndex, absence)`                     | anyone            | Prove a leg absent past the deadline; flip this chain's `Committed` legs `-> Revertable`. |
+| `claimRefund(flowId, bundle)`                                         | anyone            | Reverse a `Revertable` leg's burn; `-> Reverted`. See recovery.md.                        |
+| `legState(flowId, bundleHash)`                                        | anyone            | `view` accessor.                                                                          |
+| `legAccepted(flowId, bundleHash)`                                     | anyone            | `view` accessor for this chain's acceptances.                                             |
+| `initL2(l1ChainId)`                                                   | `ComplexUpgrader` | One-time genesis wiring: records `L1_CHAIN_ID`. Rejects a zero id and a second call.      |
 
 `append` and `requireFlowFinalized` are gated to the canonical `InteropCenter` / `InteropHandler`
 addresses (`onlyInteropCenter` / `onlyInteropHandler`, reverting `ManagerNotInteropCenter` /
@@ -160,4 +165,4 @@ because it never holds funds.
 so the canonical shape (`flowId = keccak256(abi.encode(preimage))`, supported `version`, ascending leg
 hashes, aligned source ids) cannot drift between the path that commits a leg and the path that later
 spends the proof. Any mismatch reverts (`ManagerFlowIdMismatch`, `ManagerFlowPreimageVersionMismatch`,
-`ManagerBundleHashesNotSorted`, `ManagerLegSourceChainIdsLengthMismatch`).
+`ManagerBundleHashesNotSorted`, `ManagerLegChainIdsLengthMismatch`).

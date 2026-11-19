@@ -5,6 +5,56 @@
   },
   {
     "type": "function",
+    "name": "acceptAtomicBundle",
+    "inputs": [
+      {
+        "name": "_bundle",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_flowPreimage",
+        "type": "tuple",
+        "internalType": "struct AtomicFlowPreimage",
+        "components": [
+          {
+            "name": "version",
+            "type": "bytes1",
+            "internalType": "bytes1"
+          },
+          {
+            "name": "deadline",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "settlementLayerChainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "legBundleHashes",
+            "type": "bytes32[]",
+            "internalType": "bytes32[]"
+          },
+          {
+            "name": "legChainIds",
+            "type": "uint256[]",
+            "internalType": "uint256[]"
+          }
+        ]
+      },
+      {
+        "name": "_lowNullifierIndex",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "bundleStatus",
     "inputs": [
       {
@@ -96,7 +146,7 @@
                     "internalType": "bytes32[]"
                   },
                   {
-                    "name": "legSourceChainIds",
+                    "name": "legChainIds",
                     "type": "uint256[]",
                     "internalType": "uint256[]"
                   }
@@ -285,7 +335,7 @@
                     "internalType": "bytes32[]"
                   },
                   {
-                    "name": "legSourceChainIds",
+                    "name": "legChainIds",
                     "type": "uint256[]",
                     "internalType": "uint256[]"
                   }

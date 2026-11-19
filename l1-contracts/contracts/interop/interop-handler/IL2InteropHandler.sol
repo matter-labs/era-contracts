@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
-import {AtomicFinalityProof} from "../../atomic-interop/IAtomicInterop.sol";
+import {AtomicFinalityProof, AtomicFlowPreimage} from "../../atomic-interop/IAtomicInterop.sol";
 import {IInteropHandlerBase} from "./IInteropHandlerBase.sol";
 
 /// @notice L2 interop handler surface: the proof-agnostic {IInteropHandlerBase} plus the atomic-proof-typed
@@ -12,6 +12,18 @@ import {IInteropHandlerBase} from "./IInteropHandlerBase.sol";
 /// `L2_INTEROP_HANDLER` built-in against an interface instead of importing the implementation (which itself
 /// imports {L2ContractInterfaces}, i.e. it breaks that import cycle).
 interface IL2InteropHandler is IInteropHandlerBase {
+    /// @notice Accepts a leg of an accepted atomic flow whose destination is this chain, before the flow's
+    /// deadline: inserts the leg's accept value into this chain's IMT. Permissionless; the chain's operator
+    /// decides what it includes. See {protocol-docs/atomicity/acceptance.md}.
+    /// @param _bundle ABI-encoded InteropBundle of the leg.
+    /// @param _flowPreimage The flow's full `flowId` preimage.
+    /// @param _lowNullifierIndex The low-nullifier slot for the accept value (from the IMT engine).
+    function acceptAtomicBundle(
+        bytes memory _bundle,
+        AtomicFlowPreimage calldata _flowPreimage,
+        uint256 _lowNullifierIndex
+    ) external;
+
     /// @notice Executes a full atomic interop bundle, gated by per-leg IMT inclusion proofs.
     /// @dev Named distinctly from {L1InteropHandler.executeBundle} (which takes a `MessageInclusionProof`) so
     /// the atomic vs L1-message-inclusion path is obvious at the call site.

@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {IndexedMerkleTree} from "../../common/libraries/IndexedMerkleTree.sol";
 import {Merkle} from "../../common/libraries/Merkle.sol";
-import {ImtProof, ATOMIC_COMMIT_LEAF_TAG} from "../IAtomicInterop.sol";
+import {ImtProof, ATOMIC_COMMIT_LEAF_TAG, ATOMIC_ACCEPT_LEAF_TAG} from "../IAtomicInterop.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
 import {ChainBatchRootTree} from "../../common/libraries/ChainBatchRootTree.sol";
 import {L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_VERIFICATION} from "../../common/l2-helpers/L2ContractInterfaces.sol";
@@ -33,6 +33,11 @@ library AtomicInteropProof {
     /// @notice The value inserted into a chain's IMT when a flow leg is committed.
     function commitValue(bytes32 _flowId, bytes32 _specHash) internal pure returns (uint256) {
         return uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, _flowId, _specHash)));
+    }
+
+    /// @notice The value a destination chain inserts into its IMT when it accepts a flow leg.
+    function acceptValue(bytes32 _flowId, bytes32 _bundleHash) internal pure returns (uint256) {
+        return uint256(keccak256(abi.encode(ATOMIC_ACCEPT_LEAF_TAG, _flowId, _bundleHash)));
     }
 
     /// @notice Verifies `_commitValue` is present in `_proof.sourceChainId`'s batch-END IMT root as of
@@ -70,7 +75,7 @@ library AtomicInteropProof {
     /// @notice Timeout proof: shows `_commitValue` was not committed by the deadline and the flow can
     /// never finalize (the timeout condition from the library header, either branch).
     /// @dev The caller ({AtomicFlowManager.authorizeRefund}) checks
-    /// `_proof.sourceChainId == legSourceChainIds[i]`; the SL match is checked here.
+    /// `_proof.sourceChainId == legChainIds[i]`; the SL match is checked here.
     /// @param _absence Non-inclusion proof against the begin (late batch) or end (last in-time batch)
     /// IMT root.
     /// @param _expectedSlChainId The flow's `settlementLayerChainId` the proof's root must settle on.

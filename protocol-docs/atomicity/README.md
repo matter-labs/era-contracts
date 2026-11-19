@@ -21,14 +21,15 @@ from L1 data; nothing reads it on L1. See {protocol-docs/atomicity/security.md#d
 This folder is the **canonical home** for the atomic-interop protocol. It is layered: each file opens
 with an engineer-facing summary and defers the rigorous arguments to clearly-marked deep-dive sections.
 
-| File                         | Covers                                                                                                   | Audience              |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------- |
-| this README                  | What atomic interop is, the key values, a lifecycle tour, contracts, genesis, tooling                    | everyone (start here) |
-| [imt.md](./imt.md)           | The per-chain commitment tree: how the IMT is used, seeded, and read by the bootloader                   | engineers             |
-| [flow.md](./flow.md)         | End-to-end lifecycle, the shared data structures, and the `AtomicFlowManager` state machine              | engineers             |
-| [proofs.md](./proofs.md)     | The proof system: the two authenticated clocks, finality, the timeout branches, soundness & completeness | auditors              |
-| [recovery.md](./recovery.md) | The timeout/refund path and its best-effort recovery semantics                                           | engineers + auditors  |
-| [security.md](./security.md) | Guarantees, non-guarantees, on-chain preconditions, trust assumptions, edge cases                        | auditors              |
+| File                             | Covers                                                                                                   | Audience              |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------- |
+| this README                      | What atomic interop is, the key values, a lifecycle tour, contracts, genesis, tooling                    | everyone (start here) |
+| [imt.md](./imt.md)               | The per-chain commitment tree: how the IMT is used, seeded, and read by the bootloader                   | engineers             |
+| [flow.md](./flow.md)             | End-to-end lifecycle, the shared data structures, and the `AtomicFlowManager` state machine              | engineers             |
+| [proofs.md](./proofs.md)         | The proof system: the two authenticated clocks, finality, the timeout branches, soundness & completeness | auditors              |
+| [recovery.md](./recovery.md)     | The timeout/refund path and its best-effort recovery semantics                                           | engineers + auditors  |
+| [acceptance.md](./acceptance.md) | Accepted flows (`0x02`): receipt of each leg on its destination and timeout refunds for missing receipts | engineers + auditors  |
+| [security.md](./security.md)     | Guarantees, non-guarantees, on-chain preconditions, trust assumptions, edge cases                        | auditors              |
 
 The atomic protocol's **integration** with the surrounding stack is documented where that stack lives,
 and referenced from here rather than restated: the interop send/execute wiring in
@@ -42,7 +43,7 @@ machinery in {protocol-docs/message-root.md}.
   bundle. Chain-specific, because `sourceChainId` is one of the bundle's own fields.
 - `flowId = keccak256(abi.encode(preimage))` — binds the preimage `version`, all legs, each leg's source
   chain, the deadline, and the settlement layer. `legBundleHashes` is strictly ascending (a canonical,
-  deduplicated order); `legSourceChainIds` is positional (aligned 1:1, may repeat); `deadline` is a
+  deduplicated order); `legChainIds` is positional (aligned 1:1, may repeat); `deadline` is a
   settlement-layer timestamp. See {protocol-docs/atomicity/flow.md#data-structures}.
 - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))` — the IMT
   leaf value for a leg. It bakes in `flowId` (hence all legs) and the chain-specific `bundleHash`, so a
@@ -51,7 +52,7 @@ machinery in {protocol-docs/message-root.md}.
   bound to the source chain (see {protocol-docs/atomicity/proofs.md}).
 
 The atomic-send parameters (the full `flowId` **preimage** — `version`, `deadline`,
-`settlementLayerChainId`, `legBundleHashes`, `legSourceChainIds` — plus `lowNullifierIndex`) travel
+`settlementLayerChainId`, `legBundleHashes`, `legChainIds` — plus `lowNullifierIndex`) travel
 out-of-band as the ERC-7786
 `atomicBundle((bytes1,uint64,uint256,bytes32[],uint256[]),uint256)` bundle attribute — deliberately **not**
 part of the bundle, so `bundleHash` does not depend on the preimage (which would be circular: the
@@ -73,6 +74,9 @@ interop-side send wiring.
    then do the bundle's calls execute.
 4. **Timeout / refund.** If a leg never commits in time, a single absence proof authorizes refunds; each
    committed leg reverses its own burn best-effort.
+
+In an **accepted flow** each destination also accepts its leg into its own IMT between steps 1 and 3, and
+finality and the timeout cover those acceptances like commits. See [acceptance.md](./acceptance.md).
 
 Steps 1 and 3–4 are detailed in [flow.md](./flow.md); the proof mechanics of steps 3–4 in
 [proofs.md](./proofs.md); the refund in [recovery.md](./recovery.md); step 2's channel in

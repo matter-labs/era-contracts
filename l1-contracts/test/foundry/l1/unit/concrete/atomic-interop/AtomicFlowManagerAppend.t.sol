@@ -9,7 +9,8 @@ import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitm
 import {
     AtomicFlowPreimage,
     LegState,
-    ATOMIC_FLOW_PREIMAGE_VERSION,
+    ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY,
+    ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED,
     MAX_ATOMIC_FLOW_LEGS
 } from "contracts/atomic-interop/IAtomicInterop.sol";
 import {
@@ -19,8 +20,8 @@ import {
     ManagerFlowDeadlinePassed,
     ManagerFlowPreimageVersionMismatch,
     ManagerLegAlreadyCommitted,
-    ManagerLegSourceChainIdsLengthMismatch,
-    ManagerLegSourceChainNotRegistered,
+    ManagerLegChainIdsLengthMismatch,
+    ManagerLegChainNotRegistered,
     ManagerNotInteropCenter,
     ManagerSettlementLayerNotL1,
     ManagerTooManyLegs
@@ -89,7 +90,7 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
 
     function _appendAsInteropCenter(bytes32 _bundleHash, AtomicFlowPreimage memory _preimage) internal {
         vm.prank(L2_INTEROP_CENTER_ADDR);
-        manager.append(_bundleHash, 0, _preimage);
+        manager.append(_bundleHash, AtomicFlowFixtures.UNCHECKED_DESTINATION, 0, _preimage);
     }
 
     function _appendAsInteropCenterWithLowNullifier(
@@ -98,7 +99,7 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
         AtomicFlowPreimage memory _preimage
     ) internal {
         vm.prank(L2_INTEROP_CENTER_ADDR);
-        manager.append(_bundleHash, _lowNullifierIndex, _preimage);
+        manager.append(_bundleHash, AtomicFlowFixtures.UNCHECKED_DESTINATION, _lowNullifierIndex, _preimage);
     }
 
     /// @notice Two legs of the same flow commit in sequence and the tree links them in value order.
@@ -111,14 +112,14 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
 
         // Both legs are local so both can be committed here; hashes must be strictly ascending.
         AtomicFlowPreimage memory preimage;
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY;
         preimage.deadline = DEADLINE;
         preimage.settlementLayerChainId = L1_CHAIN_ID;
         preimage.legBundleHashes = new bytes32[](2);
-        preimage.legSourceChainIds = new uint256[](2);
+        preimage.legChainIds = new uint256[](2);
         (preimage.legBundleHashes[0], preimage.legBundleHashes[1]) = legA < legB ? (legA, legB) : (legB, legA);
-        preimage.legSourceChainIds[0] = block.chainid;
-        preimage.legSourceChainIds[1] = block.chainid;
+        preimage.legChainIds[0] = block.chainid;
+        preimage.legChainIds[1] = block.chainid;
         bytes32 flowId = AtomicFlowFixtures.flowId(preimage);
 
         // Insert in commit-value order: the smaller value brackets at the head, the larger at leaf 1.
@@ -172,21 +173,21 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
     /// @notice Pins the v1 version literal: it is mirrored off-chain by hand in
     /// `test/anvil-interop/src/helpers/imt-engine-lib.ts`, so a bump must break something here.
     function test_atomicFlowPreimageVersion_isPinnedToV1() public pure {
-        assertEq(ATOMIC_FLOW_PREIMAGE_VERSION, bytes1(0x01), "v1 preimage version literal must be pinned");
+        assertEq(ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY, bytes1(0x01), "v1 preimage version literal must be pinned");
     }
 
-    /// @notice `append` rejects a preimage whose `version` the manager does not support (0x02 here),
-    /// so it can never commit a leg. See {ATOMIC_FLOW_PREIMAGE_VERSION}.
+    /// @notice `append` rejects a preimage whose `version` the manager does not support (0x03 here),
+    /// so it can never commit a leg. The error names the latest supported version.
     function test_append_RevertWhen_FlowPreimageVersionMismatch() public {
         bytes32 localLeg = keccak256("local leg");
         AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
-        bytes1 unknownVersion = 0x02;
+        bytes1 unknownVersion = 0x03;
         preimage.version = unknownVersion;
 
         vm.expectRevert(
             abi.encodeWithSelector(
                 ManagerFlowPreimageVersionMismatch.selector,
-                ATOMIC_FLOW_PREIMAGE_VERSION,
+                ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED,
                 unknownVersion
             )
         );
@@ -236,10 +237,7 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
             preimage.legBundleHashes[1],
             preimage.legBundleHashes[0]
         );
-        (preimage.legSourceChainIds[0], preimage.legSourceChainIds[1]) = (
-            preimage.legSourceChainIds[1],
-            preimage.legSourceChainIds[0]
-        );
+        (preimage.legChainIds[0], preimage.legChainIds[1]) = (preimage.legChainIds[1], preimage.legChainIds[0]);
 
         vm.expectRevert(ManagerBundleHashesNotSorted.selector);
         _appendAsInteropCenter(localLeg, preimage);
@@ -263,10 +261,10 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
     function test_append_RevertWhen_SourceChainIdsLengthMismatch() public {
         bytes32 localLeg = keccak256("local leg");
         AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
-        preimage.legSourceChainIds = new uint256[](1);
-        preimage.legSourceChainIds[0] = block.chainid;
+        preimage.legChainIds = new uint256[](1);
+        preimage.legChainIds[0] = block.chainid;
 
-        vm.expectRevert(abi.encodeWithSelector(ManagerLegSourceChainIdsLengthMismatch.selector, 2, 1));
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegChainIdsLengthMismatch.selector, 2, 1));
         _appendAsInteropCenter(localLeg, preimage);
     }
 
@@ -289,10 +287,10 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
         AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
         uint256 unregisteredChainId = 888;
         // Redeclare the remote leg's source as a chain id absent from the Bridgehub registry.
-        uint256 remoteIdx = preimage.legSourceChainIds[0] == OTHER_CHAIN_ID ? 0 : 1;
-        preimage.legSourceChainIds[remoteIdx] = unregisteredChainId;
+        uint256 remoteIdx = preimage.legChainIds[0] == OTHER_CHAIN_ID ? 0 : 1;
+        preimage.legChainIds[remoteIdx] = unregisteredChainId;
 
-        vm.expectRevert(abi.encodeWithSelector(ManagerLegSourceChainNotRegistered.selector, unregisteredChainId));
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegChainNotRegistered.selector, unregisteredChainId));
         _appendAsInteropCenter(localLeg, preimage);
     }
 
@@ -306,17 +304,17 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
         uint256 unregisteredChainId = 888;
 
         AtomicFlowPreimage memory preimage;
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY;
         preimage.deadline = DEADLINE;
         preimage.settlementLayerChainId = L1_CHAIN_ID;
         preimage.legBundleHashes = new bytes32[](2);
         preimage.legBundleHashes[0] = coLeg;
         preimage.legBundleHashes[1] = localLeg;
-        preimage.legSourceChainIds = new uint256[](2);
-        preimage.legSourceChainIds[0] = unregisteredChainId;
-        preimage.legSourceChainIds[1] = block.chainid;
+        preimage.legChainIds = new uint256[](2);
+        preimage.legChainIds[0] = unregisteredChainId;
+        preimage.legChainIds[1] = block.chainid;
 
-        vm.expectRevert(abi.encodeWithSelector(ManagerLegSourceChainNotRegistered.selector, unregisteredChainId));
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegChainNotRegistered.selector, unregisteredChainId));
         _appendAsInteropCenter(localLeg, preimage);
     }
 
@@ -326,10 +324,10 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
     function test_append_RevertWhen_CoLegSourceChainIsL1() public {
         bytes32 localLeg = keccak256("local leg");
         AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
-        uint256 remoteIdx = preimage.legSourceChainIds[0] == OTHER_CHAIN_ID ? 0 : 1;
-        preimage.legSourceChainIds[remoteIdx] = L1_CHAIN_ID;
+        uint256 remoteIdx = preimage.legChainIds[0] == OTHER_CHAIN_ID ? 0 : 1;
+        preimage.legChainIds[remoteIdx] = L1_CHAIN_ID;
 
-        vm.expectRevert(abi.encodeWithSelector(ManagerLegSourceChainNotRegistered.selector, L1_CHAIN_ID));
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegChainNotRegistered.selector, L1_CHAIN_ID));
         _appendAsInteropCenter(localLeg, preimage);
     }
 
@@ -340,14 +338,14 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
         bytes32 legA = keccak256("local leg A");
         bytes32 legB = keccak256("local leg B");
         AtomicFlowPreimage memory preimage;
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY;
         preimage.deadline = DEADLINE;
         preimage.settlementLayerChainId = L1_CHAIN_ID;
         preimage.legBundleHashes = new bytes32[](2);
-        preimage.legSourceChainIds = new uint256[](2);
+        preimage.legChainIds = new uint256[](2);
         (preimage.legBundleHashes[0], preimage.legBundleHashes[1]) = legA < legB ? (legA, legB) : (legB, legA);
-        preimage.legSourceChainIds[0] = block.chainid;
-        preimage.legSourceChainIds[1] = block.chainid;
+        preimage.legChainIds[0] = block.chainid;
+        preimage.legChainIds[1] = block.chainid;
 
         _appendAsInteropCenter(legA, preimage);
         assertEq(
@@ -455,6 +453,6 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
         AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
 
         vm.expectRevert(abi.encodeWithSelector(ManagerNotInteropCenter.selector, address(this)));
-        manager.append(localLeg, 0, preimage);
+        manager.append(localLeg, AtomicFlowFixtures.UNCHECKED_DESTINATION, 0, preimage);
     }
 }

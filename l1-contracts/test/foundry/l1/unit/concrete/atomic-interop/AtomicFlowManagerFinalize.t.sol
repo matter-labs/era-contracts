@@ -10,14 +10,14 @@ import {
     AtomicFlowPreimage,
     AtomicFinalityProof,
     ImtProof,
-    ATOMIC_FLOW_PREIMAGE_VERSION
+    ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY
 } from "contracts/atomic-interop/IAtomicInterop.sol";
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {
     ManagerFlowIdMismatch,
     ManagerProofCountMismatch,
     ManagerExecutingBundleNotInFlow,
-    ManagerLegSourceChainNotAllowed,
+    ManagerLegChainNotAllowed,
     ManagerNotInteropHandler,
     ProofSourceChainMismatch,
     ProofDeadlineExceeded
@@ -60,22 +60,22 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
         bytes32 legB = keccak256("finalize leg B");
         (legFirst, legSecond) = legA < legB ? (legA, legB) : (legB, legA);
 
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY;
         preimage.deadline = DEADLINE;
         preimage.settlementLayerChainId = SETTLEMENT_LAYER_CHAIN_ID;
         preimage.legBundleHashes = new bytes32[](2);
         preimage.legBundleHashes[0] = legFirst;
         preimage.legBundleHashes[1] = legSecond;
-        preimage.legSourceChainIds = new uint256[](2);
-        preimage.legSourceChainIds[0] = CHAIN_A;
-        preimage.legSourceChainIds[1] = CHAIN_B;
+        preimage.legChainIds = new uint256[](2);
+        preimage.legChainIds[0] = CHAIN_A;
+        preimage.legChainIds[1] = CHAIN_B;
         flowId = AtomicFlowFixtures.flowId(preimage);
 
         legFirstIndex = _insertCommit(AtomicFlowFixtures.commitValue(flowId, legFirst));
         legSecondIndex = _insertCommit(AtomicFlowFixtures.commitValue(flowId, legSecond));
 
-        _setLegSourceAllowed(CHAIN_A, true);
-        _setLegSourceAllowed(CHAIN_B, true);
+        _setLegChainAllowed(CHAIN_A, true);
+        _setLegChainAllowed(CHAIN_B, true);
     }
 
     /// @dev A finality proof with a genuine in-time inclusion proof per leg; `_tsFirst`/`_tsSecond` are
@@ -181,9 +181,9 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
     /// fails the gate even with a genuine in-time inclusion proof.
     function test_RevertWhen_LegSourceNotAllowed() public {
         AtomicFinalityProof memory finality = _validFinality();
-        _setLegSourceAllowed(CHAIN_B, false);
+        _setLegChainAllowed(CHAIN_B, false);
 
-        vm.expectRevert(abi.encodeWithSelector(ManagerLegSourceChainNotAllowed.selector, CHAIN_B));
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegChainNotAllowed.selector, CHAIN_B));
         _requireFinalizedAsHandler(legFirst, finality);
     }
 

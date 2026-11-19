@@ -17,12 +17,12 @@ import {
     AtomicFlowPreimage,
     ImtProof,
     LegState,
-    ATOMIC_FLOW_PREIMAGE_VERSION
+    ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY
 } from "contracts/atomic-interop/IAtomicInterop.sol";
 import {
     ManagerCommittedBundleNotInFlow,
     ManagerLegNotRevertable,
-    ManagerLegSourceChainNotRegistered
+    ManagerLegChainNotRegistered
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropBundle, InteropCallStarter} from "contracts/common/Messaging.sol";
@@ -191,16 +191,16 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
     function _preimageWithInvalidRemoteLeg(
         bytes32 _localLeg
     ) internal view returns (AtomicFlowPreimage memory preimage, uint256 missingLegIndex) {
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY;
         preimage.deadline = DEADLINE;
         preimage.settlementLayerChainId = L1_CHAIN_ID;
         preimage.legBundleHashes = new bytes32[](2);
-        preimage.legSourceChainIds = new uint256[](2);
+        preimage.legChainIds = new uint256[](2);
         (uint256 localIndex, uint256 remoteIndex) = _localLeg < INVALID_REMOTE_LEG ? (0, 1) : (1, 0);
         preimage.legBundleHashes[localIndex] = _localLeg;
         preimage.legBundleHashes[remoteIndex] = INVALID_REMOTE_LEG;
-        preimage.legSourceChainIds[localIndex] = block.chainid;
-        preimage.legSourceChainIds[remoteIndex] = destinationChainId;
+        preimage.legChainIds[localIndex] = block.chainid;
+        preimage.legChainIds[remoteIndex] = destinationChainId;
         missingLegIndex = remoteIndex;
     }
 
@@ -403,13 +403,13 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         bytes32 predicted = _predictBundleHash(calls, salt);
         // Well-formed preimage that does not contain the bundle being sent (e.g. a stale prediction).
         AtomicFlowPreimage memory preimage;
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY;
         preimage.deadline = DEADLINE;
         preimage.settlementLayerChainId = L1_CHAIN_ID;
         preimage.legBundleHashes = new bytes32[](1);
         preimage.legBundleHashes[0] = INVALID_REMOTE_LEG;
-        preimage.legSourceChainIds = new uint256[](1);
-        preimage.legSourceChainIds[0] = block.chainid;
+        preimage.legChainIds = new uint256[](1);
+        preimage.legChainIds[0] = block.chainid;
 
         uint256 balanceBefore = IERC20(l2Token).balanceOf(address(this));
 
@@ -761,10 +761,10 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         bytes32 predicted = _predictBundleHash(calls, salt);
         (AtomicFlowPreimage memory preimage, uint256 remoteIndex) = _preimageWithInvalidRemoteLeg(predicted);
         // Redeclare the co-leg's source as a chain id never registered in the (real) registry.
-        preimage.legSourceChainIds[remoteIndex] = phantomChainId;
+        preimage.legChainIds[remoteIndex] = phantomChainId;
 
         uint256 balanceBefore = IERC20(l2Token).balanceOf(address(this));
-        vm.expectRevert(abi.encodeWithSelector(ManagerLegSourceChainNotRegistered.selector, phantomChainId));
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegChainNotRegistered.selector, phantomChainId));
         l2InteropCenter.sendBundle(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
@@ -814,13 +814,13 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
 
         // Single all-local leg flow whose only leg is this predicted message bundle.
         AtomicFlowPreimage memory preimage;
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY;
         preimage.deadline = DEADLINE;
         preimage.settlementLayerChainId = L1_CHAIN_ID;
         preimage.legBundleHashes = new bytes32[](1);
         preimage.legBundleHashes[0] = predicted;
-        preimage.legSourceChainIds = new uint256[](1);
-        preimage.legSourceChainIds[0] = block.chainid;
+        preimage.legChainIds = new uint256[](1);
+        preimage.legChainIds[0] = block.chainid;
         bytes32 flowId = AtomicFlowFixtures.flowId(preimage);
 
         bytes[] memory attrs = new bytes[](2);

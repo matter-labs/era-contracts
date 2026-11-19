@@ -16,20 +16,24 @@ import {
     AtomicFlow,
     AtomicFlowPreimage,
     ImtProof,
-    ATOMIC_FLOW_PREIMAGE_VERSION
+    ATOMIC_ACCEPT_LEAF_TAG,
+    ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED,
+    ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY
 } from "contracts/atomic-interop/IAtomicInterop.sol";
+import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
 import {
     BundleAlreadyProcessed,
     ExecutingNotAllowed,
     WrongDestinationChainId
 } from "contracts/interop/InteropErrors.sol";
 import {IMTLeafValueMismatch} from "contracts/common/L1ContractErrors.sol";
-import {ManagerLegSourceChainNotAllowed} from "contracts/atomic-interop/AtomicInteropErrors.sol";
+import {ManagerLegChainNotAllowed} from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {BundleStatus, CallStatus, InteropBundle, InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {
+    L2_ATOMIC_FLOW_MANAGER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_INTEROP_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -134,16 +138,16 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         bytes32 predicted = _predictBundleHashWithAttrs(calls, predictionAttrs);
 
         AtomicFlowPreimage memory preimage;
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY;
         preimage.deadline = DEADLINE;
         preimage.settlementLayerChainId = L1_CHAIN_ID;
         preimage.legBundleHashes = new bytes32[](2);
-        preimage.legSourceChainIds = new uint256[](2);
+        preimage.legChainIds = new uint256[](2);
         (uint256 localIndex, uint256 remoteIndex) = predicted < REMOTE_LEG ? (0, 1) : (1, 0);
         preimage.legBundleHashes[localIndex] = predicted;
         preimage.legBundleHashes[remoteIndex] = REMOTE_LEG;
-        preimage.legSourceChainIds[localIndex] = block.chainid;
-        preimage.legSourceChainIds[remoteIndex] = destinationChainId;
+        preimage.legChainIds[localIndex] = block.chainid;
+        preimage.legChainIds[remoteIndex] = destinationChainId;
         ectxPreimage = preimage;
         ectx.flowId = AtomicFlowFixtures.flowId(preimage);
 
@@ -301,7 +305,7 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         vm.prank(SERVICE_TRANSACTION_SENDER);
         l2Bridgehub.deregisterChainForInterop(sourceChainId);
 
-        vm.expectRevert(abi.encodeWithSelector(ManagerLegSourceChainNotAllowed.selector, sourceChainId));
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegChainNotAllowed.selector, sourceChainId));
         _executeOnDestination(finality);
 
         L2InteropHandler handler = L2InteropHandler(L2_INTEROP_HANDLER_ADDR);
@@ -428,6 +432,147 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         AtomicFinalityProof memory emptyFinality;
         vm.expectRevert(abi.encodeWithSelector(BundleAlreadyProcessed.selector, ectx.bundleHash));
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyAtomicBundle(ectxBundleBytes, emptyFinality);
+    }
+
+    // Accepted flows: the destination accepts the leg before execution
+    // ({protocol-docs/atomicity/acceptance.md}). Source and destination share this EVM, so the canonical
+    // tree holds both the source's commit (leaf 1) and, after `acceptAtomicBundle`, the destination's
+    // acceptance (leaf 2); each finality proof binds its leaf to one chain via its `sourceChainId`.
+
+    uint256 internal constant ACCEPT_LEAF_INDEX = 2;
+
+    /// @dev Real send of a token-transfer leg as an accepted single-leg flow to `destinationChainId`.
+    function _sendAcceptedSingleLeg(bytes32 _salt) internal {
+        ectx.l2Token = initializeTokenByDeposit();
+        InteropCallStarter[] memory calls = _tokenCallStarter(ectx.l2Token, TRANSFER_AMOUNT, _receiver());
+        bytes[] memory predictionAttrs = new bytes[](1);
+        predictionAttrs[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (_salt));
+        bytes32 predicted = _predictBundleHashWithAttrs(calls, predictionAttrs);
+
+        AtomicFlowPreimage memory preimage;
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED;
+        preimage.deadline = DEADLINE;
+        preimage.settlementLayerChainId = L1_CHAIN_ID;
+        preimage.legBundleHashes = new bytes32[](1);
+        preimage.legBundleHashes[0] = predicted;
+        preimage.legChainIds = new uint256[](2);
+        preimage.legChainIds[0] = block.chainid;
+        preimage.legChainIds[1] = destinationChainId;
+        ectxPreimage = preimage;
+        ectx.flowId = AtomicFlowFixtures.flowId(preimage);
+
+        bytes[] memory attrs = new bytes[](2);
+        attrs[0] = predictionAttrs[0];
+        attrs[1] = abi.encodeCall(IERC7786Attributes.atomicBundle, (preimage, 0));
+        vm.recordLogs();
+        ectx.bundleHash = l2InteropCenter.sendBundle(
+            InteroperableAddress.formatEvmV1(destinationChainId),
+            calls,
+            attrs
+        );
+        assertEq(ectx.bundleHash, predicted, "the atomic bundle hash must match the preview prediction");
+        (, , InteropBundle memory sentBundle) = abi.decode(
+            extractFirstBundleFromLogs(vm.getRecordedLogs()),
+            (bytes32, bytes32, InteropBundle)
+        );
+        ectxBundleBytes = abi.encode(sentBundle);
+    }
+
+    /// @dev Finality for the accepted single-leg flow: the commit on the source, the acceptance on the
+    /// destination (`_acceptLeafIndex` in the canonical tree), both in time.
+    function _acceptedSingleLegFinality(
+        uint256 _sourceChainId,
+        uint256 _acceptLeafIndex
+    ) internal returns (AtomicFinalityProof memory finality) {
+        finality.flow = AtomicFlow({flowId: ectx.flowId, preimage: ectxPreimage});
+        finality.proofs = new ImtProof[](2);
+        finality.proofs[0] = _canonicalTreeInclusionProof(_sourceChainId, LOCAL_BATCH_NUMBER, 1, DEADLINE - 1);
+        finality.proofs[1] = _canonicalTreeInclusionProof(
+            destinationChainId,
+            REMOTE_BATCH_NUMBER,
+            _acceptLeafIndex,
+            DEADLINE - 1
+        );
+    }
+
+    /// @notice Happy path: the destination accepts the leg (accept value in its IMT, bundle still
+    /// `Unreceived`), and once the commit and the acceptance are proven in time the bundle executes.
+    function test_acceptAtomicBundle_ThenExecute_AcceptedSingleLeg() public {
+        _setUpAtomicStack();
+        _sendAcceptedSingleLeg(keccak256("accepted single leg salt"));
+        uint256 sourceChainId = block.chainid;
+        vm.chainId(destinationChainId);
+
+        vm.expectEmit(true, true, true, true, L2_ATOMIC_FLOW_MANAGER_ADDR);
+        emit IAtomicFlowManager.FlowAccepted(ectx.flowId, ectx.bundleHash, DEADLINE, ACCEPT_LEAF_INDEX);
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).acceptAtomicBundle(ectxBundleBytes, ectxPreimage, 0);
+
+        L2InteropHandler handler = L2InteropHandler(L2_INTEROP_HANDLER_ADDR);
+        assertTrue(
+            IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).legAccepted(ectx.flowId, ectx.bundleHash),
+            "acceptance recorded"
+        );
+        assertEq(
+            L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafAt(ACCEPT_LEAF_INDEX).value,
+            uint256(keccak256(abi.encode(ATOMIC_ACCEPT_LEAF_TAG, ectx.flowId, ectx.bundleHash))),
+            "accept value in the destination's IMT"
+        );
+        assertEq(uint256(handler.bundleStatus(ectx.bundleHash)), uint256(BundleStatus.Unreceived), "not executed yet");
+
+        AtomicFinalityProof memory finality = _acceptedSingleLegFinality(sourceChainId, ACCEPT_LEAF_INDEX);
+        uint256 receiverBalanceBefore = IERC20(ectx.l2Token).balanceOf(_receiver());
+        handler.executeAtomicBundle(ectxBundleBytes, finality);
+
+        assertEq(
+            IERC20(ectx.l2Token).balanceOf(_receiver()),
+            receiverBalanceBefore + TRANSFER_AMOUNT,
+            "the destination mint must credit the receiver"
+        );
+        assertEq(uint256(handler.bundleStatus(ectx.bundleHash)), uint256(BundleStatus.FullyExecuted), "executed");
+    }
+
+    /// @notice Without the destination's acceptance an accepted flow cannot execute, even with its source
+    /// commit proven: the only leaf the destination could point at is the commit itself.
+    function test_executeAtomicBundle_AcceptedFlow_RevertWhen_NotAccepted() public {
+        _setUpAtomicStack();
+        _sendAcceptedSingleLeg(keccak256("unaccepted single leg salt"));
+        uint256 sourceChainId = block.chainid;
+        vm.chainId(destinationChainId);
+        AtomicFinalityProof memory finality = _acceptedSingleLegFinality(sourceChainId, 1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IMTLeafValueMismatch.selector,
+                uint256(keccak256(abi.encode(ATOMIC_ACCEPT_LEAF_TAG, ectx.flowId, ectx.bundleHash))),
+                AtomicFlowFixtures.commitValue(ectx.flowId, ectx.bundleHash)
+            )
+        );
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).executeAtomicBundle(ectxBundleBytes, finality);
+    }
+
+    /// @notice Only the bundle's destination can accept it.
+    function test_acceptAtomicBundle_RevertWhen_WrongDestinationChain() public {
+        _setUpAtomicStack();
+        _sendAcceptedSingleLeg(keccak256("accept on source salt"));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(WrongDestinationChainId.selector, ectx.bundleHash, destinationChainId, block.chainid)
+        );
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).acceptAtomicBundle(ectxBundleBytes, ectxPreimage, 0);
+    }
+
+    /// @notice An executed bundle cannot be accepted (again).
+    function test_acceptAtomicBundle_RevertWhen_AlreadyExecuted() public {
+        _setUpAtomicStack();
+        _sendAcceptedSingleLeg(keccak256("accept after execution salt"));
+        uint256 sourceChainId = block.chainid;
+        vm.chainId(destinationChainId);
+        L2InteropHandler handler = L2InteropHandler(L2_INTEROP_HANDLER_ADDR);
+        handler.acceptAtomicBundle(ectxBundleBytes, ectxPreimage, 0);
+        handler.executeAtomicBundle(ectxBundleBytes, _acceptedSingleLegFinality(sourceChainId, ACCEPT_LEAF_INDEX));
+
+        vm.expectRevert(abi.encodeWithSelector(BundleAlreadyProcessed.selector, ectx.bundleHash));
+        handler.acceptAtomicBundle(ectxBundleBytes, ectxPreimage, 0);
     }
 
     /// @dev The remote leg's oracle-tree proof for the leaf at `_leafIndex`, with its root imported at
