@@ -215,6 +215,14 @@ contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer {
             L2Bridgehub(L2_BRIDGEHUB_ADDR).isChainFeatureEnabled(TEST_FEATURE),
             "service sender must enable the feature"
         );
+
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).setChainFeatureEnabled(TEST_FEATURE, false);
+
+        assertFalse(
+            L2Bridgehub(L2_BRIDGEHUB_ADDR).isChainFeatureEnabled(TEST_FEATURE),
+            "service sender must disable the feature"
+        );
     }
 
     function test_setChainFeatureEnabled_revertWhen_notChainRegistrationSender() public {

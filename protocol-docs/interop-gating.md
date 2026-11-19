@@ -12,6 +12,8 @@ Interop is opt-in at two levels:
 | Interop peers     | none can be whitelisted                                                                                        | enabled chains its admin whitelisted ([whitelist](#interop-peer-whitelist))                                |
 | L1 asset handlers | the native token vault and the chain asset handler ([restriction](#asset-handler-restriction))                 | any                                                                                                        |
 
+Separately, the ecosystem opts single chains into protocol features ([chain features](#chain-features)).
+
 ## Safety argument
 
 Moving a chain's balance into the [interop pool](#interop-pool) at enabling already requires governance to trust the
