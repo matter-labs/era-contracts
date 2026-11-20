@@ -88,7 +88,9 @@ pub(crate) const TRANSITION_ENGINES: &[&str] = &["DefaultUpgrade"];
 /// the rows (`DefaultCoreUpgrade` / `DefaultCTMUpgrade.deployProxyUpgradeEngine`). A release whose
 /// proxy upgrade needs follow-up calls deploys a `DefaultProxyUpgradeEngine` subclass instead, and
 /// admits it here, so its follow-up calls are reviewed code.
-pub(crate) const PROXY_UPGRADE_ENGINES: &[&str] = &["DefaultProxyUpgradeEngine"];
+pub(crate) const PROXY_UPGRADE_ENGINES: &[&str] = &[DEFAULT_PROXY_UPGRADE_ENGINE];
+/// The engine that applies the rows and nothing else.
+pub(crate) const DEFAULT_PROXY_UPGRADE_ENGINE: &str = "DefaultProxyUpgradeEngine";
 /// Each L2 upgrade delegate an authored L2 plan may name, with the `IL2DelegateCalldataComposer`
 /// that composes its calldata. A plan naming a delegate without a composer cannot be constructed
 /// (`L2PlanLib.build` reverts with `L2PlanDelegateNeedsComposer`).
@@ -656,7 +658,8 @@ pub(super) async fn verify_engine_and_l2_plan<P: Provider>(
 /// runtime must be a reviewed engine's (an unknown engine is an ERROR — it runs by delegatecall
 /// with the executor's whole authority), and, since the prepare deploys the engine its object
 /// pins, its construction must re-derive from the package's `[member_deployments]` record. A zero
-/// engine is refused, as the object's constructor refuses it.
+/// engine is refused, as the object's constructor refuses it. Returns the reviewed engine the
+/// runtime was identified as, if any.
 pub(super) async fn verify_proxy_upgrade_engine<P: Provider>(
     provider: &P,
     build: &ReviewedBuild,
@@ -664,14 +667,14 @@ pub(super) async fn verify_proxy_upgrade_engine<P: Provider>(
     members: &MemberReview<'_>,
     label: &str,
     engine: Address,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Option<&'static str>> {
     let member_label = format!("{label}: proxyUpgradeEngine");
     if engine.is_zero() {
         result.report_error(&format!(
             "{member_label} is the zero address: the object's constructor refuses it \
              (`ZeroAddress`), and the executor would delegatecall nothing"
         ));
-        return Ok(());
+        return Ok(None);
     }
     let Some(identified) = expect_code_identity(
         provider,
@@ -683,7 +686,7 @@ pub(super) async fn verify_proxy_upgrade_engine<P: Provider>(
     )
     .await?
     else {
-        return Ok(());
+        return Ok(None);
     };
     expect_member_construction(
         provider,
@@ -700,7 +703,8 @@ pub(super) async fn verify_proxy_upgrade_engine<P: Provider>(
             context: ArgContext::None,
         },
     )
-    .await
+    .await?;
+    Ok(Some(identified))
 }
 
 /// The reviewed contract `info` is the ZKsync OS bytecode info of, when it is one of

@@ -110,7 +110,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     /// @notice Deploys the write-once inventory of this upgrade's swaps — one source-checked row
     ///         per proxy this run deployed a new implementation for. Nothing is deployed when the
-    ///         run deployed none (a CTM-only upgrade has no ecosystem leg).
+    ///         run deployed none (a CTM-only upgrade has no ecosystem leg), unless the version's engine
+    ///         has work of its own ({engineRunsWithoutSwaps}).
     /// @dev Rides the CREATE2 factory like every prepare deployment: the Safe bundle replays factory
     ///      transactions only.
     function deployCoreTransition() public virtual {
@@ -123,7 +124,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
                 ++participating;
             }
         }
-        if (participating == 0) {
+        if (participating == 0 && !engineRunsWithoutSwaps()) {
             console.log("No ecosystem implementation deployed: this upgrade has no core transition");
             return;
         }
@@ -150,6 +151,12 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     ///         needs follow-up calls deploys its `DefaultProxyUpgradeEngine` subclass instead.
     function deployProxyUpgradeEngine() internal virtual returns (address) {
         return deploySimpleContract("DefaultProxyUpgradeEngine");
+    }
+
+    /// @notice Whether the core transition is deployed even when this run swaps no ecosystem proxy:
+    ///         a version whose {deployProxyUpgradeEngine} subclass makes calls of its own returns true.
+    function engineRunsWithoutSwaps() internal view virtual returns (bool) {
+        return false;
     }
 
     /// @notice The enum-indexed ecosystem inventory: one slot per `L1EcosystemContract` member, a

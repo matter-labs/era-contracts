@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {UpgradeAuthorityLib} from "../../common/libraries/UpgradeAuthorityLib.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
@@ -66,6 +67,12 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @dev Address of the L1 interop handler that finalizes L2 -> L1 withdrawals.
     address public l1InteropHandler;
 
+    /// @dev The owner, or the upgrade authority (the owner of this proxy's `ProxyAdmin`).
+    modifier onlyOwnerOrUpgrader() {
+        UpgradeAuthorityLib.requireOwnerOrUpgrader(owner());
+        _;
+    }
+
     /// @notice Checks that the message sender is the nullifier.
     modifier onlyNullifier() {
         require(msg.sender == address(L1_NULLIFIER), Unauthorized(msg.sender));
@@ -111,9 +118,9 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @notice Sets the NativeTokenVault contract address.
-    /// @dev Should be called only once by the owner.
+    /// @dev Should be called only once by the owner or the upgrade authority.
     /// @param _nativeTokenVault The address of the native token vault.
-    function setNativeTokenVault(INativeTokenVaultBase _nativeTokenVault) external onlyOwner {
+    function setNativeTokenVault(INativeTokenVaultBase _nativeTokenVault) external onlyOwnerOrUpgrader {
         require(address(nativeTokenVault) == address(0), NativeTokenVaultAlreadySet());
         require(address(_nativeTokenVault) != address(0), ZeroAddress());
         nativeTokenVault = _nativeTokenVault;
@@ -121,9 +128,9 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @notice Sets the L1 interop handler contract address, the only caller allowed to finalize withdrawals.
-    /// @dev Should be called only once by the owner.
+    /// @dev Should be called only once by the owner or the upgrade authority.
     /// @param _l1InteropHandler The address of the L1 interop handler.
-    function setL1InteropHandler(address _l1InteropHandler) external onlyOwner {
+    function setL1InteropHandler(address _l1InteropHandler) external onlyOwnerOrUpgrader {
         require(l1InteropHandler == address(0), AddressAlreadySet(l1InteropHandler));
         require(_l1InteropHandler != address(0), ZeroAddress());
         l1InteropHandler = _l1InteropHandler;

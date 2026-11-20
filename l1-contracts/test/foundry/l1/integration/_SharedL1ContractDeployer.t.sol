@@ -117,8 +117,8 @@ contract L1ContractDeployer is UtilsCallMockerTest {
             coreExecutor: l1CoreContractsScript.getUpgradeExecutor().coreExecutor,
             ctmExecutor: ctmScript.getCTMUpgradeExecutor().ctmExecutor
         });
+        // The CTM domain needs no accept: `DeployCTM` completed its handover to the CTM executor.
         _acceptOwnershipCore();
-        _acceptOwnershipCTM();
         if (_harnessAcceptsUpgradeExecutors()) {
             _acceptUpgradeExecutors();
         }
@@ -132,14 +132,6 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         addresses.sharedBridge.acceptOwnership();
         IOwnable(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).acceptOwnership();
         addresses.ctmDeploymentTracker.acceptOwnership();
-        vm.stopPrank();
-    }
-
-    /// @dev The CTM itself needs no accept: `DeployCTM` completed its handover to the CTM executor.
-    function _acceptOwnershipCTM() private {
-        address rollupDAManager = ctmAddresses.daAddresses.daContracts.rollupDAManager;
-        vm.startPrank(IOwnable(rollupDAManager).pendingOwner());
-        IOwnable(rollupDAManager).acceptOwnership();
         vm.stopPrank();
     }
 

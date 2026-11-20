@@ -55,7 +55,6 @@ import {
     RegistryMemberHasNoFixedAddress,
     RegistryTargetHasNoCode,
     ReleaseForceDeploymentMismatch,
-    RegistryUnknownKey,
     TransitionDeadlineBeforeUpgrade,
     TransitionDeadlineZero,
     ZeroAddress
@@ -872,16 +871,17 @@ contract StorageRegistriesTest is Test {
         new ProxyUpgradeTransition(manifest);
     }
 
-    /// @dev An all-inert CTM inventory changes nothing: an upgrade that leaves the CTM domain alone
-    ///      omits that leg instead of deploying an empty object.
-    function test_revertWhen_aCtmInventoryChangesNothing() public {
+    /// @dev An all-inert CTM inventory is a transition that only runs its engine's hooks.
+    function test_aCtmInventoryWithNoSwapsPinsOnlyItsEngine() public {
         ProxyUpgradeTransitionManifest memory manifest = ProxyUpgradeTransitionManifest({
             domain: ProxyUpgradeDomain.CTM,
             proxyUpgrades: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT),
             proxyUpgradeEngine: address(proxyUpgradeEngine)
         });
-        vm.expectRevert(RegistryUnknownKey.selector);
-        new ProxyUpgradeTransition(manifest);
+        ProxyUpgradeTransition hooksOnly = new ProxyUpgradeTransition(manifest);
+        assertEq(hooksOnly.rows().length, 0, "no slot participates");
+        assertEq(hooksOnly.proxyUpgradeEngine(), address(proxyUpgradeEngine), "the engine is still pinned");
+        assertEq(uint8(hooksOnly.domain()), uint8(ProxyUpgradeDomain.CTM));
     }
 
     /// @dev The rows are exactly the participating slots, in slot order — never one with a zero
@@ -1658,12 +1658,15 @@ contract StorageRegistriesTest is Test {
         assertEq(registry.rows()[0].proxy, address(0xB001), "the participating slot must survive");
     }
 
-    function test_revertWhen_everyInventorySlotIsInert() public {
-        // A registry whose whole inventory is "not upgraded" upgrades nothing — refused.
+    function test_everyInventorySlotInertStillNeedsAnEngine() public {
+        // A transition whose whole inventory is "not upgraded" only runs its engine's hooks, so the
+        // engine is the one thing it cannot leave out.
         ProxyUpgradeTransitionManifest memory manifest = _coreManifest();
         manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)].implNew = address(0);
+        assertEq(new ProxyUpgradeTransition(manifest).rows().length, 0, "no slot participates");
 
-        vm.expectRevert(RegistryUnknownKey.selector);
+        manifest.proxyUpgradeEngine = address(0);
+        vm.expectRevert(ZeroAddress.selector);
         new ProxyUpgradeTransition(manifest);
     }
 

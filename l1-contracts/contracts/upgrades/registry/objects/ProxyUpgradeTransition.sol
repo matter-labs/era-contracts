@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {ManifestStorage} from "./ManifestStorage.sol";
 import {IProxyUpgradeTransition} from "./IProxyUpgradeTransition.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
-import {RegistryUnknownKey, ZeroAddress} from "../../../common/L1ContractErrors.sol";
+import {ZeroAddress} from "../../../common/L1ContractErrors.sol";
 import {ProxyUpgradeDomain, ProxyUpgradeRow, ProxyUpgradeTransitionManifest} from "../RegistryTypes.sol";
 
 /// @title Proxy upgrade transition — one instance per domain per protocol upgrade.
@@ -25,16 +25,10 @@ contract ProxyUpgradeTransition is IProxyUpgradeTransition, ManifestStorage {
     /// @param _manifest The manifest to pin. Its inventory length is checked against the member
     ///        count of `_manifest.domain`'s contract enum — never a caller-supplied length.
     constructor(ProxyUpgradeTransitionManifest memory _manifest) ManifestStorage(abi.encode(_manifest)) {
-        ProxyUpgradeRow[] memory participating = ProxyUpgradeRowLib.toRows(
-            _manifest.proxyUpgrades,
-            ProxyUpgradeRowLib.inventoryLength(_manifest.domain)
+        // No participating rows is allowed: the transition then only runs its engine's hooks.
+        ProxyUpgradeRowLib.validateRows(
+            ProxyUpgradeRowLib.toRows(_manifest.proxyUpgrades, ProxyUpgradeRowLib.inventoryLength(_manifest.domain))
         );
-        // A transition that upgrades nothing is not a transition, it is a mistake: an upgrade that
-        // leaves a domain alone omits that domain's call instead.
-        if (participating.length == 0) {
-            revert RegistryUnknownKey();
-        }
-        ProxyUpgradeRowLib.validateRows(participating);
         // Every transition names the code that applies it; there is no implicit default.
         if (_manifest.proxyUpgradeEngine == address(0)) {
             revert ZeroAddress();

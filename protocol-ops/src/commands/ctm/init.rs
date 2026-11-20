@@ -178,8 +178,8 @@ pub async fn ctm_init(
     logger::info(format!("[timing] ctm.deploy: {:.2?}", t.elapsed()));
     let deployed = &deploy_output.deployed_addresses;
     let ctm_proxy = deployed.state_transition.state_transition_proxy_addr;
-    // DeployCTM hands the CTM, its ProxyAdmin and the ServerNotifier to a CTMUpgradeExecutor
-    // (completing the CTM and notifier transfers itself) and nominates the ECOSYSTEM governance
+    // DeployCTM hands the CTM, its ProxyAdmin, the ServerNotifier and the RollupDAManager to a
+    // CTMUpgradeExecutor (completing every transfer itself) and nominates the ECOSYSTEM governance
     // as the executor's owner; owner operations on the CTM go through `forward` from then on.
     let ctm_executor = deploy_output.ctm_executor()?;
     let ecosystem_governance =
@@ -211,13 +211,6 @@ pub async fn ctm_init(
             })
             .with_wallet(&chain_admin_owner)
             .with_timing_label("ctm.accept_admin"),
-        runner
-            .script_call(AdminFunctionsAbi::governanceAcceptOwnerCall {
-                _governor: deployed.governance_addr,
-                _target: deployed.l1_rollup_da_manager,
-            })
-            .with_wallet(owner)
-            .with_timing_label("ctm.accept_rollup_da_manager_owner"),
         runner
             .script_call(AdminFunctionsAbi::governanceAcceptOwnerConditionalCall {
                 _governor: input.owner,

@@ -30,8 +30,10 @@ Up to three write-once objects, each optional, at least one present:
 
 A `ProxyUpgradeTransition`'s domain is part of its manifest, so `manifestHash()` and its CREATE2
 address commit to it, and its inventory length is the domain's member count rather than a caller's
-choice. An object with no participating row is refused at construction: an upgrade that leaves a
-domain alone omits that domain's object and its call, so an object present always means a change.
+choice. Its constructor accepts an inventory with no participating row (the engine must still be
+nonzero): such an object only runs its engine's hooks, and the upgrade review refuses it unless that
+engine is a reviewed one with hooks of its own. An upgrade that leaves a domain alone omits that
+domain's object and its call.
 
 ### One home per responsibility
 
