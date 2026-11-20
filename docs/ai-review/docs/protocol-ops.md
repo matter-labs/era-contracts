@@ -108,9 +108,10 @@ from calldata:
   asset handler, chain registration sender, interop handler) or through the CTM (itself, its
   validator timelock, bytecodes supplier, permissionless validator, server notifier), and its
   `implNew` runs the slot's contract. A row in a slot that is no proxy of its domain fails. Before
-  that, the inventory must be exactly its enum's length with at least one participating row, and
-  every participating row a real edge: nonzero `proxy` and `expectedOldImpl`, an `implNew` other
-  than `expectedOldImpl`, no proxy twice. A new `ChainTypeManager` implementation's constructor
+  that, the inventory must be exactly its enum's length, with at least one participating row unless
+  the transition pins a reviewed engine other than the default one, and every participating row a
+  real edge: nonzero `proxy` and `expectedOldImpl`, an `implNew` other than `expectedOldImpl`, no
+  proxy twice. A new `ChainTypeManager` implementation's constructor
   immutables, which code identity masks, are held by value against the live CTM, else the
   inventory row of their slot, else a proxy the package introduces that runs the reviewed
   `TransparentUpgradeableProxy` with the CTM-domain ProxyAdmin in its EIP-1967 admin slot and the
@@ -164,10 +165,11 @@ order the domains apply in; the one governance execution keeps them atomic. No o
 reach the upgrade's authorities (the executors, the objects, the CTM, either ProxyAdmin) whether
 declared or not, with one exception: a declared `forward([acceptOwnership()])` to the CTM executor
 whose target is the CTM's RollupDAManager (the env's `rollup_da_manager`, held against a chain on
-the CTM), the v36 handover of that contract to the executor
-({docs/registry-driven-upgrades.md#what-an-engine-can-reach}). This rule, in every package kind, reads each call's direct target: a call nested
-inside another (a multicall, or any contract that forwards calls) carries only its wrapper's
-authority as far as the check sees, so a declared wrapper's inner calls are the reviewer's to read.
+the CTM), the one-time handover of that contract to the executor ([what an engine can
+reach](../../registry-driven-upgrades.md#what-an-engine-can-reach)). This rule, in every package
+kind, reads each call's direct target: a call nested inside another (a multicall, or any contract
+that forwards calls) carries only its wrapper's authority as far as the check sees, so a declared
+wrapper's inner calls are the reviewer's to read.
 The legs' INTERNAL calls are deliberately not re-derived — the executors derive
 them on chain from the same pinned objects, and a second derivation in the tool would be a second
 implementation to keep in sync.

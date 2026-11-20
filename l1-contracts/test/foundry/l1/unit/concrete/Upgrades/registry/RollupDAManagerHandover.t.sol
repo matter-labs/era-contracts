@@ -56,13 +56,18 @@ contract RollupDAManagerHandoverTest is CTMUpgradeExecutorFixture {
         assertEq(manager.pendingOwner(), address(0));
     }
 
-    /// @dev A v0.36.x patch departs from a CTM whose executor already holds the manager.
+    /// @dev A v0.36.x patch departs from a CTM whose executor already holds the manager. The executor has
+    ///      nominated governance, so only the executor-owner check keeps the handover from being declared.
     function test_executorOwnedManagerDeclaresNothing() public {
         manager.transferOwnership(address(ctmExecutor));
-        vm.prank(address(ctmExecutor));
+        vm.startPrank(address(ctmExecutor));
         manager.acceptOwnership();
+        manager.transferOwnership(governor);
+        vm.stopPrank();
 
         assertEq(_declare().length, 0);
+        assertEq(manager.owner(), address(ctmExecutor), "nothing moved");
+        assertEq(manager.pendingOwner(), governor);
     }
 
     /// @dev A CTM deployed with its own governance: the bundle's signer cannot move the manager.

@@ -409,10 +409,6 @@ impl UpgradePackage {
         }
     }
 
-    /// Every leg against its summary, both ways: a reported object must have its leg (a missing
-    /// leg leaves a reviewed object unapplied), a leg must have its reported object, and both must
-    /// name the same object and executor. Then no call may reach an executor other than through
-    /// its legs.
     /// The bundle's first `CTMUpgradeExecutor.forward([acceptOwnership()])` to the reported CTM
     /// executor: the executor taking a contract governance nominated it for. The verifier requires
     /// the contract to be the CTM's RollupDAManager
@@ -436,6 +432,10 @@ impl UpgradePackage {
         })
     }
 
+    /// Every leg against its summary, both ways: a reported object must have its leg (a missing
+    /// leg leaves a reviewed object unapplied), a leg must have its reported object, and both must
+    /// name the same object and executor. Then no call may reach an executor other than through
+    /// its legs, or the CTM executor's one [`Self::ctm_ownership_acceptance`].
     fn reconcile(&self) -> anyhow::Result<()> {
         for kind in LegKind::CANONICAL_ORDER {
             let field = kind.summary_field();

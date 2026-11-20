@@ -162,11 +162,11 @@ All are storage-backed, built once from a manifest they take in the constructor,
 `manifestHash = keccak256(abi.encode(manifest))`. The struct definitions and their field docs are
 in `l1-contracts/contracts/upgrades/registry/RegistryTypes.sol`.
 
-| Contract                 | Holds                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CTMRelease`             | `diamondInit`, `verifier`, `GenesisFacet[]` (address + freezability), `fixedForceDeploymentsData`, genesis params incl. the genesis upgrade, `l2BytecodeInfos` (the `L2EcosystemContract`-indexed implementation table), one shared `l2SystemProxyBytecodeInfo` shell                                                                                                                                                        |
-| `CTMTransition`          | version edge, `fromRelease`, `newRelease`, `chainUpgradeEngine`, `oldProtocolVersionDeadline`, `upgradeTimestamp`, `AuthoredL2Plan`; **derived and stored:** `Diamond.FacetCut[]` and the L2 force deployments                                                                                                                                                                                                               |
-| `ProxyUpgradeTransition` | its `domain` and that domain's enum-indexed inventory of `(proxy, expectedOldImpl, implNew)` rows: `Core` for the SHARED singletons (bridges, Bridgehub, MessageRoot, …), `CTM` for the CTM-domain proxies, incl. the CTM itself. One instance per changed domain per upgrade; an inventory with no participating row is rejected. Also pins its `proxyUpgradeEngine` ([below](#follow-up-calls-the-pinned-upgrade-engine)). |
+| Contract                 | Holds                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CTMRelease`             | `diamondInit`, `verifier`, `GenesisFacet[]` (address + freezability), `fixedForceDeploymentsData`, genesis params incl. the genesis upgrade, `l2BytecodeInfos` (the `L2EcosystemContract`-indexed implementation table), one shared `l2SystemProxyBytecodeInfo` shell                                                                                                                                                                                                                                                              |
+| `CTMTransition`          | version edge, `fromRelease`, `newRelease`, `chainUpgradeEngine`, `oldProtocolVersionDeadline`, `upgradeTimestamp`, `AuthoredL2Plan`; **derived and stored:** `Diamond.FacetCut[]` and the L2 force deployments                                                                                                                                                                                                                                                                                                                     |
+| `ProxyUpgradeTransition` | its `domain` and that domain's enum-indexed inventory of `(proxy, expectedOldImpl, implNew)` rows: `Core` for the SHARED singletons (bridges, Bridgehub, MessageRoot, …), `CTM` for the CTM-domain proxies, incl. the CTM itself. One instance per changed domain per upgrade. Also pins its `proxyUpgradeEngine` ([below](#follow-up-calls-the-pinned-upgrade-engine)); with no participating row it only runs that engine's hooks, and the upgrade review refuses it unless that engine is a reviewed one with hooks of its own. |
 
 ### Enum-indexed proxy inventories
 
@@ -287,9 +287,9 @@ upgrade authority. On L2 the Bridgehub's upgrader is still the complex upgrader.
 
 A release calls the setter of a contract it upgrades from `_afterSwaps`, where the new
 implementation is already live; a contract it leaves alone needs an implementation that already
-has the check (v36 onward). A release that only wires deploys a `ProxyUpgradeTransition` with no
+has the check. A release that only wires deploys a `ProxyUpgradeTransition` with no
 participating row: its prepare returns true from `engineRunsWithoutSwaps()`, and the upgrade review
-refuses a transition with no rows that pins the default engine.
+refuses a transition with no rows unless its engine is a reviewed one with hooks of its own.
 
 `UpgraderWiring.t.sol` holds this on real proxies and a real `CoreUpgradeExecutor`.
 
@@ -494,16 +494,16 @@ too, except the last row: the executor's post-check refuses an ownership move
 The executors hold more authorities, reached the same way (`forward`, or the pinned engine
 inside a proxy leg):
 `CTMUpgradeExecutor.forward` for the CTM-domain `ProxyAdmin`, the ServerNotifier's owner methods
-(`setUpgradePreconditionChecker`, `setChainTypeManager`) and the `RollupDAManager`'s
-`updateDAPair`, and `CoreUpgradeExecutor.forward` for the ecosystem `ProxyAdmin` and the L1 wiring
-setters ([what an engine can reach](#what-an-engine-can-reach)). The `L1ChainAssetHandler` stays
-with its own owner. The executor's post-check does not cover the `RollupDAManager`: the executor
-binds no address for it, so a release engine that moved it would be a reviewed change of the
-release. An ecosystem deployed before v36 hands its `RollupDAManager` over in the v36 governance
-bundle (`CTMUpgrade_v36`), when the bundle's signer owns it or is nominated on it; a CTM deployed
-with its own governance hands it over through that governance. That bundle's
-`forward([acceptOwnership()])` is the one call to an executor outside the legs `protocol-ops`
-accepts, and only when its target is the CTM's `RollupDAManager`.
+(`setUpgradePreconditionChecker`, `setChainTypeManager`) and the `RollupDAManager`'s `updateDAPair`,
+and `CoreUpgradeExecutor.forward` for the ecosystem `ProxyAdmin` and the L1 wiring setters ([what an
+engine can reach](#what-an-engine-can-reach)). Governance stays the `L1ChainAssetHandler`'s owner:
+the executor reaches only its `setAddresses`. The executor's post-check does not cover the
+`RollupDAManager`: the executor binds no address for it, so a release engine that moved it would be
+a reviewed change of the release. An ecosystem deployed before v36 hands its `RollupDAManager` over
+once, in the v36 governance bundle (`CTMUpgrade_v36`), when the bundle's signer owns it or is
+nominated on it; a CTM deployed with its own governance hands it over through that governance. That
+bundle's `forward([acceptOwnership()])` is the one call to an executor outside the legs
+`protocol-ops` accepts, and only when its target is the CTM's `RollupDAManager`.
 
 ## Provenance and validation
 
@@ -887,8 +887,8 @@ Every row's
 **Proxy upgrade transitions.** A nonzero engine. An all-inert inventory is allowed: the transition
 then only runs its engine's hooks ([what an engine can reach](#what-an-engine-can-reach)). The
 prepare deploys one only for an engine with hooks of its own, and the upgrade review refuses one
-that pins the default engine; an upgrade that leaves a domain alone omits that domain's object.
-Preparation refuses an upgrade with no object at all. A package
+unless its engine is a reviewed one with hooks of its own; an upgrade that leaves a domain alone
+omits that domain's object. Preparation refuses an upgrade with no object at all. A package
 upgrades one CTM through that CTM's own executor; the
 [multi-CTM extension boundary](../protocol-docs/ecosystem-upgrade-coordination.md#future-multi-ctm-extension)
 identifies what a package spanning several CTMs needs.
