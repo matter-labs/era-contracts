@@ -37,7 +37,7 @@ use crate::common::forge::scripts::upgrade_executors::UpgradeExecutorsRecord;
 use crate::common::governance_calls::{decode_calls, GovernanceCall, GovernanceCallsTable};
 
 use super::records::{member_records_in, records_in};
-use super::views::{CTMUpgradeExecutorView, CoreUpgradeExecutorView};
+use super::views::{CTMUpgradeExecutorView, CoreUpgradeExecutorView, Ownable2StepView};
 
 /// `Ownable2Step.transferOwnership(address)` — the nomination a bundle would smuggle past a
 /// reviewer, which the tests send to an executor or forward through one.
@@ -413,6 +413,29 @@ impl UpgradePackage {
     /// leg leaves a reviewed object unapplied), a leg must have its reported object, and both must
     /// name the same object and executor. Then no call may reach an executor other than through
     /// its legs.
+    /// The bundle's first `CTMUpgradeExecutor.forward([acceptOwnership()])` to the reported CTM
+    /// executor: the executor taking a contract governance nominated it for. The verifier requires
+    /// the contract to be the CTM's RollupDAManager
+    /// ({docs/registry-driven-upgrades.md#what-an-engine-can-reach}).
+    pub(crate) fn ctm_ownership_acceptance(&self) -> Option<OwnershipAcceptance> {
+        let executor = self.reported_ctm_executor?;
+        self.calls.iter().enumerate().find_map(|(index, call)| {
+            if call.target != executor || !call.value.is_zero() {
+                return None;
+            }
+            let forward = CTMUpgradeExecutorView::forwardCall::abi_decode(&call.data).ok()?;
+            let [inner] = forward._calls.as_slice() else {
+                return None;
+            };
+            let accept = Ownable2StepView::acceptOwnershipCall {}.abi_encode();
+            (inner.value.is_zero() && inner.data[..] == accept[..]).then_some(OwnershipAcceptance {
+                index,
+                executor,
+                target: inner.target,
+            })
+        })
+    }
+
     fn reconcile(&self) -> anyhow::Result<()> {
         for kind in LegKind::CANONICAL_ORDER {
             let field = kind.summary_field();
@@ -466,16 +489,21 @@ impl UpgradePackage {
             .chain(self.lifecycle.core_executor)
             .chain(self.reported_ctm_executor)
             .collect();
+        let acceptance = self.ctm_ownership_acceptance().map(|accept| accept.index);
         for (index, call) in self.calls.iter().enumerate() {
-            if !executors.contains(&call.target) || self.legs.iter().any(|leg| leg.index == index) {
+            if !executors.contains(&call.target)
+                || self.legs.iter().any(|leg| leg.index == index)
+                || acceptance == Some(index)
+            {
                 continue;
             }
             anyhow::bail!(
                 "unknown selector on an executor: call {index} reaches the executor {} with \
                  selector 0x{}, which is none of the entrypoints an upgrade drives \
                  (applyL1Upgrade, applyInfrastructureUpgrade, applyCTMUpgrade). An executor \
-                 takes exactly the upgrade's legs, so any other call to one — a `forward`, a \
-                 nomination — is authority the review never saw",
+                 takes exactly the upgrade's legs and the CTM executor's one acceptance of the \
+                 RollupDAManager, so any other call to one — a `forward`, a nomination — is \
+                 authority the review never saw",
                 call.target,
                 alloy::hex::encode(call.data.get(..4).unwrap_or_default())
             );
@@ -803,6 +831,18 @@ impl ReplacementPackage {
             ctm_key,
         })
     }
+}
+
+/// `CTMUpgradeExecutor.forward([acceptOwnership()])`: the CTM executor accepting ownership of
+/// `target`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct OwnershipAcceptance {
+    /// The forward's index in the bundle.
+    pub(crate) index: usize,
+    /// The forward's target, the reported CTM executor.
+    pub(crate) executor: Address,
+    /// The contract whose ownership the executor accepts.
+    pub(crate) target: Address,
 }
 
 /// The replacement as the calldata states it.
@@ -1359,6 +1399,52 @@ mod tests {
             &[forward, transition_leg()],
         );
         assert!(err.contains("unknown selector on an executor"), "{err}");
+    }
+
+    /// The CTM executor's `forward([acceptOwnership()])` loads; whether its target is the CTM's
+    /// RollupDAManager is the verifier's question. Any other shape is still refused.
+    #[test]
+    fn the_ctm_executor_may_accept_one_ownership() {
+        const MANAGER: Address = Address::repeat_byte(0xDA);
+        let accept = || {
+            inner(
+                MANAGER,
+                Ownable2StepView::acceptOwnershipCall {}.abi_encode(),
+            )
+        };
+        let package = load_upgrade(
+            &Summary::of(false, false, true),
+            &[transition_leg(), forward(vec![accept()])],
+        );
+        assert_eq!(
+            package.ctm_ownership_acceptance(),
+            Some(OwnershipAcceptance {
+                index: 1,
+                executor: CTM_EXECUTOR,
+                target: MANAGER,
+            })
+        );
+
+        let wiring = inner(MANAGER, vec![0x12, 0x34, 0x56, 0x78]);
+        let mut paying = forward(vec![accept()]);
+        paying.value = U256::from(1);
+        let mut on_core = forward(vec![accept()]);
+        on_core.target = CORE_EXECUTOR;
+        for (what, extra) in [
+            (
+                "a second inner call",
+                forward(vec![accept(), wiring.clone()]),
+            ),
+            ("another inner call", forward(vec![wiring])),
+            ("value", paying),
+            ("the core executor", on_core),
+        ] {
+            let err = refusal(&Summary::of(false, false, true), &[transition_leg(), extra]);
+            assert!(
+                err.contains("unknown selector on an executor"),
+                "{what}: {err}"
+            );
+        }
     }
 
     // ───────────────────────── a release the tool has never heard of ─────────────────────────

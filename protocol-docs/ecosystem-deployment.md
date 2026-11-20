@@ -131,14 +131,14 @@ tooling) and is what the operator's node must be started with; deploying a CTM f
 do not match it produces chains whose genesis the node cannot reproduce.
 
 `DeployCTM.s.sol` ends by handing ownership out. It nominates `owner_address` on the
-`ValidatorTimelock` and `Governance` on the `RollupDAManager`, and sets `ChainAdminOwnable` as the
-CTM's pending admin. It then deploys the CTM's `CTMUpgradeExecutor`, bound to the CTM and its
-`ProxyAdmin`, hands it the CTM (accepted with `acceptCTMOwnership`), the `ProxyAdmin` (one-step) and
-the `ServerNotifier` (accepted through `forward`), and nominates the ecosystem governance, read off
-the `CoreUpgradeExecutor`, as the executor's owner.
+`ValidatorTimelock` and sets `ChainAdminOwnable` as the CTM's pending admin. It then deploys the
+CTM's `CTMUpgradeExecutor`, bound to the CTM and its `ProxyAdmin`, hands it the CTM (accepted with
+`acceptCTMOwnership`), the `ProxyAdmin` (one-step), the `ServerNotifier` and the `RollupDAManager`
+(both accepted through `forward`), and nominates the ecosystem governance, read off the
+`CoreUpgradeExecutor`, as the executor's owner.
 
-`ctm init` then accepts the remaining nominations as their owners (the CTM executor and the
-`RollupDAManager` for `Governance`, the CTM admin role for `ChainAdminOwnable`, the
+`ctm init` then accepts the remaining nominations as their owners (the CTM executor for
+`Governance`, the CTM admin role for `ChainAdminOwnable`, the
 `ValidatorTimelock` for `owner_address`) and registers the CTM on the Bridgehub with
 `RegisterCTM.s.sol`, a `Governance` operation of three calls: `L1Bridgehub.addChainTypeManager`,
 `L1AssetRouter.setAssetDeploymentTracker` for the CTM's asset id, and
@@ -236,24 +236,24 @@ so that the upgrade tooling can address it by name later.
 
 ## Ownership after deployment
 
-| Role                  | Contract                                                                                                                  | Powers                                                                                                                                                                                          |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Ecosystem governance  | `Governance`: owner of the core proxies, each `RollupDAManager`, the `CoreUpgradeExecutor` and every `CTMUpgradeExecutor` | protocol upgrades through the executors, CTM registration, freezing chains, pausing migrations; see [the authority map](../docs/registry-driven-upgrades.md#authority)                          |
-| Core upgrade executor | `CoreUpgradeExecutor`, owned by `Governance`                                                                              | owns the ecosystem `ProxyAdmin`: every core implementation swap (`applyL1Upgrade`, or `forward`)                                                                                                |
-| CTM upgrade executor  | one `CTMUpgradeExecutor` per CTM, owned by `Governance`                                                                   | owns its CTM, the CTM-domain `ProxyAdmin` and the `ServerNotifier`: version upgrades and CTM-domain swaps (`applyCTMUpgrade`, `applyInfrastructureUpgrade`), every CTM owner method (`forward`) |
-| Bridgehub admin       | `ChainAdminOwnable`                                                                                                       | `createNewChain`, registering base-token asset ids                                                                                                                                              |
-| CTM admin             | `ChainAdminOwnable` (reused from the hub)                                                                                 | the CTM's `admin` role, which gates only its own succession (`setPendingAdmin`)                                                                                                                 |
-| Chain admin           | the chain's `ChainAdmin`                                                                                                  | the per-chain settings listed in [Chain administration](./system/contracts/chain_management/admin_role.md), applying published upgrades                                                         |
-| Validator owner       | `owner_address`, owner of the `ValidatorTimelock` (a `MultisigCommitter`)                                                 | the execution delay, ecosystem-wide and per chain; the shared commit signing set and threshold, and which chains use a custom one                                                               |
-| Operators             | `ValidatorTimelock` roles                                                                                                 | committing, proving, executing and reverting batches                                                                                                                                            |
+| Role                  | Contract                                                                                          | Powers                                                                                                                                                                                                                                          |
+| --------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ecosystem governance  | `Governance`: owner of the core proxies, the `CoreUpgradeExecutor` and every `CTMUpgradeExecutor` | protocol upgrades through the executors, CTM registration, freezing chains, pausing migrations; see [the authority map](../docs/registry-driven-upgrades.md#authority)                                                                          |
+| Core upgrade executor | `CoreUpgradeExecutor`, owned by `Governance`                                                      | owns the ecosystem `ProxyAdmin`: every core implementation swap (`applyL1Upgrade`, or `forward`)                                                                                                                                                |
+| CTM upgrade executor  | one `CTMUpgradeExecutor` per CTM, owned by `Governance`                                           | owns its CTM, the CTM-domain `ProxyAdmin`, the `ServerNotifier` and the `RollupDAManager`: version upgrades and CTM-domain swaps (`applyCTMUpgrade`, `applyInfrastructureUpgrade`), every CTM owner method and the allowed DA pairs (`forward`) |
+| Bridgehub admin       | `ChainAdminOwnable`                                                                               | `createNewChain`, registering base-token asset ids                                                                                                                                                                                              |
+| CTM admin             | `ChainAdminOwnable` (reused from the hub)                                                         | the CTM's `admin` role, which gates only its own succession (`setPendingAdmin`)                                                                                                                                                                 |
+| Chain admin           | the chain's `ChainAdmin`                                                                          | the per-chain settings listed in [Chain administration](./system/contracts/chain_management/admin_role.md), applying published upgrades                                                                                                         |
+| Validator owner       | `owner_address`, owner of the `ValidatorTimelock` (a `MultisigCommitter`)                         | the execution delay, ecosystem-wide and per chain; the shared commit signing set and threshold, and which chains use a custom one                                                                                                               |
+| Operators             | `ValidatorTimelock` roles                                                                         | committing, proving, executing and reverting batches                                                                                                                                                                                            |
 
 The public ecosystems do not keep `Governance` as the owner: ownership is moved to the
 `ProtocolUpgradeHandler` of the `zk-governance` repository (Security Council, Guardians, and the
 emergency upgrade board), which is what `governance_kind = "puh"` in the env preset refers to. A
 fresh ecosystem starts under `Governance` owned by `owner_address`; moving it under a different
 governance is a two-step transfer, through the current `Governance`, of everything it owns directly:
-the core proxies, each `RollupDAManager`, the `CoreUpgradeExecutor` and every `CTMUpgradeExecutor`,
-each accepted by the new governance. The CTMs, the `ProxyAdmin`s and the `ServerNotifier`s stay
+the core proxies, the `CoreUpgradeExecutor` and every `CTMUpgradeExecutor`, each accepted by the
+new governance. The CTMs, the `ProxyAdmin`s, the `ServerNotifier`s and the `RollupDAManager`s stay
 with their executors and move with them.
 `AdminFunctions.ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps` does not do this: it leaves a
 domain an executor holds as it is, and refuses an executor that another governance owns. How the
@@ -278,10 +278,10 @@ flows from it.
   on any other L1, run those lines with that explorer's verifier settings.
 - Check ownership once `hub init` and `ctm init` have run. `owner()` must be the governance
   contract for the Bridgehub, asset router, nullifier, native token vault, interop handler, CTM
-  deployment tracker, chain asset handler, `ChainRegistrationSender`, each `RollupDAManager`, the
+  deployment tracker, chain asset handler, `ChainRegistrationSender`, the
   `CoreUpgradeExecutor` and every `CTMUpgradeExecutor`; the `CoreUpgradeExecutor` for the
-  ecosystem `ProxyAdmin`; a CTM's `CTMUpgradeExecutor` for that CTM, its `ProxyAdmin` and its
-  `ServerNotifier`; `owner_address` for the `ValidatorTimelock` (the upgrade verifier reports that
+  ecosystem `ProxyAdmin`; a CTM's `CTMUpgradeExecutor` for that CTM, its `ProxyAdmin`, its
+  `ServerNotifier` and its `RollupDAManager`; `owner_address` for the `ValidatorTimelock` (the upgrade verifier reports that
   as a warning, since `owner_address` owns `Governance`, and any other owner as an error). Each
   executor must be bound to
   what it owns (`PROXY_ADMIN`; `CHAIN_TYPE_MANAGER` and `CTM_PROXY_ADMIN`). No `pendingOwner()` may

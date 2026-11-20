@@ -143,7 +143,7 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
         _;
     }
 
-    modifier onlyOwnerOrUpgrader() {
+    modifier onlyOwnerOrUpgrader() virtual {
         if (msg.sender != owner() && msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert Unauthorized(msg.sender);
         }

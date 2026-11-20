@@ -341,8 +341,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         }
     }
 
-    /// @dev The CTM, its ProxyAdmin and the ServerNotifier are not handed out here: they go to the
-    ///      CTM executor ({deployCTMUpgradeExecutor}).
+    /// @dev The CTM, its ProxyAdmin, the ServerNotifier and the RollupDAManager are not handed out
+    ///      here: they go to the CTM executor ({deployCTMUpgradeExecutor}).
     function updateOwners() internal {
         vm.startBroadcast(getDeployerAddress());
 
@@ -352,15 +352,13 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         IChainTypeManager ctm = IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager);
         ctm.setPendingAdmin(ctmAddresses.chainAdmin);
 
-        IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
-
         vm.stopBroadcast();
         console.log("Owners updated");
     }
 
     /// @notice Deploys the CTM executor and hands it the whole CTM domain — the CTM (whose nomination
-    ///         its `acceptCTMOwnership` completes), the CTM-domain ProxyAdmin and the
-    ///         ServerNotifier (accepted through `forward`) — then nominates the ecosystem governance on
+    ///         its `acceptCTMOwnership` completes), the CTM-domain ProxyAdmin, the ServerNotifier and
+    ///         the RollupDAManager (both accepted through `forward`) — then nominates the ecosystem governance on
     ///         it: the CTM half of the registry-era authority shape. Constructed for the deployer,
     ///         which performs the handover; governance accepts afterwards.
     /// @dev Rides the CREATE2 factory like every deployment of this script.
@@ -388,14 +386,25 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ctmProxyAdmin: ctmProxyAdmin
         });
 
-        Call[] memory acceptNotifier = new Call[](1);
-        acceptNotifier[0] = Call({target: notifier, value: 0, data: abi.encodeCall(Ownable2Step.acceptOwnership, ())});
+        address rollupDAManager = ctmAddresses.daAddresses.daContracts.rollupDAManager;
+        Call[] memory acceptOwnerships = new Call[](2);
+        acceptOwnerships[0] = Call({
+            target: notifier,
+            value: 0,
+            data: abi.encodeCall(Ownable2Step.acceptOwnership, ())
+        });
+        acceptOwnerships[1] = Call({
+            target: rollupDAManager,
+            value: 0,
+            data: abi.encodeCall(Ownable2Step.acceptOwnership, ())
+        });
         vm.startBroadcast(deployer);
         IOwnable(ctm).transferOwnership(address(executor));
         executor.acceptCTMOwnership();
         ProxyAdmin(ctmProxyAdmin).transferOwnership(address(executor));
         IOwnable(notifier).transferOwnership(address(executor));
-        executor.forward(acceptNotifier);
+        IOwnable(rollupDAManager).transferOwnership(address(executor));
+        executor.forward(acceptOwnerships);
         executor.transferOwnership(governance);
         vm.stopBroadcast();
         console.log("CTM upgrade executor deployed and handed the CTM domain");

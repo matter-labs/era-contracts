@@ -43,6 +43,8 @@ export interface CTMDeployedAddresses {
   validiumL1DAValidator: string;
   rollupL1DAValidator: string;
   interopFeeManager: string;
+  /** The CTM's own governance, `deployed_addresses.governance_addr` of the CTM deployment. */
+  governance: string;
 }
 
 export interface ChainConfig {

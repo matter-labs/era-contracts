@@ -55,7 +55,6 @@ contract DeployOwnershipHandOffTest is ZKChainDeployer {
 
     function test_fullHandOff_leavesEveryContractWithItsIntendedOwner() public {
         address governance = ecosystemAddresses.shared.governance;
-        address ctmGovernance = ctmAddresses.admin.governance;
         address ctmChainAdmin = ctmAddresses.chainAdmin;
         address ownerEoa = ecosystemConfig.ownerAddress;
         address ctm = address(addresses.chainTypeManager);
@@ -73,7 +72,6 @@ contract DeployOwnershipHandOffTest is ZKChainDeployer {
         _assertHandedOff(ecosystemAddresses.bridgehub.proxies.chainAssetHandler, governance);
         _assertHandedOff(address(addresses.chainRegistrationSender), governance);
         assertEq(ChainTypeManager(ctm).admin(), ctmChainAdmin, "CTM admin");
-        _assertHandedOff(ctmAddresses.daAddresses.daContracts.rollupDAManager, ctmGovernance);
         _assertHandedOff(validatorTimelock, ownerEoa);
 
         // The registry authority: governance owns both executors, the CTM domain is the CTM executor's.
@@ -81,6 +79,7 @@ contract DeployOwnershipHandOffTest is ZKChainDeployer {
         _assertHandedOff(upgradeExecutors.ctmExecutor, governance);
         _assertHandedOff(ctm, upgradeExecutors.ctmExecutor);
         _assertHandedOff(serverNotifier, upgradeExecutors.ctmExecutor);
+        _assertHandedOff(ctmAddresses.daAddresses.daContracts.rollupDAManager, upgradeExecutors.ctmExecutor);
         assertEq(
             ProxyAdmin(ecosystemAddresses.shared.transparentProxyAdmin).owner(),
             upgradeExecutors.coreExecutor,

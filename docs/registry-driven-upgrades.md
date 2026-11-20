@@ -233,14 +233,7 @@ it (`ProxyUpgradeExecutorBase`):
   pinned in the manifest, reviewed with the release.
 - The context is the executor's own, built from its immutables: the transition, the engine, the
   domain, the executor's `ProxyAdmin` and (CTM domain) its CTM. So the hooks act with exactly the
-  executor's authority — the CTM, the CTM-domain `ProxyAdmin` and the ServerNotifier for a CTM
-  executor, the ecosystem `ProxyAdmin` for the core executor. Owner methods of governance-owned
-  ecosystem contracts (Bridgehub, AssetRouter) are not reachable and stay declared external
-  actions. Planned for a later release: their wiring setters (Bridgehub's `setAddresses*` and the
-  like) also accept the owner of the contract's `ProxyAdmin`, so the core executor's engine can make
-  them while governance keeps ownership. The release that ships those implementations can already
-  call them in `_afterSwaps`, on the contracts its rows upgrade; a release that only wires needs a
-  transition that allows zero rows.
+  executor's authority ([what an engine can reach](#what-an-engine-can-reach)).
 - Running in the executor's storage, an engine must not read or write storage. A release engine
   keeps its configuration in immutables set by its constructor: they are part of its code, so they
   read the same under the delegatecall. Only configuration an immutable cannot hold (a dynamic
@@ -264,6 +257,41 @@ it (`ProxyUpgradeExecutorBase`):
   wrong follow-up fails the leg. Any revert rolls back the whole leg, swaps included.
 
 `ProxyUpgradeEngine.t.sol` holds the shape on the real CTM fixture.
+
+### What an engine can reach
+
+An engine reaches what its executor holds:
+
+- a CTM executor: the CTM, the CTM-domain `ProxyAdmin`, the ServerNotifier and the
+  `RollupDAManager` (so a release can change the allowed DA pairs with `updateDAPair`);
+- the core executor: the ecosystem `ProxyAdmin`, and the L1 wiring setters below.
+
+Governance keeps ownership of the ecosystem contracts: the Bridgehub's owner freezes chains
+directly ([freezing a chain](../protocol-docs/ecosystem-upgrade-coordination.md#freezing-a-chain)).
+Their wiring setters accept the owner and the contract's _upgrade authority_: the owner of the
+`ProxyAdmin` in the proxy's EIP-1967 admin slot (`UpgradeAuthorityLib`), which is the core executor.
+
+| Contract               | Setters                                                            |
+| ---------------------- | ------------------------------------------------------------------ |
+| `L1Bridgehub`          | `setAddresses`, `setAddressesV31`                                  |
+| `CTMDeploymentTracker` | `setCtmAssetHandlerAddressOnL1`                                    |
+| `L1ChainAssetHandler`  | `setAddresses`                                                     |
+| `L1Nullifier`          | `setL1NativeTokenVault`, `setL1AssetRouter`, `setL1InteropHandler` |
+| `L1AssetRouter`        | `setNativeTokenVault`, `setL1InteropHandler`                       |
+
+This grants no new power: the core executor can already `upgradeAndCall` these proxies. Every other
+owner method (ownership, pausing, CTM and asset registration, settlement-layer status) stays
+owner-only. The authority follows the `ProxyAdmin`, so an executor succession moves it with no
+change to these contracts. A contract not behind a proxy, or behind an admin with no code, has no
+upgrade authority. On L2 the Bridgehub's upgrader is still the complex upgrader.
+
+A release calls the setter of a contract it upgrades from `_afterSwaps`, where the new
+implementation is already live; a contract it leaves alone needs an implementation that already
+has the check (v36 onward). A release that only wires deploys a `ProxyUpgradeTransition` with no
+participating row: its prepare returns true from `engineRunsWithoutSwaps()`, and the upgrade review
+refuses a transition with no rows that pins the default engine.
+
+`UpgraderWiring.t.sol` holds this on real proxies and a real `CoreUpgradeExecutor`.
 
 ### Supporting libraries
 
@@ -396,6 +424,7 @@ flowchart TB
     CE -->|"owns"| CTM
     CE -->|"owns"| CPA
     CE -->|"owns"| NOTIFIER
+    CE -->|"owns"| RDM["RollupDAManager · existing"]
 ```
 
 Two executors, one authority root. Governance owns both; each holds one domain's protocol
@@ -406,7 +435,8 @@ legs together is the governance proposal that calls them, in the numbered order 
 A fresh ecosystem is born in this shape. `DeployL1CoreContracts` deploys the core executor and
 hands it the ecosystem `ProxyAdmin`; `DeployCTM` deploys the CTM executor bound to the CTM and the
 CTM-domain `ProxyAdmin` (every CTM gets its own, even when it reuses the ecosystem's governance and
-ChainAdmin), hands it the CTM, that `ProxyAdmin` and the ServerNotifier, and nominates the ecosystem
+ChainAdmin), hands it the CTM, that `ProxyAdmin`, the ServerNotifier and the `RollupDAManager`, and
+nominates the ecosystem
 governance it reads off the core executor; `RegisterCTM` registers the CTM and binds nothing. The
 scripts construct the executors for the deployer, which makes these handovers, and nominate
 governance, which accepts in `protocol-ops hub init` / `ctm init`.
@@ -461,11 +491,19 @@ too, except the last row: the executor's post-check refuses an ownership move
 | `executeUpgrade` (arbitrary cut)                                                                    | `forward` only — deliberately: the bypass the object-driven path exists to remove                                                                   | —                                       |
 | CTM / ProxyAdmin `transferOwnership` (executor succession)                                          | `forward` only                                                                                                                                      | —                                       |
 
-The executors hold three more authorities, reached the same way (`forward`, or the pinned engine
+The executors hold more authorities, reached the same way (`forward`, or the pinned engine
 inside a proxy leg):
-`CTMUpgradeExecutor.forward` for the CTM-domain `ProxyAdmin` and the ServerNotifier's owner methods
-(`setUpgradePreconditionChecker`, `setChainTypeManager`), and `CoreUpgradeExecutor.forward` for the
-ecosystem `ProxyAdmin`. The `L1ChainAssetHandler` stays with its own owner.
+`CTMUpgradeExecutor.forward` for the CTM-domain `ProxyAdmin`, the ServerNotifier's owner methods
+(`setUpgradePreconditionChecker`, `setChainTypeManager`) and the `RollupDAManager`'s
+`updateDAPair`, and `CoreUpgradeExecutor.forward` for the ecosystem `ProxyAdmin` and the L1 wiring
+setters ([what an engine can reach](#what-an-engine-can-reach)). The `L1ChainAssetHandler` stays
+with its own owner. The executor's post-check does not cover the `RollupDAManager`: the executor
+binds no address for it, so a release engine that moved it would be a reviewed change of the
+release. An ecosystem deployed before v36 hands its `RollupDAManager` over in the v36 governance
+bundle (`CTMUpgrade_v36`), when the bundle's signer owns it or is nominated on it; a CTM deployed
+with its own governance hands it over through that governance. That bundle's
+`forward([acceptOwnership()])` is the one call to an executor outside the legs `protocol-ops`
+accepts, and only when its target is the CTM's `RollupDAManager`.
 
 ## Provenance and validation
 
@@ -846,9 +884,11 @@ other than `expectedOldImpl`, one row per proxy, in an inventory of exactly its 
 Every row's
 `implNew` must be deployed code when the rows are applied, before the first swap.
 
-**Proxy upgrade transitions.** At least one participating row: an all-inert inventory is not a
-change, so an object that upgrades nothing is refused, and an upgrade that leaves a domain alone
-omits that domain's object. Preparation refuses an upgrade with no object at all. A package
+**Proxy upgrade transitions.** A nonzero engine. An all-inert inventory is allowed: the transition
+then only runs its engine's hooks ([what an engine can reach](#what-an-engine-can-reach)). The
+prepare deploys one only for an engine with hooks of its own, and the upgrade review refuses one
+that pins the default engine; an upgrade that leaves a domain alone omits that domain's object.
+Preparation refuses an upgrade with no object at all. A package
 upgrades one CTM through that CTM's own executor; the
 [multi-CTM extension boundary](../protocol-docs/ecosystem-upgrade-coordination.md#future-multi-ctm-extension)
 identifies what a package spanning several CTMs needs.

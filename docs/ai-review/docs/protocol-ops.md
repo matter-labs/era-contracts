@@ -162,7 +162,10 @@ infrastructure, then CTM transition, each only when present — must appear exac
 contiguous and in that order. With no coordinator on chain, the order the bundle states is the
 order the domains apply in; the one governance execution keeps them atomic. No other call may
 reach the upgrade's authorities (the executors, the objects, the CTM, either ProxyAdmin) whether
-declared or not. This rule, in every package kind, reads each call's direct target: a call nested
+declared or not, with one exception: a declared `forward([acceptOwnership()])` to the CTM executor
+whose target is the CTM's RollupDAManager (the env's `rollup_da_manager`, held against a chain on
+the CTM), the v36 handover of that contract to the executor
+({docs/registry-driven-upgrades.md#what-an-engine-can-reach}). This rule, in every package kind, reads each call's direct target: a call nested
 inside another (a multicall, or any contract that forwards calls) carries only its wrapper's
 authority as far as the check sees, so a declared wrapper's inner calls are the reviewer's to read.
 The legs' INTERNAL calls are deliberately not re-derived — the executors derive
