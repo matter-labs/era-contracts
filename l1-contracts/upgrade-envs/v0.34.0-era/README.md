@@ -1,14 +1,21 @@
 # v0.34.0 — Era dual proofs (stage, testnet3, mainnet)
 
-v34 moves an Era CTM from v0.33.0 to v0.34.0. From then on every Era batch needs a Boojum and an Airbender
-proof; a testnet verifier still accepts an empty proof. It also ships an operator force-fail bit for L1→L2
-transactions (new bootloader), a 15M gas cap on user L1→L2 transactions and an EVM emulator fix.
+v34 moves an Era CTM from v0.33.0 to v0.34.0, and mainnet's to v0.34.1 (see "Version"). From then on every Era
+batch needs a Boojum and an Airbender proof; a testnet verifier still accepts an empty proof. It also ships an
+operator force-fail bit for L1→L2 transactions (new bootloader), a 15M gas cap on user L1→L2 transactions and an
+EVM emulator fix.
 
 | Environment                   | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | stage (Sepolia, chain 499)    | Executed 2026-10-22 as one emergency proposal, without a timer. `output/stage/` is generate run [39414177988](https://github.com/matter-labs/era-contracts/actions/runs/39414177988); its input `stage.toml` is in git history at `93e2c5a7b`                                                                                                                                                                                                               |
 | testnet3 (Sepolia, chain 312) | `output/testnet3/` is generate run [41802074519](https://github.com/matter-labs/era-contracts/actions/runs/41802074519) (Sepolia block 12018509); its deployer bundle was deployed by run [40849834276](https://github.com/matter-labs/era-contracts/actions/runs/40849834276), and the three contracts the base deployment flow added by run [41599475703](https://github.com/matter-labs/era-contracts/actions/runs/41599475703). Governance not executed |
-| mainnet (chain 324)           | Not generated yet: generated on a mainnet fork once chain 324 is on v0.33.0 with its first v0.33.0 batch executed                                                                                                                                                                                                                                                                                                                                           |
+| mainnet (chain 324)           | v0.33.0 → v0.34.1 with the #2694 verifiers, not generated yet. Run [42640975005](https://github.com/matter-labs/era-contracts/actions/runs/42640975005) deployed the bundle of the superseded v0.34.0 generate run [42208743790](https://github.com/matter-labs/era-contracts/actions/runs/42208743790) on 2026-11-09; 20 of its 24 transactions carry over. Governance not executed                                                                        |
+
+## Version
+
+Mainnet skips v0.34.0: Sepolia's v0.34.0 has the verifier keys from before #2694 and gets the new ones as v0.34.1
+(`upgrade-envs/v0.34.1-era`). `mainnet.toml`'s `new_protocol_version` sets v0.34.1; the L2 upgrade transaction,
+bootloader and keys stay the genesis's.
 
 ## What changes
 
@@ -41,9 +48,9 @@ and so does an emergency execution.
 
 Each chain, once stage 1 has executed (`chain set-upgrade-timestamp` and `chain upgrade` below read what it
 registered): its ChainAdmin's owner sets the upgrade timestamp, with the bundle
-`protocol_ops chain set-upgrade-timestamp --env <env> --chain-id <id> --new-protocol-version 146028888064 --upgrade-timestamp <unix> --l1-rpc-url <rpc> --out <dir>`
-writes; on testnets `1` means as soon as the node sees it, on mainnet it is a real future date. Once the chain is
-drained:
+`protocol_ops chain set-upgrade-timestamp --env <env> --chain-id <id> --new-protocol-version <version> --upgrade-timestamp <unix> --l1-rpc-url <rpc> --out <dir>`
+writes, with `<version>` 146028888064 on testnet3 and 146028888065 on mainnet; on testnets `1` means as soon as
+the node sees it, on mainnet it is a real future date. Once the chain is drained:
 
 1. **Server path (first choice):** the node's operator calls `ValidatorTimelock.upgradeChainFromVersion`, which
    needs `UPGRADER_ROLE` for the diamond. Mainnet's 324 has no holder; grant only that role with
@@ -57,7 +64,8 @@ drained:
 ## Files
 
 - `<env>.toml`: what the script can't read from `permanent-values/<env>.toml`, the chain or the v34 genesis: the
-  verifier flavour, the timer delay, the salt and `use_v29_introspection = false`.
+  verifier flavour, the timer delay, the salt and `use_v29_introspection = false`; on mainnet only, also
+  `new_protocol_version`.
 - `output/<env>/`: committed from the generate run. `output/stage/` keeps the layout stage was generated with; the
   others are in `DefaultCTMUpgrade.saveOutput`'s layout, where the zero addresses are fields v34 doesn't use and
   `admin.ecosystem_admin_addr` is the CTM owner (the PUH).
@@ -68,7 +76,8 @@ Generating and deploying work as for every forge-script upgrade (`docs/ecosystem
 
 ## Server side
 
-- The node and prover must support v0.34.0 before any chain upgrades: from then on the chain needs both proofs.
+- The node and prover must support the new version before any chain upgrades: from then on the chain needs both
+  proofs. On mainnet that is v0.34.1 with the #2694 keys.
 - The new verifier's no-argument `verificationKeyHash()` returns the Boojum FFLONK key (`0x1249…`), which the node
   stores as the version's snark wrapper VK hash.
 - The chain's first post-upgrade batch executes the L2 upgrade transaction.

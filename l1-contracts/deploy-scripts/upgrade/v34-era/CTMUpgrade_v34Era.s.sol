@@ -5,9 +5,11 @@ pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
+import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IEraMultiProofVerifier} from "contracts/state-transition/chain-interfaces/IEraMultiProofVerifier.sol";
@@ -26,9 +28,9 @@ import {UpgradeHelperLib} from "../default-upgrade/UpgradeHelperLib.sol";
 import {UpgradeUtils} from "../default-upgrade/UpgradeUtils.sol";
 import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 
-/// @notice v34 Era: moves an Era CTM from v0.33.0 to v0.34.0. From then on every batch needs a Boojum and an
-/// Airbender proof; the release also ships the force-fail bootloader, the 15M user L1->L2 gas cap and an EVM
-/// emulator fix.
+/// @notice v34 Era: moves an Era CTM from v0.33.0 to v0.34.0, or to a later v0.34 patch set by the input's
+/// `new_protocol_version`. From then on every batch needs a Boojum and an Airbender proof; the release also ships
+/// the force-fail bootloader, the 15M user L1->L2 gas cap and an EVM emulator fix.
 /// @dev Initialized by `initializeWithArgs` from the env's permanent values; the rest is introspected from the CTM
 /// or read from the v34 genesis. `prepareCTMUpgrade` deploys, through CREATE2 with the input's salt, what
 /// `deployNewCTMContracts` lists below plus the six facets and `DiamondInit`. Output and test calls are the base's.
@@ -59,6 +61,10 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
             governance: address(0),
             zkTokenAssetId: permanent.readBytes32("$.zk_token_asset_id")
         });
+        // An env may target a later patch of the genesis minor; its L2 tx, bootloader and keys stay the genesis's.
+        if (input.keyExists("$.new_protocol_version")) {
+            _setNewProtocolVersionFromInput(input.readUint("$.new_protocol_version"));
+        }
         ctmAddresses.daAddresses.daContracts.rollupDAManager = IAdmin(upToDateZkChain.zkChainProxy)
             .getRollupDAManager();
         // v34's verifier has no PLONK verifier; introspection found v0.33.0's.
@@ -73,13 +79,23 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
         console.log("v34: output written to", upgradeConfig.outputPath);
     }
 
+    /// @dev Only a later patch of the genesis's minor: the L2 upgrade tx, bootloader and keys are the genesis's.
+    function _setNewProtocolVersionFromInput(uint256 _version) internal {
+        (uint32 major, uint32 minor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_version));
+        (uint32 genesisMajor, uint32 genesisMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(getNewProtocolVersion()));
+        require(major == genesisMajor && minor == genesisMinor, "v34: new_protocol_version not the genesis minor");
+        require(_version > getNewProtocolVersion(), "v34: new_protocol_version not above the genesis");
+        setNewProtocolVersion(_version);
+    }
+
     // ======================== Live-state checks ========================
 
-    /// @dev Fail before deploying anything if the CTM is not an Era CTM one minor below the genesis.
+    /// @dev Fail before deploying anything if the CTM is not an Era CTM one minor below the new version (the
+    ///      genesis's, or a later patch of it from the input's `new_protocol_version`).
     function _checkLiveState() internal view {
         IChainTypeManager ctm = IChainTypeManager(newConfig.ctm);
         require(!ctm.isZKsyncOS(), "v34: not an Era CTM");
-        require(!UpgradeHelperLib.isPatchUpgrade(getNewProtocolVersion()), "v34: must be a minor upgrade");
+        // A minor upgrade whatever the new patch: the L2 upgrade tx's nonce is the minor.
         require(
             UpgradeHelperLib.getProtocolUpgradeNonce(getNewProtocolVersion()) ==
                 UpgradeHelperLib.getProtocolUpgradeNonce(getOldProtocolVersion()) + 1,

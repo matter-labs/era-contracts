@@ -1,6 +1,8 @@
 # v34 Era upgrade of mainnet's Era CTM: input for deploy-scripts/upgrade/v34-era/CTMUpgrade_v34Era.s.sol.
 # The CTM comes from permanent-values/mainnet.toml; everything else from the chain and the v34 genesis.
 
+# v0.33.0 -> v0.34.1 directly: Sepolia's v0.34.0 has the pre-#2694 verifier keys.
+new_protocol_version = 146028888065
 # Production: deploy EraMultiProofVerifier, and the Mailbox and Migrator facets' mainnet time windows.
 testnet_verifier = false
 # Stage 1 runs at least 48 hours after stage 0: the delay every mainnet upgrade has used since v28.

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Rehearse the v34 Era upgrade of one environment on an L1 fork and check the resulting L1 state. The
 # environment is UPGRADE_ENV (testnet3, mainnet); every fact comes from its $UPGRADE_ENV.toml,
-# permanent-values/$UPGRADE_ENV.toml, the v34 genesis, the output and the chain.
+# permanent-values/$UPGRADE_ENV.toml, the v34 genesis, the output and the chain. The new version is the
+# genesis's, or a later patch of it from $UPGRADE_ENV.toml's new_protocol_version.
 #   1. CTMUpgrade_v34Era.prepare — CREATE2 deployments and factory-dep publication (fork only), writes
 #      output/$UPGRADE_ENV/ecosystem.toml
 #   2. every factory dep of the L2 upgrade tx is published to the BytecodesSupplier
@@ -105,6 +106,12 @@ if [ "$PUBLISHED_ONLY" = "0" ]; then
 import json, re, sys, tomllib
 env, permanent = (tomllib.load(open(p, "rb")) for p in sys.argv[1:3])
 semver = json.load(open(sys.argv[3]))["protocol_semantic_version"]
+genesis = new = semver["major"] << 64 | semver["minor"] << 32 | semver["patch"]
+if "new_protocol_version" in env:
+    # As CTMUpgrade_v34Era: only a later patch of the genesis minor.
+    new = env["new_protocol_version"]
+    if type(new) is not int or new >> 32 != genesis >> 32 or new <= genesis:
+        sys.exit(f"  new_protocol_version {new!r}: not a later patch of the genesis's {genesis}")
 ctm = permanent["ctm_contracts"]["ctms"][0]  # the script's: the first CTM, which must be Era
 if ctm["is_zk_sync_os"]:
     sys.exit("  permanent values: the first CTM is not Era")
@@ -113,7 +120,7 @@ for name, value, pattern in [
     ("CTM", ctm["proxy"], ADDRESS),
     ("TESTNET", env["testnet_verifier"], BOOL),
     ("TIMER_DELAY", env["governance_upgrade_timer_initial_delay"], NUMBER),
-    ("NEW", semver["major"] << 64 | semver["minor"] << 32 | semver["patch"], NUMBER),
+    ("NEW", new, NUMBER),
     ("SALT", env["create2_factory_salt"], WORD),
     ("L1_CHAIN_ID", permanent["l1_chain_id"], NUMBER),
     ("FACTORY", permanent["permanent_contracts"]["create2_factory_addr"], ADDRESS),
@@ -124,6 +131,8 @@ for name, value, pattern in [
     if not re.fullmatch(pattern, str(value)):
         sys.exit(f"  {name}: malformed {value!r}")
     print(f"export {name}={value}")
+# For check labels.
+print(f"export NEW_LABEL=v{new >> 64}.{new >> 32 & 0xFFFFFFFF}.{new & 0xFFFFFFFF}")
 PYINPUTS
   # shellcheck disable=SC1091
   . "$S/inputs.env"
@@ -395,7 +404,7 @@ check("default account hash = genesis (unchanged)", p[2], aa)
 check("EVM emulator hash = genesis", p[3], evm)
 check("verifier and verifierParams zero", [p[4], p[5]], [ZERO, ["0x" + "00" * 32] * 3])
 check("l1ContractsUpgradeCalldata, postUpgradeCalldata empty; upgradeTimestamp 0", [p[6], p[7], I(p[8])], ["0x", "0x", 0])
-check("newProtocolVersion = v0.34.0", I(p[9]), I(E["NEW"]))
+check(f"newProtocolVersion = {E['NEW_LABEL']}", I(p[9]), I(E["NEW"]))
 check("tx: type 254, from 0x8007, to 0x8006, gas 72M, 800 per pubdata, no fees or paymaster, nonce 34, value 0",
       [I(x) for x in tx[:10]], [254, 0x8007, 0x8006, 72_000_000, 800, 0, 0, 0, I(E["NEW"]) >> 32, 0])
 check("tx reserved, signature, paymasterInput, reservedDynamic empty", [[I(x) for x in tx[10]], tx[12], tx[14], tx[15]], [[0] * 4, "0x", "0x", "0x"])
@@ -506,7 +515,7 @@ for n, call in [(0, PAUSE), (1, PAUSE), (2, UNPAUSE), (0, T["start"]), (1, T["de
 check("stage 1 ProxyAdmin.upgrade(CTM, new implementation)", find(1, UPGRADE_CTM),
       calldata("upgrade(address,address)", E["CTM"], st["chain_type_manager_implementation_addr"]))
 snvu = dec_call(f"setNewVersionUpgrade({CUT},uint256,uint256,uint256,address)", find(1, SET_NEW_VERSION))
-check("stage 1 setNewVersionUpgrade(cut, v0.33.0, no deadline, v0.34.0, new verifier)",
+check(f"stage 1 setNewVersionUpgrade(cut, v0.33.0, no deadline, {E['NEW_LABEL']}, new verifier)",
       [enc(CUT, fmt_cut(snvu[0])), I(snvu[1]), I(snvu[2]), I(snvu[3]), snvu[4]],
       [upgrade_cut_data, I(E["OLD"]), (1 << 256) - 1, I(E["NEW"]), st["verifier_addr"]])
 check("stage 1 setChainCreationParams(new params)", find(1, SET_CREATION), "0x4958bf4f" + cc["new_chain_creation_params"][2:])
@@ -740,7 +749,7 @@ chk "timer TIMER_GOVERNANCE = the PUH (sends the stages)" "$(call "$TIMER" 'TIME
 chk "timer owner = the PUH" "$(call "$TIMER" 'owner()(address)')" "$PUH"
 chk "timer not started" "$(call "$TIMER" 'deadline()(uint256)' | first)" 0
 chk "stage validator CHAIN_TYPE_MANAGER = the CTM" "$(call "$STAGE_VALIDATOR" 'CHAIN_TYPE_MANAGER()(address)')" "$CTM"
-chk "stage validator NEW_PROTOCOL_VERSION = v0.34.0" "$(call "$STAGE_VALIDATOR" 'NEW_PROTOCOL_VERSION()(uint256)' | first)" "$NEW"
+chk "stage validator NEW_PROTOCOL_VERSION = $NEW_LABEL" "$(call "$STAGE_VALIDATOR" 'NEW_PROTOCOL_VERSION()(uint256)' | first)" "$NEW"
 
 echo "== Stage 0 and the CTM proxy upgrade, sent as the CTM owner (PUH)"
 while read -r target value data; do send "$PUH" "$target" "$data" "stage 0 ${data:0:10} -> $target"; done < "$S/stage0.txt"
@@ -780,8 +789,8 @@ while read -r target value data; do send "$PUH" "$target" "$data" "stage 1 ${dat
 while read -r target value data; do send "$PUH" "$target" "$data" "stage 2 ${data:0:10} -> $target"; done < "$S/stage2.txt"
 
 echo "== CTM state after the governance stages"
-chk "protocolVersion = v0.34.0" "$(call "$CTM" 'protocolVersion()(uint256)' | first)" "$NEW"
-chk "protocolVersionVerifier(v0.34.0) = new verifier" "$(call "$CTM" 'protocolVersionVerifier(uint256)(address)' "$NEW")" "$VERIFIER"
+chk "protocolVersion = $NEW_LABEL" "$(call "$CTM" 'protocolVersion()(uint256)' | first)" "$NEW"
+chk "protocolVersionVerifier($NEW_LABEL) = new verifier" "$(call "$CTM" 'protocolVersionVerifier(uint256)(address)' "$NEW")" "$VERIFIER"
 chk "verifier IS_TESTNET_VERIFIER = testnet_verifier" "$(call "$VERIFIER" 'IS_TESTNET_VERIFIER()(bool)')" "$(echo "$TESTNET" | tr A-Z a-z)"
 chk "verifier BOOJUM_VERIFIER = the FFLONK verifier (verifier_fflonk_addr)" "$(call "$VERIFIER" 'BOOJUM_VERIFIER()(address)')" "$EXP_FFLONK"
 chk "verifier AIRBENDER_VERIFIER = new Plonk" "$(call "$VERIFIER" 'AIRBENDER_VERIFIER()(address)')" "$AIRBENDER_VERIFIER"
@@ -800,7 +809,7 @@ for x in "$CTM" "$NEW_CTM_IMPL" "$SN" "$NEW_SN_IMPL"; do
 done
 
 echo "== Chain $CHAIN_ID's upgrade timestamp, sent by the ChainAdmin's owner"
-send "$CHAIN_ADMIN_OWNER" "$CHAIN_ADMIN" "$SET_TS_CALLDATA" "ChainAdmin.setUpgradeTimestamp(v0.34.0, $TS), directly (onlyOwner)"
+send "$CHAIN_ADMIN_OWNER" "$CHAIN_ADMIN" "$SET_TS_CALLDATA" "ChainAdmin.setUpgradeTimestamp($NEW_LABEL, $TS), directly (onlyOwner)"
 send "$CHAIN_ADMIN_OWNER" "$CHAIN_ADMIN" "$SN_TS_CALLDATA" "ChainAdmin multicall(ServerNotifier.setUpgradeTimestamp($CHAIN_ID, $TS))"
 python3 - "$S/receipt.json" "$(cast keccak 'UpgradeTimestampUpdated(uint256,uint256,uint256)')" <<'PYLOG' && echo "  OK   UpgradeTimestampUpdated($CHAIN_ID, v0.33.0, $TS) emitted by the ServerNotifier" || fail "UpgradeTimestampUpdated($CHAIN_ID, v0.33.0, $TS) not emitted"
 import json, os, sys
@@ -809,7 +818,7 @@ sys.exit(0 if len(logs) == 1 and [int(t, 16) for t in logs[0]["topics"][1:]] == 
          and int(logs[0]["data"], 16) == int(os.environ["TS"]) else 1)
 PYLOG
 chk "ServerNotifier protocolVersionToUpgradeTimestamp($CHAIN_ID, v0.33.0)" "$(call "$SN" 'protocolVersionToUpgradeTimestamp(uint256,uint256)(uint256)' "$CHAIN_ID" "$OLD" | first)" "$TS"
-chk "ChainAdmin protocolVersionToUpgradeTimestamp(v0.34.0)" "$(call "$CHAIN_ADMIN" 'protocolVersionToUpgradeTimestamp(uint256)(uint256)' "$NEW" | first)" "$TS"
+chk "ChainAdmin protocolVersionToUpgradeTimestamp($NEW_LABEL)" "$(call "$CHAIN_ADMIN" 'protocolVersionToUpgradeTimestamp(uint256)(uint256)' "$NEW" | first)" "$TS"
 
 echo "== Negative: chain $CHAIN_ID's upgrade reverts while batches are in flight"
 counts() { echo "$(call "$DIAMOND" 'getTotalBatchesCommitted()(uint256)' | first) $(call "$DIAMOND" 'getTotalBatchesVerified()(uint256)' | first) $(call "$DIAMOND" 'getTotalBatchesExecuted()(uint256)' | first)"; }
@@ -840,9 +849,9 @@ fi
 read -r COMMITTED VERIFIED EXECUTED <<< "$(counts)"
 [ "$COMMITTED" = "$EXECUTED" ] && [ "$VERIFIED" = "$EXECUTED" ] && echo "  OK   committed == verified == executed ($EXECUTED)" || fail "not drained: $COMMITTED / $VERIFIED / $EXECUTED"
 
-# chain_state LABEL CHAIN — the post-upgrade state of a chain on v0.34.0.
+# chain_state LABEL CHAIN — the post-upgrade state of a chain on the new version.
 chain_state() {
-  chk "$1 protocol version = v0.34.0" "$(call "$2" 'getProtocolVersion()(uint256)' | first)" "$NEW"
+  chk "$1 protocol version = $NEW_LABEL" "$(call "$2" 'getProtocolVersion()(uint256)' | first)" "$NEW"
   chk "$1 bootloader = new" "$(call "$2" 'getL2BootloaderBytecodeHash()(bytes32)')" "$BOOT"
   chk "$1 default account = unchanged" "$(call "$2" 'getL2DefaultAccountBytecodeHash()(bytes32)')" "$AA"
   chk "$1 EVM emulator = new" "$(call "$2" 'getL2EvmEmulatorBytecodeHash()(bytes32)')" "$EVM"
@@ -917,7 +926,7 @@ first_batches() {
   case "$executed" in '' | *[!0-9]*) fail "first v34 batches: not run (chain $CHAIN_ID's batch counts unreadable)"; return ;; esac
   if [ "$committed" != "$executed" ] || [ "$verified" != "$executed" ] \
     || [ "$(call "$DIAMOND" 'getProtocolVersion()(uint256)' | first)" != "$NEW" ]; then
-    fail "first v34 batches: not run (chain $CHAIN_ID not drained or not on v0.34.0)"; return
+    fail "first v34 batches: not run (chain $CHAIN_ID not drained or not on $NEW_LABEL)"; return
   fi
   case "$START_BLOCK" in '' | *[!0-9]*) fail "first v34 batches: not run (no start block)"; return ;; esac
 
