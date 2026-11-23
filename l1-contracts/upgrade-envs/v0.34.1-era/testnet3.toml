@@ -1,0 +1,11 @@
+# v0.34.1 Era patch of testnet3's Era CTM: input for deploy-scripts/upgrade/v34-era/CTMUpgrade_v34_1Era.s.sol.
+# The CTM comes from permanent-values/testnet3.toml; the new keys from configs/genesis/era/latest.json.
+testnet_verifier = true              # the v0.34.0 verifier's IS_TESTNET_VERIFIER()
+old_protocol_version = 146028888064  # v0.34.0
+new_protocol_version = 146028888065  # v0.34.1
+# Fresh 32 bytes; differs from stage's (same chain) and from every earlier salt.
+create2_factory_salt = "0x8651e4424aff28c4527634a1f297def413de723d52f88d41f8e2e8e34380ff6f"
+chain_ids = [312]
+# The CTM's current creation params, from v0.34.0's committed output; checked against initialCutHash and
+# initialForceDeploymentHash.
+chain_creation_params_toml = "/upgrade-envs/v0.34.0-era/output/testnet3/ecosystem.toml"

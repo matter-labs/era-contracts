@@ -21,6 +21,13 @@ alloy::sol! {
     function execute(Operation _operation);
     function setUpgradeTimestamp(uint256 _protocolVersion, uint256 _upgradeTimestamp);
     function upgradeChainFromVersion(address _chain, uint256 _oldProtocolVersion, DiamondCutData _cut);
+    function createNewPatchUpgrade(
+        uint256 _oldProtocolVersion,
+        uint256 _oldProtocolVersionDeadline,
+        uint256 _newProtocolVersion,
+        address _verifier,
+        address _upgradeContract
+    );
 }
 
 /// The v0.33.0 stage upgrade: the committed emergency proposal and its runbook.
@@ -618,6 +625,10 @@ fn known_functions_have_the_selectors_the_contracts_use() {
         ("0x3b6d7534", "`upgradeChainFromVersion(...)`"),
         ("0xfc57565f", "`upgradeChainFromVersion(...)`"),
         ("0x8265f458", "`setNewVersionUpgrade(...)`"),
+        (
+            "0x81a8e48e",
+            "`createNewPatchUpgrade(uint256,uint256,uint256,address,address)`",
+        ),
         ("0x4958bf4f", "`setChainCreationParams(...)`"),
         ("0x9b016b8b", "`setChainCreationParams(...)`"),
         ("0x3290f93a", "`grantRole(address,bytes32,address)`"),
@@ -698,6 +709,38 @@ fn upgrade_timestamps_name_a_version_or_a_chain() {
         decode::annotation(&server_notifier).as_deref(),
         Some("chain 499 at timestamp 1")
     );
+}
+
+#[test]
+fn patch_upgrades_name_the_versions_the_deadline_the_verifier_and_the_upgrade_contract() {
+    let call = |deadline: U256| {
+        createNewPatchUpgradeCall {
+            _oldProtocolVersion: U256::from(146_028_888_064u64),
+            _oldProtocolVersionDeadline: deadline,
+            _newProtocolVersion: U256::from(146_028_888_065u64),
+            _verifier: address!("fedcbafedcbafedcbafedcbafedcbafedcbafedc"),
+            _upgradeContract: address!("abcdefabcdefabcdefabcdefabcdefabcdefabcd"),
+        }
+        .abi_encode()
+    };
+    let data = call(U256::MAX);
+    assert_eq!(
+        decode::call_display(&data),
+        "`createNewPatchUpgrade(uint256,uint256,uint256,address,address)`"
+    );
+    // Checksummed, as everywhere else in a runbook.
+    assert_eq!(
+        decode::annotation(&data).as_deref(),
+        Some(
+            "v0.34.0 to v0.34.1, no deadline for v0.34.0, \
+             verifier `0xfeDcbaFEdcBaFEDcbAfedcBAfeDCBAFeDCBafEdc`, \
+             upgrade contract `0xABcdEFABcdEFabcdEfAbCdefabcdeFABcDEFabCD`"
+        )
+    );
+    // A finite deadline stops v0.34.0 chains from committing: the signer must see it.
+    assert!(decode::annotation(&call(U256::from(1_767_225_600u64)))
+        .unwrap()
+        .contains("v0.34.0 deadline at timestamp 1767225600"));
 }
 
 #[test]

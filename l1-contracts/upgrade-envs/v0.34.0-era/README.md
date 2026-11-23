@@ -5,16 +5,20 @@ batch needs a Boojum and an Airbender proof; a testnet verifier still accepts an
 operator force-fail bit for L1→L2 transactions (new bootloader), a 15M gas cap on user L1→L2 transactions and an
 EVM emulator fix.
 
-| Environment                   | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| stage (Sepolia, chain 499)    | Executed 2026-10-22 as one emergency proposal, without a timer. `output/stage/` is generate run [39414177988](https://github.com/matter-labs/era-contracts/actions/runs/39414177988); its input `stage.toml` is in git history at `93e2c5a7b`                                                                                                                                                                                                                                                                                                                                                                                           |
-| testnet3 (Sepolia, chain 312) | `output/testnet3/` is generate run [41802074519](https://github.com/matter-labs/era-contracts/actions/runs/41802074519) (Sepolia block 12018509); its input `testnet3.toml` is in git history at `492671af6`; its deployer bundle was deployed by run [40849834276](https://github.com/matter-labs/era-contracts/actions/runs/40849834276), and the three contracts the base deployment flow added by run [41599475703](https://github.com/matter-labs/era-contracts/actions/runs/41599475703). Executed: the CTM and chain 312 are on v0.34.0                                                                                          |
-| mainnet (chain 324)           | v0.33.0 → v0.34.1 with the #2694 verifiers. `output/mainnet/` is generate run [45249096283](https://github.com/matter-labs/era-contracts/actions/runs/45249096283) (block 26355491, on `8553c3cce`). 20 of its 24 deployer transactions were deployed on 2026-11-09 by run [42640975005](https://github.com/matter-labs/era-contracts/actions/runs/42640975005), from the superseded v0.34.0 generate run [42208743790](https://github.com/matter-labs/era-contracts/actions/runs/42208743790); the stage validator and the three verifiers are not deployed yet, and that run's own four stay on chain unused. Governance not executed |
+| Environment                   | Status                                                                              |
+| ----------------------------- | ----------------------------------------------------------------------------------- |
+| stage (Sepolia, chain 499)    | Executed 2026-10-22 as one emergency proposal, without a timer                      |
+| testnet3 (Sepolia, chain 312) | Executed 2026-11-06 through the PUH's normal path                                   |
+| mainnet (chain 324)           | v0.33.0 → v0.34.1 with the #2694 verifiers (see "Version"). Governance not executed |
+
+- stage: `output/stage/` is generate run [39414177988](https://github.com/matter-labs/era-contracts/actions/runs/39414177988); its input `stage.toml` is in git history at `93e2c5a7b`.
+- testnet3: `output/testnet3/` is generate run [41802074519](https://github.com/matter-labs/era-contracts/actions/runs/41802074519) (Sepolia block 12018509); its input `testnet3.toml` is in git history at `492671af6`; its deployer bundle was deployed by run [40849834276](https://github.com/matter-labs/era-contracts/actions/runs/40849834276), and the three contracts the base deployment flow added by run [41599475703](https://github.com/matter-labs/era-contracts/actions/runs/41599475703). Governance executed at Sepolia block 12076383; chain 312 was upgraded the same day by its operator through the ValidatorTimelock (block 12076549).
+- mainnet: `output/mainnet/` is generate run [45249096283](https://github.com/matter-labs/era-contracts/actions/runs/45249096283) (block 26355491, on `8553c3cce`). 20 of its 24 deployer transactions were deployed on 2026-11-09 by run [42640975005](https://github.com/matter-labs/era-contracts/actions/runs/42640975005), from the superseded v0.34.0 generate run [42208743790](https://github.com/matter-labs/era-contracts/actions/runs/42208743790); the stage validator and the three verifiers are not deployed yet, and that run's own four stay on chain unused.
 
 ## Version
 
-Mainnet skips v0.34.0: Sepolia's v0.34.0 has the verifier keys from before #2694 and gets the new ones as v0.34.1
-(#2696). The genesis is v0.34.1, so mainnet takes it.
+Mainnet skips v0.34.0: Sepolia's v0.34.0 has the verifier keys from before #2694, and stage and testnet3 get the new
+ones as v0.34.1 ([v0.34.1-era](../v0.34.1-era/README.md)). The genesis is v0.34.1, so mainnet takes it.
 
 ## What changes
 
@@ -79,8 +83,9 @@ Generating and deploying work as for every forge-script upgrade (`docs/ecosystem
 
 ## Server side
 
-- The node and prover must support the new version before any chain upgrades: from then on the chain needs both
-  proofs. On mainnet that is v0.34.1 with the #2694 keys.
-- The new verifier's no-argument `verificationKeyHash()` returns the Boojum FFLONK key (`0x1249…`), which the node
-  stores as the version's snark wrapper VK hash.
+- The node and prover must support the new version (v0.34.1 on mainnet) before any chain upgrades: from then on the
+  chain needs both proofs.
+- The new verifier's no-argument `verificationKeyHash()` returns the Boojum FFLONK key, which the node stores as the
+  version's snark wrapper VK hash. Stage's and testnet3's v0.34.0 verifiers carry FFLONK `0xd89b…` and Airbender
+  `0xe1ea…`; the regenerated keys (FFLONK `0x1249…`, Airbender `0x0103…`) reach them as v0.34.1, and mainnet directly.
 - The chain's first post-upgrade batch executes the L2 upgrade transaction.
