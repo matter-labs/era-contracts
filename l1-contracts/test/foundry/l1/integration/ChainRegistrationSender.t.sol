@@ -26,12 +26,14 @@ import {InteropGatingDeployer} from "./_SharedInteropGatingDeployer.t.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
 
-/// @notice The interop peer whitelist of `ChainRegistrationSender`. See
-/// {protocol-docs/interop-gating.md#interop-peer-whitelist}.
+/// @notice The interop peer whitelist and the chain features of `ChainRegistrationSender`. See
+/// {protocol-docs/interop-gating.md#interop-peer-whitelist} and {protocol-docs/interop-gating.md#chain-features}.
 contract ChainRegistrationSenderTests is InteropGatingDeployer {
     using LogFinder for Vm.Log[];
 
     uint256 internal constant UNREGISTERED_CHAIN_ID = 123456;
+    /// @dev No production feature exists yet; the gate takes any id.
+    bytes32 internal constant TEST_FEATURE = keccak256("testFeature");
 
     uint256 internal chainId;
     uint256 internal peerChainId;
@@ -362,6 +364,45 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
             bytes.concat(CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION, abi.encode(chainId)),
             abi.encodeWithSelector(InteropPeerNotAllowed.selector, chainId, chainId)
         );
+    }
+
+    /// @notice Enabling a feature queues a service transaction setting it on the chain's own L2 Bridgehub, and on no
+    /// other chain; disabling it sends the new value the same way.
+    function test_setChainFeatureEnabled_pushesToOwnChain() public {
+        address owner = addresses.chainRegistrationSender.owner();
+        uint256 peerPriorityTxs = IGetters(getZKChainAddress(peerChainId)).getTotalPriorityTxs();
+
+        vm.expectEmit(true, true, false, true, address(addresses.chainRegistrationSender));
+        emit IChainRegistrationSender.ChainFeatureSet(chainId, TEST_FEATURE, true);
+        vm.recordLogs();
+        vm.prank(owner);
+        addresses.chainRegistrationSender.setChainFeatureEnabled(chainId, TEST_FEATURE, true);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        assertTrue(addresses.chainRegistrationSender.isChainFeatureEnabled(chainId, TEST_FEATURE));
+        assertEq(
+            _priorityTxCalldata(logs, chainId),
+            abi.encodeCall(IL2Bridgehub.setChainFeatureEnabled, (TEST_FEATURE, true))
+        );
+        assertEq(IGetters(getZKChainAddress(peerChainId)).getTotalPriorityTxs(), peerPriorityTxs);
+
+        vm.recordLogs();
+        vm.prank(owner);
+        addresses.chainRegistrationSender.setChainFeatureEnabled(chainId, TEST_FEATURE, false);
+        logs = vm.getRecordedLogs();
+
+        assertFalse(addresses.chainRegistrationSender.isChainFeatureEnabled(chainId, TEST_FEATURE));
+        assertEq(
+            _priorityTxCalldata(logs, chainId),
+            abi.encodeCall(IL2Bridgehub.setChainFeatureEnabled, (TEST_FEATURE, false))
+        );
+    }
+
+    /// @notice A chain's admin can't enable a feature for its own chain.
+    function test_setChainFeatureEnabled_revertWhen_chainAdmin() public {
+        vm.prank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, chainAdmin));
+        addresses.chainRegistrationSender.setChainFeatureEnabled(chainId, TEST_FEATURE, true);
     }
 
     function _peers(uint256 _peerChainId) internal pure returns (uint256[] memory peers) {

@@ -15,9 +15,11 @@ import {IL1MessageRoot} from "../message-root/IL1MessageRoot.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
+import {SEMVER_MINOR_OFFSET} from "../../common/libraries/SemVer.sol";
 
 import {Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
 import {
+    ChainFeaturesNotSupported,
     ChainHasNoBatchesInMessageRoot,
     InteropNotEnabled,
     InteropPeerAlreadyAllowed,
@@ -32,10 +34,14 @@ import {IL2Bridgehub} from "../bridgehub/IL2Bridgehub.sol";
 /// The retired version `0x01` registered any pair without consent.
 bytes1 constant CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION = 0x02;
 
+/// @dev The first protocol version, v0.36.0, whose `L2Bridgehub` has `setChainFeatureEnabled`.
+uint256 constant CHAIN_FEATURES_MIN_PROTOCOL_VERSION = 36 << SEMVER_MINOR_OFFSET;
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Registers chains on other chains' L2 Bridgehubs to enable interop between them, for the pairs
-/// the chain admins whitelisted. See {protocol-docs/interop-gating.md#interop-peer-whitelist}.
+/// the chain admins whitelisted, and pushes each chain's features to its own L2 Bridgehub. See
+/// {protocol-docs/interop-gating.md#interop-peer-whitelist} and {protocol-docs/interop-gating.md#chain-features}.
 contract ChainRegistrationSender is
     IChainRegistrationSender,
     IL1CrossChainSender,
@@ -50,6 +56,9 @@ contract ChainRegistrationSender is
 
     /// @inheritdoc IChainRegistrationSender
     mapping(uint256 chainId => mapping(uint256 peerChainId => bool allowed)) public interopPeerAllowed;
+
+    /// @inheritdoc IChainRegistrationSender
+    mapping(uint256 chainId => mapping(bytes32 feature => bool enabled)) public isChainFeatureEnabled;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
@@ -90,6 +99,29 @@ contract ChainRegistrationSender is
 
         // slither-disable-next-line unused-return
         IMailbox(zkChain).requestL2ServiceTransaction(L2_BRIDGEHUB_ADDR, _getL2RegistrationCalldata(_peerChainId));
+    }
+
+    /// @inheritdoc IChainRegistrationSender
+    function setChainFeatureEnabled(uint256 _chainId, bytes32 _feature, bool _enabled) external nonReentrant {
+        require(msg.sender == owner() || msg.sender == BRIDGE_HUB.admin(), Unauthorized(msg.sender));
+        address zkChain = BRIDGE_HUB.getZKChain(_chainId);
+        require(zkChain != address(0), ZKChainNotRegistered());
+        // The chain's L2 runs its upgrade transaction before this service transaction, so a chain that
+        // reports the version already has the setter on L2.
+        uint256 protocolVersion = IGetters(zkChain).getProtocolVersion();
+        require(
+            protocolVersion >= CHAIN_FEATURES_MIN_PROTOCOL_VERSION,
+            ChainFeaturesNotSupported(_chainId, protocolVersion)
+        );
+
+        isChainFeatureEnabled[_chainId][_feature] = _enabled;
+        emit ChainFeatureSet(_chainId, _feature, _enabled);
+
+        // slither-disable-next-line unused-return
+        IMailbox(zkChain).requestL2ServiceTransaction(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeCall(IL2Bridgehub.setChainFeatureEnabled, (_feature, _enabled))
+        );
     }
 
     /// @inheritdoc IChainRegistrationSender

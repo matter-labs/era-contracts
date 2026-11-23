@@ -6,6 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {
+    CHAIN_FEATURES_MIN_PROTOCOL_VERSION,
     CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION,
     ChainRegistrationSender
 } from "contracts/core/chain-registration/ChainRegistrationSender.sol";
@@ -20,6 +21,7 @@ import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses
 import {TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
 import {Unauthorized, UnsupportedEncodingVersion} from "contracts/common/L1ContractErrors.sol";
 import {
+    ChainFeaturesNotSupported,
     ChainHasNoBatchesInMessageRoot,
     InteropNotEnabled,
     InteropPeerAlreadyAllowed,
@@ -31,7 +33,8 @@ import {
 
 /// @notice `ChainRegistrationSender` alone. The Bridgehub, the message root and the chains are mocked to
 /// isolate the sender's checks; the end-to-end flow with real contracts is in the integration test
-/// `ChainRegistrationSender.t.sol`. See {protocol-docs/interop-gating.md#interop-peer-whitelist}.
+/// `ChainRegistrationSender.t.sol`. See {protocol-docs/interop-gating.md#interop-peer-whitelist} and
+/// {protocol-docs/interop-gating.md#chain-features}.
 contract ChainRegistrationSenderUnitTest is Test {
     uint256 internal constant CHAIN_ID = 271;
     uint256 internal constant PEER_CHAIN_ID = 272;
@@ -39,6 +42,8 @@ contract ChainRegistrationSenderUnitTest is Test {
     uint256 internal constant UNREGISTERED_CHAIN_ID = 123456;
     bytes32 internal constant PEER_BASE_TOKEN_ASSET_ID = keccak256("peerBaseToken");
     bytes32 internal constant CHAIN_BASE_TOKEN_ASSET_ID = keccak256("chainBaseToken");
+    /// @dev No production feature exists yet; the gate takes any id.
+    bytes32 internal constant TEST_FEATURE = keccak256("testFeature");
 
     address internal bridgehub;
     address internal messageRoot;
@@ -450,4 +455,73 @@ contract ChainRegistrationSenderUnitTest is Test {
 
     // add this to be excluded from coverage report
     function test() internal virtual {}
+
+    /*//////////////////////////////////////////////////////////////
+                            Chain features
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev The chain-feature push to `CHAIN_ID`'s L2 Bridgehub.
+    function _expectFeaturePush(bool _enabled) internal {
+        vm.expectCall(
+            chain,
+            abi.encodeCall(
+                IMailbox.requestL2ServiceTransaction,
+                (L2_BRIDGEHUB_ADDR, abi.encodeCall(IL2Bridgehub.setChainFeatureEnabled, (TEST_FEATURE, _enabled)))
+            )
+        );
+    }
+
+    function _mockBridgehubAdmin(address _admin) internal {
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.admin, ()), abi.encode(_admin));
+    }
+
+    function _mockProtocolVersion(uint256 _protocolVersion) internal {
+        vm.mockCall(chain, abi.encodeCall(IGetters.getProtocolVersion, ()), abi.encode(_protocolVersion));
+    }
+
+    function test_setChainFeatureEnabled_byOwnerOrBridgehubAdmin() public {
+        address ecosystemAdmin = makeAddr("ecosystemAdmin");
+        _mockBridgehubAdmin(ecosystemAdmin);
+        _mockProtocolVersion(CHAIN_FEATURES_MIN_PROTOCOL_VERSION);
+
+        vm.expectEmit(true, true, false, true, address(sender));
+        emit IChainRegistrationSender.ChainFeatureSet(CHAIN_ID, TEST_FEATURE, true);
+        _expectFeaturePush(true);
+        vm.prank(owner);
+        sender.setChainFeatureEnabled(CHAIN_ID, TEST_FEATURE, true);
+        assertTrue(sender.isChainFeatureEnabled(CHAIN_ID, TEST_FEATURE));
+        assertFalse(sender.isChainFeatureEnabled(PEER_CHAIN_ID, TEST_FEATURE));
+
+        vm.expectEmit(true, true, false, true, address(sender));
+        emit IChainRegistrationSender.ChainFeatureSet(CHAIN_ID, TEST_FEATURE, false);
+        _expectFeaturePush(false);
+        vm.prank(ecosystemAdmin);
+        sender.setChainFeatureEnabled(CHAIN_ID, TEST_FEATURE, false);
+        assertFalse(sender.isChainFeatureEnabled(CHAIN_ID, TEST_FEATURE));
+    }
+
+    /// @notice A chain's admin can't enable a feature for its chain: the ecosystem decides which chains use it.
+    function test_setChainFeatureEnabled_revertWhen_chainAdmin() public {
+        _mockBridgehubAdmin(makeAddr("ecosystemAdmin"));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, chainAdmin));
+        vm.prank(chainAdmin);
+        sender.setChainFeatureEnabled(CHAIN_ID, TEST_FEATURE, true);
+    }
+
+    /// @notice A chain whose L2 Bridgehub doesn't have the setter yet can't get a feature: the service transaction
+    /// would fail on L2 while L1 shows the feature enabled.
+    function test_setChainFeatureEnabled_revertWhen_protocolVersionTooOld() public {
+        uint256 oldVersion = CHAIN_FEATURES_MIN_PROTOCOL_VERSION - 1;
+        _mockProtocolVersion(oldVersion);
+        vm.expectRevert(abi.encodeWithSelector(ChainFeaturesNotSupported.selector, CHAIN_ID, oldVersion));
+        vm.prank(owner);
+        sender.setChainFeatureEnabled(CHAIN_ID, TEST_FEATURE, true);
+        assertFalse(sender.isChainFeatureEnabled(CHAIN_ID, TEST_FEATURE));
+    }
+
+    function test_setChainFeatureEnabled_revertWhen_chainNotRegistered() public {
+        vm.expectRevert(ZKChainNotRegistered.selector);
+        vm.prank(owner);
+        sender.setChainFeatureEnabled(UNREGISTERED_CHAIN_ID, TEST_FEATURE, true);
+    }
 }
