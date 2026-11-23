@@ -69,6 +69,6 @@ Generating and deploying work as for every forge-script upgrade (`docs/ecosystem
 ## Server side
 
 - The node and prover must support v0.34.0 before any chain upgrades: from then on the chain needs both proofs.
-- The new verifier's no-argument `verificationKeyHash()` returns the Boojum FFLONK key (`0xd89b…`), which the node
+- The new verifier's no-argument `verificationKeyHash()` returns the Boojum FFLONK key (`0x1249…`), which the node
   stores as the version's snark wrapper VK hash.
 - The chain's first post-upgrade batch executes the L2 upgrade transaction.
