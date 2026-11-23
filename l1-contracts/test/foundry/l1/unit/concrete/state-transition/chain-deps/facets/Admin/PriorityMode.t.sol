@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
 import {
+    NotCompatibleWithPriorityMode,
     OnlyPriorityMode,
     PriorityOpsRequestTimestampMissing,
     Unauthorized
@@ -13,6 +14,9 @@ import {PriorityModeAlreadyAllowed} from "contracts/state-transition/L1StateTran
 contract PriorityModeAdminTest is AdminTest {
     function setUp() public override {
         super.setUp();
+        // A registered chain has its base token multiplier set (`RegisterZKChain` sets it).
+        utilsFacet.util_setBaseTokenGasPriceMultiplierNominator(1);
+        utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
     }
 
     /// @dev Fakes a priority tx with a non-zero timestamp so permanentlyAllowPriorityMode can succeed.
@@ -27,6 +31,34 @@ contract PriorityModeAdminTest is AdminTest {
         vm.prank(admin);
         vm.expectRevert(abi.encodeWithSelector(PriorityOpsRequestTimestampMissing.selector, 0));
         adminFacet.permanentlyAllowPriorityMode();
+    }
+
+    /// @notice Regression test: a free service transaction can be the pending priority operation, so a
+    /// chain whose multiplier was never set could opt in. Its L1 -> L2 requests revert, and after the
+    /// opt-in the price-change bound would keep the multiplier from ever being set.
+    function test_revertWhen_permanentlyAllowPriorityMode_multiplierNotSet() public {
+        _fakePriorityTx();
+        utilsFacet.util_setBaseTokenGasPriceMultiplierNominator(0);
+        utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(0);
+        address admin = utilsFacet.util_getAdmin();
+
+        vm.prank(admin);
+        vm.expectRevert(NotCompatibleWithPriorityMode.selector);
+        adminFacet.permanentlyAllowPriorityMode();
+
+        assertFalse(utilsFacet.util_getPriorityModeCanBeActivated());
+    }
+
+    /// @notice A multiplier with a zero nominator is set: the chain prices requests by `minimalL2GasPrice`.
+    function test_permanentlyAllowPriorityMode_zeroNominator() public {
+        _fakePriorityTx();
+        utilsFacet.util_setBaseTokenGasPriceMultiplierNominator(0);
+        address admin = utilsFacet.util_getAdmin();
+
+        vm.prank(admin);
+        adminFacet.permanentlyAllowPriorityMode();
+
+        assertTrue(utilsFacet.util_getPriorityModeCanBeActivated());
     }
 
     function test_revertWhen_permanentlyAllowPriorityMode_calledTwice() public {

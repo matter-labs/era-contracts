@@ -586,9 +586,14 @@ contract CoreUpgradeDeclaredChanges is CoreUpgrade_v36 {
     }
 }
 
-/// @notice The release's own declared release-member changes.
+/// @notice The release's own declared release-member changes on an edge, which depend on whether it is a patch.
 contract CTMUpgradeDeclaredChanges is CTMUpgrade_v36 {
-    function declaredChanges() external view returns (string[] memory) {
+    function declaredChanges(
+        uint256 _oldProtocolVersion,
+        uint256 _newProtocolVersion
+    ) external returns (string[] memory) {
+        newConfig.oldProtocolVersion = _oldProtocolVersion;
+        setNewProtocolVersion(_newProtocolVersion);
         return changedReleaseMembers();
     }
 }
@@ -624,7 +629,10 @@ contract ReleaseDeclaredChangesTest is UpgradeIntegrationReleaseFixture {
 
         checked = CTMUpgradeForLocalTest(address(ctmUpgrade)).reuseChecked();
         assertGt(checked.length, 0, "the prepare checked no release member for reuse");
-        declared = new CTMUpgradeDeclaredChanges().declaredChanges();
+        declared = new CTMUpgradeDeclaredChanges().declaredChanges(
+            ctmUpgrade.getOldProtocolVersion(),
+            ctmUpgrade.getNewProtocolVersion()
+        );
         for (uint256 i = 0; i < checked.length; ++i) {
             requireDeclaredIfChanged(checked[i], previous, current, declared, "changedReleaseMembers()");
         }
