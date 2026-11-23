@@ -51,14 +51,19 @@ registered): its ChainAdmin's owner sets the upgrade timestamp, with the bundle
 writes, with `<version>` 146028888064 on testnet3 and 146028888065 on mainnet; on testnets `1` means as soon as
 the node sees it, on mainnet it is a real future date. Once the chain is drained:
 
-1. **Server path (first choice):** the node's operator calls `ValidatorTimelock.upgradeChainFromVersion`, which
-   needs `UPGRADER_ROLE` for the diamond. Mainnet's 324 has no holder; grant only that role with
-   `protocol_ops chain grant-upgrader --env <env> --chain-id <id> --validator-address <operator> --l1-rpc-url <rpc> --out <dir>`.
+1. **Server path (first choice):** the node sends `upgradeChainFromVersion` to the contract it sends its batches to,
+   once the timestamp has passed and its batches are proven. Whoever calls the ValidatorTimelock needs
+   `UPGRADER_ROLE` there for the diamond. Mainnet's batches go to the EraMultisigValidator `0xdc26…539d`, which
+   checks the role for the operator itself (held), then forwards to the ValidatorTimelock `0x2e51…b776`, which checks
+   it for the multisig (missing). That target is node configuration and can change, so first check that the `to` of
+   324's latest prove transaction is still `0xdc26…539d`. Then grant only that role to the multisig with
+   `protocol_ops chain grant-upgrader --env mainnet --chain-id 324 --validator-address 0xdc26b08f0335b68721f64001c38b05d0bc9b539d --l1-rpc-url <rpc> --out <dir>`.
    It simulates on a fork and writes a Safe bundle and `EXECUTE.md` for the ChainAdmin's owner. Afterwards require
-   `cast call <timelock> 'hasRole(address,bytes32,address)(bool)' <diamond> $(cast keccak UPGRADER_ROLE) <operator>`
+   `cast call <timelock> 'hasRole(address,bytes32,address)(bool)' <diamond> $(cast keccak UPGRADER_ROLE) 0xdc26b08f0335b68721f64001c38b05d0bc9b539d`
    to return `true`; a successful receipt is not enough.
 2. **Fallback:** the ChainAdmin's owner sends the bundle
-   `protocol_ops chain upgrade --env <env> --chain-id <id> --l1-rpc-url <rpc> --out <dir>` writes.
+   `protocol_ops chain upgrade --env <env> --chain-id <id> --l1-rpc-url <rpc> --out <dir>` writes. Whichever path
+   lands second reverts with `ProtocolIdMismatch`.
 
 ## Files
 
