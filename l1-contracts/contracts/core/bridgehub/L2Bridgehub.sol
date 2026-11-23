@@ -42,6 +42,9 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     /// @inheritdoc IL2Bridgehub
     mapping(uint256 chainId => bool) public isPeerAllowed;
 
+    /// @inheritdoc IL2Bridgehub
+    mapping(bytes32 feature => bool enabled) public isChainFeatureEnabled;
+
     modifier onlyChainRegistrationSender() {
         if (
             /// Note on the L2 the chainRegistrationSender is aliased.
@@ -102,6 +105,11 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     function deregisterChainForInterop(uint256 _chainId) external onlyChainRegistrationSender {
         delete baseTokenAssetId[_chainId];
         delete isPeerAllowed[_chainId];
+    }
+
+    /// @inheritdoc IL2Bridgehub
+    function setChainFeatureEnabled(bytes32 _feature, bool _enabled) external onlyChainRegistrationSender {
+        isChainFeatureEnabled[_feature] = _enabled;
     }
 
     /*//////////////////////////////////////////////////////////////

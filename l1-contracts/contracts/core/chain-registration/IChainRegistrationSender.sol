@@ -11,11 +11,25 @@ interface IChainRegistrationSender {
     /// @notice The owner or the admin of `chainRegisteredOn` removed `chainId` from its L2 Bridgehub.
     event InteropPairDeregistered(uint256 indexed chainRegisteredOn, uint256 indexed chainId);
 
+    /// @notice `feature` was enabled or disabled for `chainId`.
+    event ChainFeatureSet(uint256 indexed chainId, bytes32 indexed feature, bool enabled);
+
     function initialize(address _owner) external;
 
     /// @notice Whether the admin of `_chainId` allowed interop with `_peerChainId`.
     /// See {protocol-docs/interop-gating.md#interop-peer-whitelist}.
     function interopPeerAllowed(uint256 _chainId, uint256 _peerChainId) external view returns (bool);
+
+    /// @notice Whether `_feature` is enabled for `_chainId`. See {protocol-docs/interop-gating.md#chain-features}.
+    function isChainFeatureEnabled(uint256 _chainId, bytes32 _feature) external view returns (bool);
+
+    /// @notice Enables or disables `_feature` for `_chainId`, on L1 and on the chain's L2 Bridgehub.
+    /// Callable by the owner and by the Bridgehub admin, once the chain runs a protocol version whose L2 Bridgehub
+    /// has the setter. See {protocol-docs/interop-gating.md#chain-features}.
+    /// @param _chainId The chain.
+    /// @param _feature The feature id.
+    /// @param _enabled Whether the feature is enabled.
+    function setChainFeatureEnabled(uint256 _chainId, bytes32 _feature, bool _enabled) external;
 
     /// @notice Allows interop between `_chainId` and `_peerChainId` on `_chainId`'s side, on L1 and on
     /// `_chainId`'s L2 Bridgehub. `deregisterInteropPairs` revokes it.
