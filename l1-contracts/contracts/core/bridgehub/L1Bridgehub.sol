@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
+import {UpgradeAuthorityLib} from "../../common/libraries/UpgradeAuthorityLib.sol";
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 
 import {BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
@@ -63,6 +64,12 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
         _initializeInner();
+    }
+
+    /// @dev On L1 the upgrader is the owner of this proxy's `ProxyAdmin`, not the L2 complex upgrader.
+    modifier onlyOwnerOrUpgrader() override {
+        UpgradeAuthorityLib.requireOwnerOrUpgrader(owner());
+        _;
     }
 
     /// @notice used to initialize the contract

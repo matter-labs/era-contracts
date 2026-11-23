@@ -257,28 +257,48 @@ export function assertUpgradeLegs(
 }
 
 /**
- * A recurring registry hop's merged output: the bundle is exactly the reported upgrade's legs, one
- * contiguous run in canonical order with no other call, and the prepares declared no external
- * action of any phase (after the bootstrap, governance holds both domains through the executors).
+ * A recurring registry hop's merged output: the bundle is the reported upgrade's legs, one
+ * contiguous run in canonical order, followed by exactly `declared` — the governance actions the
+ * CTM prepare declares (v36's RollupDAManager handover), which are also the prepares' only external
+ * actions. With `declared` empty, the bundle is the legs alone and nothing is declared (after the
+ * bootstrap, governance holds both domains through the executors).
  */
 export function assertRegistryHopBundle(
   merged: MergedGovernanceOutput,
   selectors: UpgradeLegSelectors,
-  expected: UpgradeLeg[]
+  expected: UpgradeLeg[],
+  declared: ExpectedCall[] = []
 ): RecoveredUpgradeLeg[] {
   const calls = governanceCallsOf(merged);
   const legs = assertUpgradeLegs(calls, selectors, expected);
+  const lastLeg = Math.max(...legs.map((leg) => leg.position));
   const others = calls
     .map((call, position) => ({ call, position }))
     .filter(({ position }) => !legs.some((leg) => leg.position === position));
-  if (others.length !== 0) {
+  const misplaced = others.filter(({ position }) => position < lastLeg);
+  if (misplaced.length !== 0 || (declared.length === 0 && others.length !== 0)) {
     const lines = others.map(({ call, position }) => `  [${position}] ${describeCall(call)}`);
-    throw new Error(`a registry hop's bundle must carry only its upgrade legs, got also:\n${lines.join("\n")}`);
+    throw new Error(
+      `a registry hop's bundle must carry only its upgrade legs, then its declared calls, got also:\n${lines.join("\n")}`
+    );
   }
+  assertBundleIs(
+    others.map(({ call }) => call),
+    declared,
+    "the calls after the legs"
+  );
   const externalActions = merged.external_actions ?? [];
-  if (externalActions.length !== 0) {
+  const undeclared = externalActions.filter(
+    (action, i) =>
+      action.phase !== "governance" ||
+      action.target?.toLowerCase() !== declared[i]?.target.toLowerCase() ||
+      action.data?.toLowerCase() !== declared[i]?.data.toLowerCase()
+  );
+  if (externalActions.length !== declared.length || undeclared.length !== 0) {
     const lines = externalActions.map((a) => `  phase ${a.phase} | ${a.label} | target ${a.target ?? "?"}`);
-    throw new Error(`a registry hop's prepares must declare no external actions, got:\n${lines.join("\n")}`);
+    throw new Error(
+      `a registry hop's prepares must declare exactly its ${declared.length} expected governance action(s), got:\n${lines.join("\n")}`
+    );
   }
   return legs;
 }

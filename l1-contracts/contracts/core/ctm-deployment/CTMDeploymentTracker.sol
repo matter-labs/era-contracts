@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {UpgradeAuthorityLib} from "../../common/libraries/UpgradeAuthorityLib.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
 import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../bridgehub/IBridgehubBase.sol";
@@ -33,6 +34,12 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
 
     /// @dev L1AssetRouter smart contract that is used to bridge assets (including chains) between L1 and L2.
     IAssetRouterBase public immutable override L1_ASSET_ROUTER;
+
+    /// @dev The owner, or the upgrade authority (the owner of this proxy's `ProxyAdmin`).
+    modifier onlyOwnerOrUpgrader() {
+        UpgradeAuthorityLib.requireOwnerOrUpgrader(owner());
+        _;
+    }
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
@@ -83,7 +90,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
     /// @dev This function is called during the ecosystem upgrade process
     /// @dev while `registerCTMAssetOnL1` is called during the ecosystem genesis process.
     /// @param _ctmAddress the address of the ctm asset.
-    function setCtmAssetHandlerAddressOnL1(address _ctmAddress) external onlyOwner {
+    function setCtmAssetHandlerAddressOnL1(address _ctmAddress) external onlyOwnerOrUpgrader {
         AssetRouterBase(address(L1_ASSET_ROUTER)).setAssetHandlerAddressThisChain(
             bytes32(uint256(uint160(_ctmAddress))),
             BRIDGE_HUB.chainAssetHandler()

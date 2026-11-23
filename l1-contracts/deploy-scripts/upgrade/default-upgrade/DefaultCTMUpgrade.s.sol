@@ -403,13 +403,13 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     /// @notice Deploys the write-once CTM-domain `ProxyUpgradeTransition` of this upgrade's
     ///         CTM-domain implementation swaps — what `applyInfrastructureUpgrade` applies. Nothing is
     ///         deployed when the run swaps none (an upgrade that leaves the CTM domain alone omits that
-    ///         leg).
+    ///         leg), unless the version's engine has work of its own ({engineRunsWithoutSwaps}).
     /// @dev Rides the CREATE2 factory like every prepare deployment: the Safe bundle replays
     ///      factory transactions only, so a plain CREATE would leave the executor call pointing at a
     ///      codeless address on the real chain.
     function deployCTMInfrastructureTransition() public virtual {
         ProxyUpgradeRow[] memory inventory = ctmProxyInventory();
-        if (_participatingRows(inventory) == 0) {
+        if (_participatingRows(inventory) == 0 && !engineRunsWithoutSwaps()) {
             console.log("No CTM-domain implementation deployed: this upgrade has no infrastructure transition");
             return;
         }
@@ -435,6 +435,13 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ///         subclass instead.
     function deployProxyUpgradeEngine() internal virtual returns (address) {
         return deploySimpleContract("DefaultProxyUpgradeEngine");
+    }
+
+    /// @notice Whether the infrastructure transition is deployed even when this run swaps no
+    ///         CTM-domain proxy: a version whose {deployProxyUpgradeEngine} subclass makes calls of its
+    ///         own returns true.
+    function engineRunsWithoutSwaps() internal view virtual returns (bool) {
+        return false;
     }
 
     /// @notice The enum-indexed CTM-domain inventory of this edge: a source-checked row for every

@@ -26,10 +26,11 @@ return. Replacing one is therefore a handover of its domain to a successor const
 same bindings and owned by governance, through the predecessor's `forward`:
 
 - the core domain: `ProxyAdmin.transferOwnership(successor)` on the ecosystem `ProxyAdmin`;
-- a CTM domain: `transferOwnership(successor)` on the CTM, its `ProxyAdmin` and the ServerNotifier;
-  the successor's `acceptCTMOwnership()` (called by governance, the successor's owner, or by the
-  predecessor in the same `forward`) and a `forward([notifier.acceptOwnership()])` complete the
-  two-step handovers.
+- a CTM domain: `transferOwnership(successor)` on the CTM, its `ProxyAdmin`, the ServerNotifier and
+  the `RollupDAManager`; the successor's `acceptCTMOwnership()` (called by governance, the
+  successor's owner, or by the predecessor in the same `forward`) and a
+  `forward([notifier.acceptOwnership(), rollupDAManager.acceptOwnership()])` complete the two-step
+  handovers.
 
 Hand over before preparing the next upgrade: the prepares name the executor that holds each domain
 at prepare time (the ecosystem `ProxyAdmin`'s owner, the CTM's owner), and the merge derives the
@@ -57,9 +58,11 @@ architecture document).
   owner freezing directly, as the Security Council's freeze does
   ([freezing a chain](../protocol-docs/ecosystem-upgrade-coordination.md#freezing-a-chain)).
 - **Ownership changes** (`OwnershipTransferStarted` / `OwnershipTransferred`) on the executors, the
-  CTM, both `ProxyAdmin`s, the ServerNotifier and the Bridgehub (whose owner can freeze the CTM's
-  chains): expected only during executor succession or
-  [governance self-migration](governance-self-migration.md).
+  CTM, both `ProxyAdmin`s, the ServerNotifier, the `RollupDAManager` (whose owner sets the allowed DA
+  pairs) and the Bridgehub (whose owner can freeze the CTM's chains): expected only during executor
+  succession, [governance self-migration](governance-self-migration.md) or the `RollupDAManager`'s
+  one-time handover to the CTM executor
+  ([what an engine can reach](registry-driven-upgrades.md#what-an-engine-can-reach)).
 - **`AdminChanged`** on the CTM's and the ServerNotifier's proxies: not expected from v36 on; the
   v35 ServerNotifier handover, which moved the notifier under the CTM-domain `ProxyAdmin`, was the
   last.

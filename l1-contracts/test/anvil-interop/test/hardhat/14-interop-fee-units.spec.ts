@@ -124,13 +124,9 @@ describe("14 - Interop fee units", function () {
     expect(proxyAdmin).to.equal(await proxyAdminOf(state.ctmAddresses!.chainTypeManager));
     const ctmExecutor: string = await new Contract(ctm.address, getAbi("Ownable2Step"), l1Provider).owner();
     expect(await new Contract(proxyAdmin, getAbi("ProxyAdmin"), l1Provider).owner()).to.equal(ctmExecutor);
-    // The switch belongs to the CTM's governance, which owns it and receives the fees from initialization. The CTM
-    // deployment nominates the same governance on the RollupDAManager, and anvil never accepts that nomination.
-    const bridgehub = new Contract(state.l1Addresses!.bridgehub, getAbi("L1Bridgehub"), l1Provider);
-    const diamond = new Contract(await bridgehub.getZKChain(directSettledChainId), getAbi("IZKChain"), l1Provider);
-    const rollupDAManager = new Contract(await diamond.getRollupDAManager(), getAbi("Ownable2Step"), l1Provider);
-    const governance: string = await rollupDAManager.pendingOwner();
-    expect(governance).to.not.equal(ethers.constants.AddressZero);
+    // The switch belongs to the CTM's governance, which owns it and receives the fees from initialization.
+    const governance = state.ctmAddresses!.governance;
+    expect(governance, "the CTM deployment records its governance").to.not.equal(ethers.constants.AddressZero);
     expect(await feeManager.owner()).to.equal(governance);
     expect(await feeManager.feeRecipient()).to.equal(governance);
     expect(await feeManager.pendingOwner()).to.equal(ethers.constants.AddressZero);

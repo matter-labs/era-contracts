@@ -414,8 +414,6 @@ error RegistrySelfEdgeProxyRow(address proxy);
 error RegistryServerNotifierNotBound(address expected, address actual);
 // 0xe89c554c
 error RegistryTargetHasNoCode(address target);
-// 0x1f20dafa
-error RegistryUnknownKey();
 // 0xfad1d610
 error ReleaseForceDeploymentMismatch(uint256 member);
 // 0xc99ade52

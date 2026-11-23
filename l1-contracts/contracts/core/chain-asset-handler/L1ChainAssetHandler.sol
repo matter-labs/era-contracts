@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {UpgradeAuthorityLib} from "../../common/libraries/UpgradeAuthorityLib.sol";
 import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
 import {
     ETH_TOKEN_ADDRESS,
@@ -94,6 +95,12 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         return assetRouter;
     }
 
+    /// @dev The owner, or the upgrade authority (the owner of this proxy's `ProxyAdmin`).
+    modifier onlyOwnerOrUpgrader() {
+        UpgradeAuthorityLib.requireOwnerOrUpgrader(owner());
+        _;
+    }
+
     constructor(address _owner, address _bridgehub) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGEHUB = IL1Bridgehub(_bridgehub);
@@ -110,7 +117,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
 
     /// @notice Sets the addresses of the message root and asset router by querying the bridgehub.
     /// @dev Called after deployment once the dependent contracts are registered on the bridgehub.
-    function setAddresses() external onlyOwner {
+    function setAddresses() external onlyOwnerOrUpgrader {
         messageRoot = BRIDGEHUB.messageRoot();
         assetRouter = BRIDGEHUB.assetRouter();
     }

@@ -558,6 +558,19 @@ impl<'a> MemberReview<'a> {
         Ok((DynSolValue::Address(reviewed), source))
     }
 
+    /// The CTM's RollupDAManager and where it was established: the reviewed env's
+    /// `rollup_da_manager`, held against a chain on the CTM, or that chain's alone.
+    pub(super) async fn ctm_rollup_da_manager<P: Provider>(
+        &self,
+        provider: &P,
+    ) -> Result<(Address, String), String> {
+        let (value, source) = self.rollup_da_manager(provider).await?;
+        let address = value
+            .as_address()
+            .ok_or_else(|| format!("{source} is not an address"))?;
+        Ok((address, source))
+    }
+
     async fn rollup_da_manager<P: Provider>(&self, provider: &P) -> Established {
         let Some(ctm) = self.ctm else {
             return Err("the package names no CTM whose RollupDAManager it is".into());
