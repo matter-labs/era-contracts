@@ -61,7 +61,7 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
             governance: address(0),
             zkTokenAssetId: permanent.readBytes32("$.zk_token_asset_id")
         });
-        // An env may target a later patch of the genesis minor; its L2 tx, bootloader and keys stay the genesis's.
+        // An env may target another patch of the genesis minor; its L2 tx, bootloader and keys stay the genesis's.
         if (input.keyExists("$.new_protocol_version")) {
             _setNewProtocolVersionFromInput(input.readUint("$.new_protocol_version"));
         }
@@ -79,19 +79,18 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
         console.log("v34: output written to", upgradeConfig.outputPath);
     }
 
-    /// @dev Only a later patch of the genesis's minor: the L2 upgrade tx, bootloader and keys are the genesis's.
+    /// @dev Only a patch of the genesis's minor: the L2 upgrade tx, bootloader and keys are the genesis's.
     function _setNewProtocolVersionFromInput(uint256 _version) internal {
         (uint32 major, uint32 minor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_version));
         (uint32 genesisMajor, uint32 genesisMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(getNewProtocolVersion()));
         require(major == genesisMajor && minor == genesisMinor, "v34: new_protocol_version not the genesis minor");
-        require(_version > getNewProtocolVersion(), "v34: new_protocol_version not above the genesis");
         setNewProtocolVersion(_version);
     }
 
     // ======================== Live-state checks ========================
 
     /// @dev Fail before deploying anything if the CTM is not an Era CTM one minor below the new version (the
-    ///      genesis's, or a later patch of it from the input's `new_protocol_version`).
+    ///      genesis's, or another patch of it from the input's `new_protocol_version`).
     function _checkLiveState() internal view {
         IChainTypeManager ctm = IChainTypeManager(newConfig.ctm);
         require(!ctm.isZKsyncOS(), "v34: not an Era CTM");

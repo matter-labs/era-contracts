@@ -14,8 +14,8 @@ EVM emulator fix.
 ## Version
 
 Mainnet skips v0.34.0: Sepolia's v0.34.0 has the verifier keys from before #2694 and gets the new ones as v0.34.1
-(`upgrade-envs/v0.34.1-era`). `mainnet.toml`'s `new_protocol_version` sets v0.34.1; the L2 upgrade transaction,
-bootloader and keys stay the genesis's.
+(`upgrade-envs/v0.34.1-era`). The genesis is v0.34.1, so mainnet takes it; `testnet3.toml`'s `new_protocol_version`
+keeps testnet3 on v0.34.0. The L2 upgrade transaction, bootloader and keys stay the genesis's.
 
 ## What changes
 
@@ -64,7 +64,7 @@ the node sees it, on mainnet it is a real future date. Once the chain is drained
 ## Files
 
 - `<env>.toml`: what the script can't read from `permanent-values/<env>.toml`, the chain or the v34 genesis: the
-  verifier flavour, the timer delay, the salt and `use_v29_introspection = false`; on mainnet only, also
+  verifier flavour, the timer delay, the salt and `use_v29_introspection = false`; on testnet3 only, also
   `new_protocol_version`.
 - `output/<env>/`: committed from the generate run. `output/stage/` keeps the layout stage was generated with; the
   others are in `DefaultCTMUpgrade.saveOutput`'s layout, where the zero addresses are fields v34 doesn't use and

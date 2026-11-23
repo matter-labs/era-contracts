@@ -2,7 +2,7 @@
 # Rehearse the v34 Era upgrade of one environment on an L1 fork and check the resulting L1 state. The
 # environment is UPGRADE_ENV (testnet3, mainnet); every fact comes from its $UPGRADE_ENV.toml,
 # permanent-values/$UPGRADE_ENV.toml, the v34 genesis, the output and the chain. The new version is the
-# genesis's, or a later patch of it from $UPGRADE_ENV.toml's new_protocol_version.
+# genesis's, or another patch of it from $UPGRADE_ENV.toml's new_protocol_version.
 #   1. CTMUpgrade_v34Era.prepare — CREATE2 deployments and factory-dep publication (fork only), writes
 #      output/$UPGRADE_ENV/ecosystem.toml
 #   2. every factory dep of the L2 upgrade tx is published to the BytecodesSupplier
@@ -108,10 +108,10 @@ env, permanent = (tomllib.load(open(p, "rb")) for p in sys.argv[1:3])
 semver = json.load(open(sys.argv[3]))["protocol_semantic_version"]
 genesis = new = semver["major"] << 64 | semver["minor"] << 32 | semver["patch"]
 if "new_protocol_version" in env:
-    # As CTMUpgrade_v34Era: only a later patch of the genesis minor.
+    # As CTMUpgrade_v34Era: only a patch of the genesis minor.
     new = env["new_protocol_version"]
-    if type(new) is not int or new >> 32 != genesis >> 32 or new <= genesis:
-        sys.exit(f"  new_protocol_version {new!r}: not a later patch of the genesis's {genesis}")
+    if type(new) is not int or new >> 32 != genesis >> 32:
+        sys.exit(f"  new_protocol_version {new!r}: not a patch of the genesis's minor {genesis}")
 ctm = permanent["ctm_contracts"]["ctms"][0]  # the script's: the first CTM, which must be Era
 if ctm["is_zk_sync_os"]:
     sys.exit("  permanent values: the first CTM is not Era")

@@ -2,7 +2,7 @@
   "protocol_semantic_version": {
     "major": 0,
     "minor": 34,
-    "patch": 0
+    "patch": 1
   },
   "genesis_root": "0xabe05c1be8b191d9876b1b93ff02a8736856c72033cb27a7b50892c78a254ce4",
   "genesis_rollup_leaf_index": 102,
