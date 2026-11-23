@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {UpgradeAuthorityLib} from "../common/libraries/UpgradeAuthorityLib.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
@@ -101,6 +102,12 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// Exposed on the nullifier so deploy scripts and other bridge contracts can discover the handler.
     address public l1InteropHandler;
 
+    /// @dev The owner, or the upgrade authority (the owner of this proxy's `ProxyAdmin`).
+    modifier onlyOwnerOrUpgrader() {
+        UpgradeAuthorityLib.requireOwnerOrUpgrader(owner());
+        _;
+    }
+
     /// @notice Checks that the message sender is the asset router.
     modifier onlyAssetRouter() {
         require(msg.sender == address(l1AssetRouter), Unauthorized(msg.sender));
@@ -125,27 +132,27 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     }
 
     /// @notice Sets the nativeTokenVault contract address.
-    /// @dev Should be called only once by the owner.
+    /// @dev Should be called only once by the owner or the upgrade authority.
     /// @param _l1NativeTokenVault The address of the native token vault.
-    function setL1NativeTokenVault(IL1NativeTokenVault _l1NativeTokenVault) external onlyOwner {
+    function setL1NativeTokenVault(IL1NativeTokenVault _l1NativeTokenVault) external onlyOwnerOrUpgrader {
         require(address(l1NativeTokenVault) == address(0), NativeTokenVaultAlreadySet());
         require(address(_l1NativeTokenVault) != address(0), ZeroAddress());
         l1NativeTokenVault = _l1NativeTokenVault;
     }
 
     /// @notice Sets the L1 asset router contract address.
-    /// @dev Should be called only once by the owner.
+    /// @dev Should be called only once by the owner or the upgrade authority.
     /// @param _l1AssetRouter The address of the asset router.
-    function setL1AssetRouter(address _l1AssetRouter) external onlyOwner {
+    function setL1AssetRouter(address _l1AssetRouter) external onlyOwnerOrUpgrader {
         require(address(l1AssetRouter) == address(0), AddressAlreadySet(address(l1AssetRouter)));
         require(_l1AssetRouter != address(0), ZeroAddress());
         l1AssetRouter = IL1AssetRouter(_l1AssetRouter);
     }
 
     /// @notice Sets the L1 interop handler contract address.
-    /// @dev Should be called only once by the owner.
+    /// @dev Should be called only once by the owner or the upgrade authority.
     /// @param _l1InteropHandler The address of the interop handler.
-    function setL1InteropHandler(address _l1InteropHandler) external onlyOwner {
+    function setL1InteropHandler(address _l1InteropHandler) external onlyOwnerOrUpgrader {
         require(l1InteropHandler == address(0), AddressAlreadySet(l1InteropHandler));
         require(_l1InteropHandler != address(0), ZeroAddress());
         l1InteropHandler = _l1InteropHandler;

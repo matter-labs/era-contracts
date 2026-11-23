@@ -47,7 +47,7 @@ import {
   upgradeLegCall,
   upgradeLegSelectors,
 } from "./upgrade-test-utils";
-import type { GovernanceCall, MergedGovernanceOutput } from "./governance-bundle";
+import type { ExpectedCall, GovernanceCall, MergedGovernanceOutput } from "./governance-bundle";
 import { assertBundleIs, assertRegistryHopBundle, upgradeLegsOf } from "./governance-bundle";
 import { l1GasOverrides, recordL1TransactionGas } from "./l1-transaction-gas";
 import { createProvider, impersonateAndRun } from "../core/utils";
@@ -166,7 +166,12 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
       ctmAddresses.chainTypeManager,
       await readProxyAdmin(l1Provider, l1Addresses.messageRoot)
     );
-    await transferL1Ownership(l1Provider, defaultSigner, l1Addresses, executors);
+    const rollupDAManager: string = await new ethers.Contract(
+      upgradeChainAddresses[0].diamondProxy,
+      getAbi("AdminFacet"),
+      l1Provider
+    ).getRollupDAManager();
+    await transferL1Ownership(l1Provider, defaultSigner, l1Addresses, executors, rollupDAManager);
 
     // ── Deploy ChainAdmin for each upgrade target ──
     console.log("\n── Deploying temporary ChainAdminOwnable contracts ──");
@@ -455,10 +460,21 @@ async function runRecurringHop(
     }
 
     // ── The tooling claim, checked on the artifact ──
-    const legs = assertRegistryHopBundle(merged, upgradeLegSelectors(), reportedLegs);
+    const rollupDAManager: string = await new ethers.Contract(
+      upgradeChainAddresses[0].diamondProxy,
+      getAbi("AdminFacet"),
+      l1Provider
+    ).getRollupDAManager();
+    const handover = await rollupDAManagerHandover(
+      l1Provider,
+      rollupDAManager,
+      executors.ctmExecutor,
+      ctx.l1Addresses.governance
+    );
+    const legs = assertRegistryHopBundle(merged, upgradeLegSelectors(), reportedLegs, handover);
     console.log(
       `  ✓ the merged bundle is exactly the ${legs.map((leg) => leg.kind).join(" -> ")} leg run, ` +
-        "with no other call and no external actions"
+        `then ${handover.length} declared call(s) handing the RollupDAManager to the CTM executor`
     );
 
     verifyPackageAsReviewed({
@@ -522,7 +538,22 @@ async function runRecurringHop(
         data: call.data,
       })
     );
-    assertBundleIs(executedCalls, reportedLegs.map(upgradeLegCall), "the operation Governance executed");
+    assertBundleIs(
+      executedCalls,
+      [...reportedLegs.map(upgradeLegCall), ...handover],
+      "the operation Governance executed"
+    );
+    const rollupDAManagerOwner: string = await new ethers.Contract(
+      rollupDAManager,
+      getAbi("Ownable2Step"),
+      l1Provider
+    ).owner();
+    if (rollupDAManagerOwner.toLowerCase() !== executors.ctmExecutor.toLowerCase()) {
+      throw new Error(
+        `the RollupDAManager is owned by ${rollupDAManagerOwner}, not the CTM executor ${executors.ctmExecutor}`
+      );
+    }
+    console.log("  ✓ the CTM executor owns the RollupDAManager");
     const applied = await assertLegsApplied(l1Provider, execution, reportedLegs, rowSnapshots);
     const ctmExecutorIface = new ethers.utils.Interface(getAbi("CTMUpgradeExecutor"));
     const transitionAppliedLog = execution.logs.find(
@@ -657,9 +688,46 @@ async function sendAndCheck(
 // ── L1 ownership & admin setup ───────────────────────────────────────
 
 /**
+ * The calls a hop's bundle carries after its legs to hand the RollupDAManager to the CTM executor (the
+ * v36 prepare's declared handover): none once the executor owns it, otherwise governance nominates
+ * the executor and the executor accepts through `forward`.
+ */
+async function rollupDAManagerHandover(
+  provider: ethers.providers.JsonRpcProvider,
+  rollupDAManager: string,
+  ctmExecutor: string,
+  governance: string
+): Promise<ExpectedCall[]> {
+  const ownable = new ethers.utils.Interface(getAbi("Ownable2Step"));
+  const owner: string = await new ethers.Contract(rollupDAManager, ownable, provider).owner();
+  if (owner.toLowerCase() === ctmExecutor.toLowerCase()) {
+    return [];
+  }
+  if (owner.toLowerCase() !== governance.toLowerCase()) {
+    throw new Error(
+      `the RollupDAManager ${rollupDAManager} is owned by ${owner}, neither governance nor the CTM executor`
+    );
+  }
+  const accept = { target: rollupDAManager, value: 0, data: ownable.encodeFunctionData("acceptOwnership") };
+  return [
+    {
+      label: "RollupDAManager.transferOwnership(ctmExecutor)",
+      target: rollupDAManager,
+      data: ownable.encodeFunctionData("transferOwnership", [ctmExecutor]),
+    },
+    {
+      label: "ctmExecutor.forward([RollupDAManager.acceptOwnership()])",
+      target: ctmExecutor,
+      data: new ethers.utils.Interface(getAbi("CTMUpgradeExecutor")).encodeFunctionData("forward", [[accept]]),
+    },
+  ];
+}
+
+/**
  * Gives the fixture a production ecosystem's authority, which the anvil deployment partly leaves with the
- * deployer: governance owns the core contracts and both upgrade executors (the CTM domain stays with the CTM
- * executor).
+ * deployer: governance owns the core contracts, both upgrade executors and the CTM's RollupDAManager (the CTM
+ * domain stays with the CTM executor). A live ecosystem's governance owns the RollupDAManager until v36 hands it
+ * to the CTM executor, so the upgrade carries that handover.
  */
 async function transferL1Ownership(
   provider: ethers.providers.JsonRpcProvider,
@@ -671,7 +739,8 @@ async function transferL1Ownership(
     l1NativeTokenVault: string;
     l1NullifierProxy?: string;
   },
-  executors: { coreExecutor: string; ctmExecutor: string }
+  executors: { coreExecutor: string; ctmExecutor: string },
+  rollupDAManager: string
 ): Promise<void> {
   const gov = l1Addresses.governance;
   await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.bridgehub);
@@ -684,6 +753,15 @@ async function transferL1Ownership(
   }
   await transferOwnership2Step(provider, defaultSigner, gov, executors.coreExecutor);
   await transferOwnership2Step(provider, defaultSigner, gov, executors.ctmExecutor);
+  // A state deployed on v36 or later already gave it to the CTM executor.
+  const rollupDAManagerOwner: string = await new ethers.Contract(
+    rollupDAManager,
+    getAbi("Ownable2Step"),
+    provider
+  ).owner();
+  if (rollupDAManagerOwner.toLowerCase() !== executors.ctmExecutor.toLowerCase()) {
+    await transferOwnership2Step(provider, defaultSigner, gov, rollupDAManager);
+  }
 }
 
 async function deployChainAdmins(

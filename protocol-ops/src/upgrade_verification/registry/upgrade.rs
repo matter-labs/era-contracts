@@ -59,7 +59,7 @@ use super::lifecycle::{
 use super::member_construction::{MemberReview, ReviewedEnv};
 use super::members::{
     verify_engine_and_l2_plan, verify_proxy_upgrade_engine, verify_release_members,
-    DepartingMembers,
+    DepartingMembers, DEFAULT_PROXY_UPGRADE_ENGINE,
 };
 use super::package::{LegKind, UpgradePackage};
 use super::provenance::{expect_code_identity, expect_code_present, tolerate};
@@ -456,7 +456,11 @@ pub(crate) async fn verify<P: Provider>(
     // ── 6. The calldata governance will actually sign ──
     result.print_info("\n== Governance calldata ==");
     let authorities = upgrade_authorities(package, &bindings, &reviewed);
-    verify_upgrade_calls(package, &authorities, result);
+    let rollup_da_manager = match package.ctm_ownership_acceptance() {
+        Some(_) => Some(members.ctm_rollup_da_manager(provider).await),
+        None => None,
+    };
+    verify_upgrade_calls(package, &authorities, rollup_da_manager.as_ref(), result);
 
     members.report_unconsulted(result);
 
@@ -716,11 +720,14 @@ fn upgrade_authorities(
 ///
 /// Every other call is held to two rules. A call reaching any of `authorities` — the executors,
 /// the objects, the CTM, either ProxyAdmin — is an ERROR whether declared or not: the run is the
-/// complete list of what the upgrade needs from them. Every remaining call is held to the
-/// declared-calls rule ([`judge_declared_calls`]).
+/// complete list of what the upgrade needs from them. The one exception is the CTM executor's
+/// `forward([acceptOwnership()])` of the CTM's RollupDAManager, `rollup_da_manager` (with where
+/// it was established), which is then judged as a declared call. Every remaining call is held to
+/// the declared-calls rule ([`judge_declared_calls`]).
 pub(super) fn verify_upgrade_calls(
     package: &UpgradePackage,
     authorities: &BTreeMap<Address, String>,
+    rollup_da_manager: Option<&Result<(Address, String), String>>,
     result: &mut VerificationResult,
 ) {
     let calls = &package.calls;
@@ -798,8 +805,38 @@ pub(super) fn verify_upgrade_calls(
     let leg_indices: Vec<usize> = package.legs.iter().map(|leg| leg.index).collect();
     let run_start = package.legs.iter().map(|leg| leg.index).min();
     let mut others: Vec<(usize, &GovernanceCall)> = Vec::new();
+    let acceptance = package.ctm_ownership_acceptance();
     for (index, call) in calls.iter().enumerate() {
         if leg_indices.contains(&index) {
+            continue;
+        }
+        if let Some(accept) = acceptance.filter(|accept| accept.index == index) {
+            match rollup_da_manager {
+                Some(Ok((manager, _))) if *manager == accept.target => {
+                    result.report_ok(&format!(
+                        "call {index} has the CTM executor ({}) accept the CTM's RollupDAManager \
+                         {manager}",
+                        accept.executor
+                    ));
+                    others.push((index, call));
+                }
+                Some(Ok((manager, source))) => result.report_error(&format!(
+                    "call {index} has the CTM executor ({}) accept ownership of {}, which is not \
+                     the CTM's RollupDAManager {manager} ({source}): the RollupDAManager is the \
+                     one contract the executor may take outside the run of legs",
+                    accept.executor, accept.target
+                )),
+                Some(Err(why)) => result.report_error(&format!(
+                    "call {index} has the CTM executor ({}) accept ownership of {}, but the CTM's \
+                     RollupDAManager is unknown ({why}), so it cannot be held against it",
+                    accept.executor, accept.target
+                )),
+                None => result.report_error(&format!(
+                    "call {index} has the CTM executor ({}) accept ownership of {}, but no \
+                     RollupDAManager was established to hold it against",
+                    accept.executor, accept.target
+                )),
+            }
             continue;
         }
         match authorities.get(&call.target) {
@@ -1192,7 +1229,7 @@ pub(super) async fn verify_proxy_upgrade_transition<P: Provider>(
     }
     // The engine the executor delegatecalls to apply the rows runs with the executor's whole
     // authority, so it is held to its role like a transition's engine.
-    verify_proxy_upgrade_engine(
+    let engine = verify_proxy_upgrade_engine(
         provider,
         build,
         result,
@@ -1211,10 +1248,14 @@ pub(super) async fn verify_proxy_upgrade_transition<P: Provider>(
         ));
         return Ok(None);
     }
-    if participating(&manifest.proxyUpgrades) == 0 {
+    // With no rows, only an engine with hooks of its own does anything.
+    if participating(&manifest.proxyUpgrades) == 0
+        && engine.is_none_or(|name| name == DEFAULT_PROXY_UPGRADE_ENGINE)
+    {
         result.report_error(&format!(
             "{label} at {transition} upgrades nothing: no slot of its inventory has a nonzero \
-             `implNew`, which the object's constructor refuses; omit the leg instead"
+             `implNew` and its engine is not a reviewed engine with hooks of its own; omit the leg \
+             instead"
         ));
     }
     result.print_info(&format!(
@@ -1668,7 +1709,7 @@ mod tests {
 
     fn judge(package: &UpgradePackage) -> VerificationResult {
         let mut result = VerificationResult::default();
-        verify_upgrade_calls(package, &authorities(package), &mut result);
+        verify_upgrade_calls(package, &authorities(package), None, &mut result);
         result
     }
 
@@ -1832,6 +1873,83 @@ mod tests {
             // The authority call, and its now-unmatched declaration.
             assert_eq!(result.errors, 2, "{target}");
         }
+    }
+
+    /// The CTM executor's acceptance of the CTM's RollupDAManager passes as a declared call; of
+    /// any other contract, or with the manager unknown, it fails.
+    #[test]
+    fn the_ctm_executor_accepts_only_the_rollup_da_manager() {
+        use super::super::views::{CTMUpgradeExecutorView, ForwardedCall, Ownable2StepView};
+        const MANAGER: Address = Address::repeat_byte(0xDA);
+        let accept = |target: Address| GovernanceCall {
+            target: CTM_EXECUTOR,
+            value: U256::ZERO,
+            data: CTMUpgradeExecutorView::forwardCall {
+                _calls: vec![ForwardedCall {
+                    target,
+                    value: U256::ZERO,
+                    data: Ownable2StepView::acceptOwnershipCall {}.abi_encode().into(),
+                }],
+            }
+            .abi_encode(),
+        };
+        let judge_with =
+            |call: GovernanceCall, manager: Option<Result<(Address, String), String>>| {
+                let package = package(
+                    vec![transition(), call.clone()],
+                    declared(std::slice::from_ref(&call)),
+                );
+                let mut result = VerificationResult::default();
+                verify_upgrade_calls(
+                    &package,
+                    &authorities(&package),
+                    manager.as_ref(),
+                    &mut result,
+                );
+                result
+            };
+        let known = || Some(Ok((MANAGER, "the env's rollup_da_manager".to_string())));
+
+        let result = judge_with(accept(MANAGER), known());
+        assert_eq!(
+            (result.errors, result.warnings),
+            (0, 0),
+            "{:?}",
+            result.error_messages
+        );
+
+        let result = judge_with(accept(STRANGER), known());
+        assert!(
+            result.has_error("which is not the CTM's RollupDAManager"),
+            "{:?}",
+            result.error_messages
+        );
+
+        let result = judge_with(
+            accept(MANAGER),
+            Some(Err("no chain on the CTM".to_string())),
+        );
+        assert!(
+            result.has_error("RollupDAManager is unknown"),
+            "{:?}",
+            result.error_messages
+        );
+
+        // Undeclared, the acceptance is a call no declaration accounts for.
+        let call = accept(MANAGER);
+        let package = package(vec![transition(), call], Vec::new());
+        let mut result = VerificationResult::default();
+        verify_upgrade_calls(
+            &package,
+            &authorities(&package),
+            known().as_ref(),
+            &mut result,
+        );
+        assert!(
+            result.has_error("neither a leg of this upgrade nor a declared"),
+            "{:?}",
+            result.error_messages
+        );
     }
 
     /// The bundle applies another object than the reviewed one the summary names: the re-encoded
@@ -2125,8 +2243,8 @@ mod tests {
         );
     }
 
-    /// objlib-24: a transition with no participating row upgrades nothing. Its constructor refuses
-    /// it, and so does the review, on either domain — which still hands the (inert) inventory on,
+    /// objlib-24: a transition with no participating row that pins the default engine upgrades
+    /// nothing. The review refuses it on either domain — which still hands the (inert) inventory on,
     /// which no row check reads.
     #[tokio::test]
     async fn an_empty_proxy_upgrade_transition_upgrades_nothing() {

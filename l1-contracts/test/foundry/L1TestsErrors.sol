@@ -20,3 +20,5 @@ error UnexpectedTimelock(address live);
 error TimelockNotWired(address live);
 
 error FollowUpFailed();
+
+error SetterNotWired(address live);

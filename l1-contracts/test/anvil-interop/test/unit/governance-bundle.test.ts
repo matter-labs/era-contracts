@@ -256,7 +256,7 @@ test("a registry hop refuses an empty bundle and any call besides its legs", () 
   ]) {
     assert.throws(
       () => assertRegistryHopBundle(merged(calls), SELECTORS, [TRANSITION_LEG]),
-      /must carry only its upgrade legs, got also:\n {2}\[\d\] target 0x0000000000000000000000000000000000000099/
+      /must carry only its upgrade legs, then its declared calls, got also:\n {2}\[\d\] target 0x0000000000000000000000000000000000000099/
     );
   }
 });
@@ -269,6 +269,43 @@ test("a registry hop refuses any declared external action, admin phase included"
       new RegExp(`phase ${phase} \\| an undeclared extra`)
     );
   }
+});
+
+test("a registry hop carries its declared calls after the legs, each declared once", () => {
+  const declared: ExpectedCall = { label: "a declared handover", ...OTHER_CALL };
+  const action = { phase: "governance", label: declared.label, target: OTHER_CALL.target, data: OTHER_CALL.data };
+  const legs = assertRegistryHopBundle(
+    merged([legCall(TRANSITION_LEG), OTHER_CALL], [action]),
+    SELECTORS,
+    [TRANSITION_LEG],
+    [declared]
+  );
+  assert.deepEqual(
+    legs.map((leg) => leg.kind),
+    ["ctmTransition"]
+  );
+  // Before the legs.
+  assert.throws(
+    () =>
+      assertRegistryHopBundle(
+        merged([OTHER_CALL, legCall(TRANSITION_LEG)], [action]),
+        SELECTORS,
+        [TRANSITION_LEG],
+        [declared]
+      ),
+    /must carry only its upgrade legs, then its declared calls/
+  );
+  // Expected but not carried.
+  assert.throws(
+    () => assertRegistryHopBundle(merged([legCall(TRANSITION_LEG)], [action]), SELECTORS, [TRANSITION_LEG], [declared]),
+    /the calls after the legs differs from the expected bundle/
+  );
+  // Carried but not declared by the prepare.
+  assert.throws(
+    () =>
+      assertRegistryHopBundle(merged([legCall(TRANSITION_LEG), OTHER_CALL]), SELECTORS, [TRANSITION_LEG], [declared]),
+    /must declare exactly its 1 expected governance action/
+  );
 });
 
 run();

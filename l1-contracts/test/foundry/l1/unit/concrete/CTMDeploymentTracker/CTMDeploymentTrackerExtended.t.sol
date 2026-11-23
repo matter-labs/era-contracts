@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {Test} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -230,7 +231,7 @@ contract CTMDeploymentTrackerExtendedTest is Test {
         address ctmAddress = makeAddr("ctmAddress");
 
         vm.prank(notOwner);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notOwner));
         ctmDeploymentTracker.setCtmAssetHandlerAddressOnL1(ctmAddress);
     }
 
