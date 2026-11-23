@@ -1,0 +1,11 @@
+# v34 Era upgrade of mainnet's Era CTM: input for deploy-scripts/upgrade/v34-era/CTMUpgrade_v34Era.s.sol.
+# The CTM comes from permanent-values/mainnet.toml; everything else from the chain and the v34 genesis.
+
+# Production: deploy EraMultiProofVerifier, and the Mailbox and Migrator facets' mainnet time windows.
+testnet_verifier = false
+# Stage 1 runs at least 48 hours after stage 0: the delay every mainnet upgrade has used since v28.
+governance_upgrade_timer_initial_delay = 172800
+# CREATE2 salt for every deployment.
+create2_factory_salt = "0x33c3ad6aa59321440ec4b49ac4b9c010a86f555643539add2327afbf12a30cd9"
+# Never v29 introspection, which the base would pick if the bridgehub's first chain were below v0.31.
+use_v29_introspection = false

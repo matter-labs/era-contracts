@@ -1100,6 +1100,16 @@
     "evmDeployedBytecodeLength": 24525
   },
   {
+    "contractName": "l1-contracts/EraMaintenanceTransactionFilterer",
+    "zkBytecodeHash": "0x010003294daed123c1e82fe7b2da77357dfeb17a5d058e1c0ec52ed14e6bc51b",
+    "zkBytecodePath": "/l1-contracts/zkout/EraMaintenanceTransactionFilterer.sol/EraMaintenanceTransactionFilterer.json",
+    "evmBytecodeHash": "0x6e6832463dca32f430e66e4d2248e9d7a59d54f653e1a8def573ba86db582aa6",
+    "evmBytecodePath": "/l1-contracts/out/EraMaintenanceTransactionFilterer.sol/EraMaintenanceTransactionFilterer.json",
+    "evmDeployedBytecodeHash": "0x4bfbcd2e568b06ce4ba2efac6d456c50861a8eee7c70f434f5662668a13d74b9",
+    "evmDeployedBytecodeBlakeHash": "0xe0cc0df4257cab31820ceb52478da40c91aa8911a2d94f3dac08007be8919837",
+    "evmDeployedBytecodeLength": 7828
+  },
+  {
     "contractName": "l1-contracts/EraMultiProofTestnetVerifier",
     "zkBytecodeHash": "0x0100013de19c380a0d8c6b5c52dd9a16edd4c399a73599a4a3bdbe050db6fbca",
     "zkBytecodePath": "/l1-contracts/zkout/EraMultiProofTestnetVerifier.sol/EraMultiProofTestnetVerifier.json",

@@ -33,7 +33,7 @@ use crate::types::L2DACommitmentScheme;
 /// The upgrade the generate / replay pipeline targets when none is named.
 pub const DEFAULT_UPGRADE: &str = "v0.31.0-interopB";
 const V31_UPGRADE_DIR: &str = "upgrade-envs/v0.31.0-interopB";
-const PERMANENT_VALUES_DIR: &str = "upgrade-envs/permanent-values";
+pub(crate) const PERMANENT_VALUES_DIR: &str = "upgrade-envs/permanent-values";
 
 #[derive(Debug, Deserialize)]
 pub struct PermanentValues {

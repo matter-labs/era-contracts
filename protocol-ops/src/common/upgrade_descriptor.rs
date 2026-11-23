@@ -7,7 +7,8 @@
 //!   broadcasts become the deployer's bundle, packed exactly like `upgrade-prepare-all`'s.
 //!   The upgrade supplies its own checks, since PUVT only knows v31. An optional
 //!   `[execution]` script writes the transactions whoever executes sends by hand; the
-//!   pipeline replays them on the fork and renders `EXECUTE.md` from them.
+//!   pipeline replays them on the fork and renders `EXECUTE.md` from them. Its `envs`
+//!   limits it to the environments whose governance can run it.
 
 use std::path::{Path, PathBuf};
 
@@ -16,6 +17,7 @@ use alloy::json_abi::Function;
 use anyhow::Context;
 use serde::Deserialize;
 
+use crate::common::env_config::PERMANENT_VALUES_DIR;
 use crate::common::paths;
 
 pub const UPGRADE_DESCRIPTOR_FILE: &str = "upgrade.toml";
@@ -61,6 +63,10 @@ pub struct ForgeScriptUpgrade {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ExecutionScript {
+    /// The environments that get the runbook; absent means every environment. Leave out
+    /// one whose governance the script can't drive, e.g. behind a timer between stages.
+    #[serde(default)]
+    pub envs: Option<Vec<String>>,
     /// `path/To.s.sol:Contract`, relative to `l1-contracts/`.
     pub script: String,
     /// Solidity signature of the entry point.
@@ -71,17 +77,21 @@ pub struct ExecutionScript {
     pub output: String,
 }
 
+/// A single path component, so it can't point outside the directory it is joined to.
+fn is_plain_name(name: &str) -> bool {
+    !name.is_empty()
+        && name != "."
+        && name != ".."
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
+}
+
 /// An upgrade name is a directory under `upgrade-envs/`; it arrives from workflow inputs
 /// and bundle metadata, so it must not be able to point anywhere else.
 pub fn validate_upgrade_name(upgrade: &str) -> anyhow::Result<()> {
-    let valid = !upgrade.is_empty()
-        && upgrade != "."
-        && upgrade != ".."
-        && upgrade
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'));
     anyhow::ensure!(
-        valid,
+        is_plain_name(upgrade),
         "invalid upgrade name {upgrade:?}: expected a directory name under upgrade-envs/"
     );
     Ok(())
@@ -100,10 +110,15 @@ impl UpgradeDescriptor {
         let path = upgrade_dir(upgrade)?.join(UPGRADE_DESCRIPTOR_FILE);
         let raw = std::fs::read_to_string(&path)
             .with_context(|| format!("read upgrade descriptor {}", path.display()))?;
-        Self::parse(&raw).with_context(|| format!("parse {}", path.display()))
+        let permanent_values = paths::resolve_l1_contracts_path()?.join(PERMANENT_VALUES_DIR);
+        Self::parse(&raw, |env| {
+            permanent_values.join(format!("{env}.toml")).is_file()
+        })
+        .with_context(|| format!("parse {}", path.display()))
     }
 
-    fn parse(raw: &str) -> anyhow::Result<Self> {
+    /// `has_permanent_values(env)`: whether `permanent-values/<env>.toml` exists.
+    fn parse(raw: &str, has_permanent_values: impl Fn(&str) -> bool) -> anyhow::Result<Self> {
         let descriptor: Self = toml::from_str(raw)?;
         if let Self::ForgeScript(upgrade) = &descriptor {
             anyhow::ensure!(
@@ -121,6 +136,18 @@ impl UpgradeDescriptor {
                     "execution.output {:?} must be a file name under output/<env>/",
                     execution.output
                 );
+                if let Some(envs) = &execution.envs {
+                    anyhow::ensure!(
+                        !envs.is_empty(),
+                        "execution.envs is empty; drop it to run the script for every env"
+                    );
+                    for env in envs {
+                        anyhow::ensure!(
+                            is_plain_name(env) && has_permanent_values(env),
+                            "execution.envs lists {env:?}, which has no permanent-values/<env>.toml"
+                        );
+                    }
+                }
             }
         }
         Ok(descriptor)
@@ -184,6 +211,16 @@ impl ForgeScriptUpgrade {
         substitute_env(&self.args, env)
     }
 
+    /// The `[execution]` script, if it applies to `env`.
+    pub fn execution_for(&self, env: &str) -> Option<&ExecutionScript> {
+        self.execution.as_deref().filter(|execution| {
+            execution
+                .envs
+                .as_ref()
+                .is_none_or(|envs| envs.iter().any(|listed| listed == env))
+        })
+    }
+
     /// ABI-encoded call of the entry point for `env`.
     pub fn calldata(&self, env: &str) -> anyhow::Result<Vec<u8>> {
         encode_entry_point(&self.signature, &self.args_for(env))
@@ -199,6 +236,13 @@ impl ForgeScriptUpgrade {
 mod tests {
     use super::*;
 
+    /// Envs the unit tests treat as having permanent values.
+    const KNOWN_ENVS: [&str; 2] = ["stage", "testnet"];
+
+    fn parse(raw: &str) -> anyhow::Result<UpgradeDescriptor> {
+        UpgradeDescriptor::parse(raw, |env| KNOWN_ENVS.contains(&env))
+    }
+
     const FORGE_SCRIPT: &str = r#"
 prepare = "forge-script"
 script = "deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol:CTMUpgrade_v33"
@@ -211,16 +255,14 @@ verify_chain = ["bash", "upgrade-envs/v0.33.0-compiler/rehearse-stage.sh", "--pu
     #[test]
     fn parses_prepare_all() {
         assert_eq!(
-            UpgradeDescriptor::parse("prepare = \"prepare-all\"\n").unwrap(),
+            parse("prepare = \"prepare-all\"\n").unwrap(),
             UpgradeDescriptor::PrepareAll {}
         );
     }
 
     #[test]
     fn parses_forge_script_and_encodes_the_call() {
-        let UpgradeDescriptor::ForgeScript(upgrade) =
-            UpgradeDescriptor::parse(FORGE_SCRIPT).unwrap()
-        else {
+        let UpgradeDescriptor::ForgeScript(upgrade) = parse(FORGE_SCRIPT).unwrap() else {
             panic!("expected a forge-script upgrade");
         };
         assert_eq!(
@@ -254,7 +296,7 @@ output = "emergency-upgrade-board.json"
     #[test]
     fn parses_an_execution_script() {
         let UpgradeDescriptor::ForgeScript(upgrade) =
-            UpgradeDescriptor::parse(&format!("{FORGE_SCRIPT}{EXECUTION}")).unwrap()
+            parse(&format!("{FORGE_SCRIPT}{EXECUTION}")).unwrap()
         else {
             panic!("expected a forge-script upgrade");
         };
@@ -269,8 +311,7 @@ output = "emergency-upgrade-board.json"
             &alloy::primitives::keccak256("emergencyUpgradeAllStages(string,string,string)")[..4];
         assert_eq!(&calldata[..4], selector);
         // Without the table the upgrade has no runbook.
-        let UpgradeDescriptor::ForgeScript(plain) = UpgradeDescriptor::parse(FORGE_SCRIPT).unwrap()
-        else {
+        let UpgradeDescriptor::ForgeScript(plain) = parse(FORGE_SCRIPT).unwrap() else {
             panic!("expected a forge-script upgrade");
         };
         assert_eq!(plain.execution, None);
@@ -283,10 +324,63 @@ output = "emergency-upgrade-board.json"
                 "output = \"emergency-upgrade-board.json\"",
                 &format!("output = {bad:?}"),
             );
-            assert!(UpgradeDescriptor::parse(&raw).is_err(), "{bad:?} accepted");
+            assert!(parse(&raw).is_err(), "{bad:?} accepted");
         }
         let raw = format!("{FORGE_SCRIPT}{EXECUTION}extra = 1\n");
-        assert!(UpgradeDescriptor::parse(&raw).is_err());
+        assert!(parse(&raw).is_err());
+    }
+
+    /// The descriptor with `envs = <envs>` in its `[execution]` table.
+    fn with_execution_envs(envs: &str) -> String {
+        format!("{FORGE_SCRIPT}{EXECUTION}")
+            .replace("[execution]\n", &format!("[execution]\nenvs = {envs}\n"))
+    }
+
+    fn forge_script(raw: &str) -> ForgeScriptUpgrade {
+        let UpgradeDescriptor::ForgeScript(upgrade) = parse(raw).unwrap() else {
+            panic!("expected a forge-script upgrade");
+        };
+        upgrade
+    }
+
+    #[test]
+    fn execution_without_envs_applies_to_every_env() {
+        let upgrade = forge_script(&format!("{FORGE_SCRIPT}{EXECUTION}"));
+        // Not even checked against permanent values: absent `envs` is the pre-`envs` behaviour.
+        for env in ["stage", "testnet", "mainnet"] {
+            assert!(upgrade.execution_for(env).is_some(), "{env}");
+        }
+    }
+
+    #[test]
+    fn execution_applies_only_to_the_listed_envs() {
+        let upgrade = forge_script(&with_execution_envs(r#"["stage"]"#));
+        assert_eq!(
+            upgrade.execution_for("stage").unwrap().envs,
+            Some(vec!["stage".to_string()])
+        );
+        assert_eq!(upgrade.execution_for("testnet"), None);
+        assert_eq!(upgrade.execution_for("mainnet"), None);
+    }
+
+    #[test]
+    fn rejects_empty_or_unknown_execution_envs() {
+        for bad in ["[]", r#"["mainnet"]"#, r#"["stage", "mainnet"]"#] {
+            assert!(parse(&with_execution_envs(bad)).is_err(), "{bad} accepted");
+        }
+        // A name that isn't a single path component fails even if the file it points to exists.
+        for bad in [
+            r#"["../permanent-values/stage"]"#,
+            r#"["a/b"]"#,
+            r#"[".."]"#,
+            r#"[""]"#,
+        ] {
+            let raw = with_execution_envs(bad);
+            assert!(
+                UpgradeDescriptor::parse(&raw, |_| true).is_err(),
+                "{bad} accepted"
+            );
+        }
     }
 
     #[test]
@@ -295,16 +389,13 @@ output = "emergency-upgrade-board.json"
             "signature = \"prepare(string,string)\"",
             "signature = \"prepare(string)\"",
         );
-        assert!(UpgradeDescriptor::parse(&raw).is_err());
+        assert!(parse(&raw).is_err());
     }
 
     #[test]
     fn rejects_missing_checks_and_unknown_fields() {
-        assert!(
-            UpgradeDescriptor::parse(&FORGE_SCRIPT.replace("verify_chain", "# verify_chain"))
-                .is_err()
-        );
-        assert!(UpgradeDescriptor::parse("prepare = \"prepare-all\"\nextra = 1\n").is_err());
+        assert!(parse(&FORGE_SCRIPT.replace("verify_chain", "# verify_chain")).is_err());
+        assert!(parse("prepare = \"prepare-all\"\nextra = 1\n").is_err());
     }
 
     /// Every committed `upgrade-envs/<upgrade>/upgrade.toml` parses.

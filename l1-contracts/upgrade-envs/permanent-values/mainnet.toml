@@ -22,32 +22,27 @@ bridgehub_proxy_addr = "0x303a465B659cBB0ab36eE643eA362c509EEb5213"
 governance_kind = "puh"
 
 [ctm_contracts]
-# Legacy single-CTM (Era) — kept for anvil-interop synthetic-state harnesses.
-# The v31 multi-CTM upgrade flow uses the `[[ctm_contracts.ctms]]` array below.
+# Legacy single-CTM (Era) keys, with their pre-v31 values: nothing reads them from this file (anvil-interop's
+# synthetic-state harnesses read their own template). Every upgrade flow uses `[[ctm_contracts.ctms]]` below.
 ctm_proxy_addr = "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C"
 l1_bytecodes_supplier_addr = "0xC9F20FC268Fc3e0e597660550033Bf2C24218fd8"
 rollup_da_manager = "0xE689e79a06D3D09f99C21E534cCF6a8b7C9b3C45"
 
-# v31 multi-CTM list — consumed by `scripts/v31-simulate-upgrade.ts`.
-# Mainnet is currently pre-v31 — overrides are required because the v31 getters
-# (`ctm.isZKsyncOS()`, `ctm.L1_BYTECODES_SUPPLIER()`) don't exist yet.
+# Every CTM, Era first. Each value is the CTM's own: bytecodes_supplier is its L1_BYTECODES_SUPPLIER(),
+# rollup_da_manager the getRollupDAManager() of the AdminFacet its cuts add, which a chain reports once it is on
+# the CTM's version.
 [[ctm_contracts.ctms]]
 # Era CTM (witness chain: 324)
 proxy = "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C"
 is_zk_sync_os = false
-bytecodes_supplier = "0xC9F20FC268Fc3e0e597660550033Bf2C24218fd8"
-rollup_da_manager = "0xE689e79a06D3D09f99C21E534cCF6a8b7C9b3C45"
+bytecodes_supplier = "0x456A572539d9D9697fFD68954A7a039682D99557"
+rollup_da_manager = "0xc16161C7f704388285fE58db287F6216a350dAFA"
 
 [[ctm_contracts.ctms]]
 # Atlas (ZKsyncOS) CTM (witness chain: 30715)
-# rollup_da_manager queried via `chain.getRollupDAManager()` on the diamond proxy.
-# bytecodes_supplier shared with Era on mainnet (per
-# v0.29.2-interopA-ff/mainnet.toml and v0.31.0-interopB/mainnet.toml — both
-# carry a single `l1_bytecodes_supplier_addr` per env, matching the pattern
-# already documented on stage/testnet).
 proxy = "0x1adf137f59949c9081157d5dE1e002D1c992071F"
 is_zk_sync_os = true
-bytecodes_supplier = "0xC9F20FC268Fc3e0e597660550033Bf2C24218fd8"
+bytecodes_supplier = "0xE55877fC38D774C5bDBe989899F97DAe480A2931"
 rollup_da_manager = "0x3F54A35a979Fe576159002B05bE2eDf9b455FAAA"
 
 # Contracts that own a CTM / ProxyAdmin and have no private key — ownership

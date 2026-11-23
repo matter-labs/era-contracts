@@ -620,6 +620,8 @@ fn known_functions_have_the_selectors_the_contracts_use() {
         ("0x8265f458", "`setNewVersionUpgrade(...)`"),
         ("0x4958bf4f", "`setChainCreationParams(...)`"),
         ("0x9b016b8b", "`setChainCreationParams(...)`"),
+        ("0x3290f93a", "`grantRole(address,bytes32,address)`"),
+        ("0x8c63a1a1", "`revokeRole(address,bytes32,address)`"),
         ("0xac700e63", "`pauseMigration()`"),
         ("0xf7c7eb92", "`unpauseMigration()`"),
         ("0x79ba5097", "`acceptOwnership()`"),

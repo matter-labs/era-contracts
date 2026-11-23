@@ -586,6 +586,49 @@
   },
   {
     "type": "function",
+    "name": "grantValidatorTimelockRole",
+    "inputs": [
+      {
+        "name": "_bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_adminAddr",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_accessControlRestriction",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_validatorTimelock",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_role",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "makePermanentRollup",
     "inputs": [
       {

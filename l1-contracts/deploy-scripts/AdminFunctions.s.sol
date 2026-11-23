@@ -909,6 +909,27 @@ contract AdminFunctions is Script, IAdminFunctions {
         Utils.adminExecute(_adminAddr, _accessControlRestriction, _validatorTimelock, data, 0);
     }
 
+    /// @notice Grants one ValidatorTimelock role for a chain, e.g. only `UPGRADER_ROLE`, where `updateValidator`
+    ///         grants them all. Sent by the chain's admin.
+    function grantValidatorTimelockRole(
+        address _bridgehub,
+        uint256 _chainId,
+        address _adminAddr,
+        address _accessControlRestriction,
+        address _validatorTimelock,
+        bytes32 _role,
+        address _account
+    ) public {
+        address chain = IL1Bridgehub(_bridgehub).getZKChain(_chainId);
+        require(chain != address(0), "Chain not registered on the bridgehub");
+        // The timelock forwards to the diamond, which accepts only its validators: without this the role is useless.
+        require(IGetters(chain).isValidator(_validatorTimelock), "ValidatorTimelock is not a validator of the chain");
+        // The timelock's grantRole would grant the role to the zero address.
+        require(_account != address(0), "Account is the zero address");
+        bytes memory data = abi.encodeCall(ValidatorTimelock(_validatorTimelock).grantRole, (chain, _role, _account));
+        Utils.adminExecute(_adminAddr, _accessControlRestriction, _validatorTimelock, data, 0);
+    }
+
     /// @notice Adds L2WrappedBaseToken of a chain to the store.
     function addL2WethToStore(
         address _storeAddress,

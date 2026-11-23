@@ -1,3 +1,5 @@
+use alloy::primitives::{b256, B256};
+
 /// The zero address, used for unset optional protocol addresses.
 pub const ZERO_ADDRESS: &str = "0x0000000000000000000000000000000000000000";
 
@@ -18,6 +20,11 @@ pub const LOCAL_ZK_TOKEN_ASSET_ID: &str =
 pub const DEFAULT_ZK_TOKEN_ASSET_ID: &str =
     "0x0000000000000000000000000000000000000000000000000000000000000001";
 
+/// `ValidatorTimelock.UPGRADER_ROLE()`, `keccak256("UPGRADER_ROLE")`: the role the node needs for
+/// `upgradeChainFromVersion`.
+pub const VALIDATOR_TIMELOCK_UPGRADER_ROLE: B256 =
+    b256!("189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3");
+
 /// Default CREATE2 salt used by generated script config templates.
 pub const ZERO_BYTES32: &str = "0x0000000000000000000000000000000000000000000000000000000000000000";
 
@@ -33,3 +40,14 @@ pub const L2_L1_MESSENGER: &str = "0x0000000000000000000000000000000000008008";
 /// Expected first localhost wallet address for the default test mnemonic.
 #[cfg(test)]
 pub const DEFAULT_TEST_WALLET_ADDRESS: &str = "0xa61464658AfeAf65CccaaFD3a512b69A83B77618";
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn upgrader_role_is_the_hash_of_its_name() {
+        assert_eq!(
+            super::VALIDATOR_TIMELOCK_UPGRADER_ROLE,
+            alloy::primitives::keccak256("UPGRADER_ROLE")
+        );
+    }
+}

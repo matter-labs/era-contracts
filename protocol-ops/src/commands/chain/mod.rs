@@ -36,6 +36,8 @@ pub enum ChainCommands {
     AddValidator(ChainValidatorArgs),
     /// Remove a validator from the chain's ValidatorTimelock (revokes all batch operator roles)
     RemoveValidator(ChainValidatorArgs),
+    /// Grant only UPGRADER_ROLE on the chain's ValidatorTimelock (the node's chain upgrade path)
+    GrantUpgrader(ChainValidatorArgs),
     /// Gateway operations: converting a chain into a gateway or migrating to one
     #[command(subcommand)]
     Gateway(GatewayCommands),
@@ -52,6 +54,7 @@ pub async fn run(args: ChainCommands) -> anyhow::Result<()> {
         }
         ChainCommands::AddValidator(args) => validator::run_add(args).await,
         ChainCommands::RemoveValidator(args) => validator::run_remove(args).await,
+        ChainCommands::GrantUpgrader(args) => validator::run_grant_upgrader(args).await,
         ChainCommands::Gateway(cmd) => gateway::run(cmd).await,
     }
 }
