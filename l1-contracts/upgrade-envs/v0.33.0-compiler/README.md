@@ -109,10 +109,10 @@ v0.32.2 by then.
 
 The node must run v33 as the v32 VM with the new bootloader:
 
-- The last private server revision before the v33 force-fail integration (`3c96bae48`) maps both
-  `Version32` and `Version33` to `VmMediumInteropUlongremGuard`. Server PR #138 ran these contracts
-  on it: core integration tests and the Boojum prover e2e tests (plonk, fflonk) pass. Its Airbender
-  e2e cannot pass, because the draft-v31 L1 verifier has no Airbender support.
+- The last private server revision before the v33 force-fail integration (`3c96bae48`) maps
+  `Version33` to the same VM as `Version32`. Server PR #138 ran these contracts on it: core
+  integration tests and the Boojum prover e2e tests (plonk, fflonk) pass. Its Airbender e2e cannot
+  pass, because the draft-v31 L1 verifier has no Airbender support.
 - The private server's `dev` maps `Version33` to `VmMediumInteropForceFail`, the force-fail
   bootloader that is now v34. A server or prover built from `dev` must not run stage after this
   upgrade until force-fail moves to `Version34`.
