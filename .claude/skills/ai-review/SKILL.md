@@ -92,10 +92,19 @@ changed function into its callers and callees. On top of the rules from step 2, 
 - **Completeness.** Every caller, config, doc, test and downstream consumer of a changed or removed thing is updated.
   Grep the whole repo. Downstream: `zksync-os-integration-tests` uses the `protocol_ops` crate and its paths, and
   `zksync-os-server` pins era-contracts SHAs in `local-chains/`.
+- **Completeness by meaning.** For each rule the change removes or relaxes (a revert, a check, a refusal), grep the
+  docs and comments for the words that state it, not only its symbol. For example,
+  [#2690](https://github.com/matter-labs/era-contracts/pull/2690) let a `ProxyUpgradeTransition` have no participating
+  row. No doc named the deleted error, `RegistryUnknownKey`, but four still said such a transition is refused.
 - **Minimal and neat.** Dead code goes entirely, including what the change orphans. Unused parameters are removed.
   Nothing duplicates an existing helper or pattern. No new flag or config for what can be read from L1. The scope
-  matches the title.
-- **Tests** assert outcomes, and mocks only isolate. A test that cannot fail is a finding.
+  matches the title. In a first review (no SINCE), ask once whether a much simpler design would do the same job.
+- **Reachability.** For each new flag, hook, config key or branch, name a caller that sets or reaches it; without one
+  it is dead code. For example, nothing overrode `engineRunsWithoutSwaps()` in #2690, so it always returned false and
+  the zero-row path it gated never ran.
+- **Tests** assert outcomes, and mocks only isolate. For each new or changed test, break the line it guards with a
+  one-line mutation in a throwaway `git worktree add --detach` of HEAD (never your checkout), and show the test go
+  from green to red there; remove the worktree at the end. A test that cannot fail is a finding.
 - **Contracts.** The build has no CBOR metadata, so a constructor-only edit leaves the runtime code unchanged: the
   upgrade must declare that contract (`changedReleaseMembers()`, `changedEcosystemImplementations()`) or its prepare
   keeps the live one. Deleting covered code fails the coverage gate. L2-deployable contracts have no constructors or
