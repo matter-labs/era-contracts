@@ -5,17 +5,16 @@ batch needs a Boojum and an Airbender proof; a testnet verifier still accepts an
 operator force-fail bit for L1→L2 transactions (new bootloader), a 15M gas cap on user L1→L2 transactions and an
 EVM emulator fix.
 
-| Environment                   | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| stage (Sepolia, chain 499)    | Executed 2026-10-22 as one emergency proposal, without a timer. `output/stage/` is generate run [39414177988](https://github.com/matter-labs/era-contracts/actions/runs/39414177988); its input `stage.toml` is in git history at `93e2c5a7b`                                                                                                                                                                                                               |
-| testnet3 (Sepolia, chain 312) | `output/testnet3/` is generate run [41802074519](https://github.com/matter-labs/era-contracts/actions/runs/41802074519) (Sepolia block 12018509); its deployer bundle was deployed by run [40849834276](https://github.com/matter-labs/era-contracts/actions/runs/40849834276), and the three contracts the base deployment flow added by run [41599475703](https://github.com/matter-labs/era-contracts/actions/runs/41599475703). Governance not executed |
-| mainnet (chain 324)           | v0.33.0 → v0.34.1 with the #2694 verifiers, not generated yet. Run [42640975005](https://github.com/matter-labs/era-contracts/actions/runs/42640975005) deployed the bundle of the superseded v0.34.0 generate run [42208743790](https://github.com/matter-labs/era-contracts/actions/runs/42208743790) on 2026-11-09; 20 of its 24 transactions carry over. Governance not executed                                                                        |
+| Environment                   | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| stage (Sepolia, chain 499)    | Executed 2026-10-22 as one emergency proposal, without a timer. `output/stage/` is generate run [39414177988](https://github.com/matter-labs/era-contracts/actions/runs/39414177988); its input `stage.toml` is in git history at `93e2c5a7b`                                                                                                                                                                                                                                                                           |
+| testnet3 (Sepolia, chain 312) | `output/testnet3/` is generate run [41802074519](https://github.com/matter-labs/era-contracts/actions/runs/41802074519) (Sepolia block 12018509); its input `testnet3.toml` is in git history at `492671af6`; its deployer bundle was deployed by run [40849834276](https://github.com/matter-labs/era-contracts/actions/runs/40849834276), and the three contracts the base deployment flow added by run [41599475703](https://github.com/matter-labs/era-contracts/actions/runs/41599475703). Governance not executed |
+| mainnet (chain 324)           | v0.33.0 → v0.34.1 with the #2694 verifiers, not generated yet. Run [42640975005](https://github.com/matter-labs/era-contracts/actions/runs/42640975005) deployed the bundle of the superseded v0.34.0 generate run [42208743790](https://github.com/matter-labs/era-contracts/actions/runs/42208743790) on 2026-11-09; 20 of its 24 transactions carry over. Governance not executed                                                                                                                                    |
 
 ## Version
 
 Mainnet skips v0.34.0: Sepolia's v0.34.0 has the verifier keys from before #2694 and gets the new ones as v0.34.1
-(`upgrade-envs/v0.34.1-era`). The genesis is v0.34.1, so mainnet takes it; `testnet3.toml`'s `new_protocol_version`
-keeps testnet3 on v0.34.0. The L2 upgrade transaction, bootloader and keys stay the genesis's.
+(`upgrade-envs/v0.34.1-era`). The genesis is v0.34.1, so mainnet takes it.
 
 ## What changes
 
@@ -64,8 +63,7 @@ the node sees it, on mainnet it is a real future date. Once the chain is drained
 ## Files
 
 - `<env>.toml`: what the script can't read from `permanent-values/<env>.toml`, the chain or the v34 genesis: the
-  verifier flavour, the timer delay, the salt and `use_v29_introspection = false`; on testnet3 only, also
-  `new_protocol_version`.
+  verifier flavour, the timer delay, the salt and `use_v29_introspection = false`.
 - `output/<env>/`: committed from the generate run. `output/stage/` keeps the layout stage was generated with; the
   others are in `DefaultCTMUpgrade.saveOutput`'s layout, where the zero addresses are fields v34 doesn't use and
   `admin.ecosystem_admin_addr` is the CTM owner (the PUH).
