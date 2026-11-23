@@ -18,6 +18,7 @@ import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {FeeWithdrawalFailed, ZKTokenNotAvailable} from "contracts/interop/InteropErrors.sol";
 import {
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_INTEROP_CENTER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_BOOTLOADER_ADDRESS,
@@ -800,6 +801,64 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         l2InteropCenter.claimZKFees(receiver);
 
         assertEq(l2InteropCenter.accumulatedZKFees(claimer), 0);
+    }
+
+    /// @notice Regression test: on a chain whose base token is ZK, the NTV resolves the ZK asset to the base
+    /// token system contract, which has no `transferFrom`, so every fixed-fee send used to revert. The fee is
+    /// charged in the wrapped base token there; see {protocol-docs/interop.md#fee-model}.
+    function test_sendBundle_fixedFeeUsesWrappedBaseTokenWhenBaseTokenIsZK() public {
+        _setupGatewayMode();
+
+        // The fixture's base token stands in for ZK: point the ZK asset at it, the way the tests above
+        // pick the ZK asset.
+        stdstore.target(L2_INTEROP_CENTER_ADDR).sig("ZK_TOKEN_ASSET_ID()").checked_write(baseTokenAssetId);
+        assertEq(
+            INativeTokenVaultBase(L2_NATIVE_TOKEN_VAULT_ADDR).tokenAddress(baseTokenAssetId),
+            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            "The NTV should resolve the ZK asset to the base token system contract"
+        );
+        assertEq(l2InteropCenter.getZKTokenAddress(), address(weth), "The fee token should be the wrapped base token");
+
+        address sender = makeAddr("zkFeeSender");
+        uint256 zkFeePerCall = l2InteropCenter.ZK_INTEROP_FEE();
+        vm.deal(sender, zkFeePerCall);
+        vm.startPrank(sender);
+        weth.deposit{value: zkFeePerCall}();
+        weth.approve(L2_INTEROP_CENTER_ADDR, zkFeePerCall);
+        vm.stopPrank();
+
+        address coinbaseAddr = makeAddr("coinbase");
+        vm.coinbase(coinbaseAddr);
+
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(
+            address(0),
+            UNBUNDLER_ADDRESS,
+            true,
+            bytes32(0)
+        );
+        InteropCallStarter[] memory calls = _buildSimpleCall();
+
+        vm.expectEmit(true, true, false, true, L2_INTEROP_CENTER_ADDR);
+        emit IInteropCenter.FixedZKFeesAccumulated(sender, coinbaseAddr, zkFeePerCall);
+
+        vm.prank(sender);
+        l2InteropCenter.sendBundle{value: 0}(
+            InteroperableAddress.formatEvmV1(destinationChainId),
+            calls,
+            bundleAttributes
+        );
+
+        assertEq(l2InteropCenter.accumulatedZKFees(coinbaseAddr), zkFeePerCall, "Fees should be accumulated");
+        assertEq(weth.balanceOf(sender), 0, "The sender should have paid in the wrapped base token");
+        assertEq(weth.balanceOf(L2_INTEROP_CENTER_ADDR), zkFeePerCall, "InteropCenter should hold the fee");
+        assertEq(address(l2InteropCenter.zkToken()), address(weth), "The fee token should be cached");
+
+        address receiver = makeAddr("receiver");
+        vm.prank(coinbaseAddr);
+        l2InteropCenter.claimZKFees(receiver);
+
+        assertEq(weth.balanceOf(receiver), zkFeePerCall, "The receiver should get the claimed fees");
+        assertEq(l2InteropCenter.accumulatedZKFees(coinbaseAddr), 0, "Accumulated ZK fees should be zero after claim");
     }
 
     /*//////////////////////////////////////////////////////////////

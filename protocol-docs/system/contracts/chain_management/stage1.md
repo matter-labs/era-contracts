@@ -53,6 +53,13 @@ submit the requests that Priority Mode exists to force through, and once the que
 could trigger activation. Only the admin can lift the pause, and the admin is the actor Priority Mode
 constrains.
 
+For the same reason the base token multiplier must be set at opt-in. Until it is, every new request
+reverts, and after opt-in the
+[price-change limit](#fee-accounting-and-base-token-moves-price-modifications) would keep it from
+ever being set to a non-zero price: the limit treats an unset multiplier as a zero price. The pending priority operation the
+opt-in requires can be a free service transaction, which is not priced, so it does not show that the
+multiplier is set.
+
 After opt-in, the objective censorship signal is an unprocessed priority operation whose recorded
 request timestamp is at least `PRIORITY_EXPIRATION` old. Once that condition is met, any account can
 activate Priority Mode on L1 through `AdminFacet.activatePriorityMode`. Activation reverts all batches
@@ -122,6 +129,8 @@ Firstly, it is important to clarify that in order to perform an L1->L2 one needs
 ### Fee accounting and base token moves price modifications
 
 One of the ways a malicious admin could prevent deposits is by setting an absurdly high fee for each L1->L2 making it impossible for most users to leave the system. In order to prevent this, there is a speed limit on how fast the price can change (at most 30% in a day).
+
+The limit applies to the L2 gas price derived from the fee params and the base token multiplier at a reference L1 gas price of 1 gwei, and it holds whatever that price is: a zero price is no exception. The highest allowed price is rounded down to a whole unit, so a price below 4 cannot be increased at all. A chain therefore sets the price it intends to charge before it allows Priority Mode.
 
 Note, that even after the priority mode is activated, the chain admin is the only entity that can continue updating the fees for priority transactions. It means that after the Stage 1 is activated, the fee can in theory become very small and uneconomical for a permissionless validator service to process the priority transactions. It is assumed that in case this event happens, the community will provide fees for their priority transactions in some way offchain or build batches themselves.
 

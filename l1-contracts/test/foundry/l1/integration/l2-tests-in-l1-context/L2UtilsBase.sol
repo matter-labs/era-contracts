@@ -68,7 +68,7 @@ library L2UtilsBase {
         // Initialize variables in a scoped block to avoid stack too deep
         {
             baseTokenAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
-            wethToken = address(0x1);
+            wethToken = _args.wethToken;
         }
 
         {

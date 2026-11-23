@@ -113,7 +113,7 @@ contract InteropCenter is
     /// @notice ZK token asset ID for resolving token address via native token vault.
     bytes32 public ZK_TOKEN_ASSET_ID;
 
-    /// @notice Cached ZK token contract address (resolved from asset ID).
+    /// @notice Cached address of the token the fixed ZK fee is charged in; see {getZKTokenAddress}.
     IERC20 public zkToken;
 
     /// @notice Accumulated protocol fees (base token) per coinbase, claimable via claimProtocolFees().
@@ -149,13 +149,20 @@ contract InteropCenter is
         if (address(zkToken) != address(0)) {
             return address(zkToken);
         }
-        return IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT).tokenAddress(ZK_TOKEN_ASSET_ID);
+        IL2NativeTokenVault nativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT);
+        // The base token is not an ERC-20, so a chain whose base token is ZK charges the fee in its
+        // wrapped base token; see {protocol-docs/interop.md#fee-model}.
+        if (ZK_TOKEN_ASSET_ID == nativeTokenVault.BASE_TOKEN_ASSET_ID()) {
+            return nativeTokenVault.WETH_TOKEN();
+        }
+        return nativeTokenVault.tokenAddress(ZK_TOKEN_ASSET_ID);
     }
 
-    /// @notice Resolves the ZK token address from its asset ID (via the NTV), caching the result.
+    /// @notice Resolves the token the fixed ZK fee is charged in (see {getZKTokenAddress}), caching the
+    ///         result.
     /// @dev Reverts with `ZKTokenNotAvailable` if the ZK token has not been bridged to this chain yet,
     ///      so useFixedFee=true only works after it is.
-    /// @return The ZK token contract interface.
+    /// @return The fee token contract interface.
     function _getZKToken() internal returns (IERC20) {
         address tokenAddress = getZKTokenAddress();
         require(tokenAddress != address(0), ZKTokenNotAvailable());
