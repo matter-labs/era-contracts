@@ -10,10 +10,15 @@ A key change on a live version must be a new patch: the node stores the keys per
 matching the chain's verifier. `setProtocolVersionVerifier` would not do it: chains read the verifier only at upgrade or
 creation.
 
-| Environment                   | Status                                                                       |
-| ----------------------------- | ---------------------------------------------------------------------------- |
-| stage (Sepolia, chain 499)    | Not generated yet. Governance: one Emergency Upgrade Board proposal          |
-| testnet3 (Sepolia, chain 312) | Not generated yet. Governance: the PUH's normal path, one proposal per stage |
+| Environment                   | Status                                                                             |
+| ----------------------------- | ---------------------------------------------------------------------------------- |
+| stage (Sepolia, chain 499)    | Generated, not deployed. Governance: one Emergency Upgrade Board proposal          |
+| testnet3 (Sepolia, chain 312) | Generated, not deployed. Governance: the PUH's normal path, one proposal per stage |
+
+- stage: `output/stage/` is generate run [45198144834](https://github.com/matter-labs/era-contracts/actions/runs/45198144834)
+  (Sepolia block 12196440).
+- testnet3: `output/testnet3/` is generate run
+  [45198151963](https://github.com/matter-labs/era-contracts/actions/runs/45198151963) (Sepolia block 12196431).
 
 ## What changes
 
