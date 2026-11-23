@@ -281,8 +281,9 @@ and that member's proxy is discovered on chain: the reviewed Bridgehub (below) a
 `serverNotifierAddress()`. A row naming another proxy, a row in a slot that is no proxy of its
 domain, and an inventory whose length is not its enum's each fail the run, and so does a malformed
 inventory, which the objects' constructors refuse too: a row with a zero proxy or a zero `expectedOldImpl`, a
-self-edge (`expectedOldImpl == implNew`, which applies as a no-op), two rows naming one proxy, and a
-`ProxyUpgradeTransition` with no participating row at all (omit the leg instead).
+self-edge (`expectedOldImpl == implNew`, which applies as a no-op) and two rows naming one proxy. A
+`ProxyUpgradeTransition` with no participating row fails the run too unless its engine is a
+reviewed one with hooks of its own (omit the leg instead), although its constructor accepts one.
 
 A new `ChainTypeManager` implementation's constructor immutables — `BRIDGE_HUB`,
 `L1_BYTECODES_SUPPLIER`, `PERMISSIONLESS_VALIDATOR`, `L1_INTEROP_FEE_MANAGER` — are masked by the

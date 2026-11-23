@@ -109,7 +109,7 @@ contract L1NullifierTest is Test {
     function test_SetL1NativeTokenVault_RevertWhen_NotOwner() public {
         address notOwner = makeAddr("notOwner");
         vm.prank(notOwner);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notOwner));
         l1Nullifier.setL1NativeTokenVault(IL1NativeTokenVault(nativeTokenVault));
     }
 
@@ -137,7 +137,7 @@ contract L1NullifierTest is Test {
     function test_SetL1AssetRouter_RevertWhen_NotOwner() public {
         address notOwner = makeAddr("notOwner");
         vm.prank(notOwner);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notOwner));
         l1Nullifier.setL1AssetRouter(assetRouter);
     }
 
