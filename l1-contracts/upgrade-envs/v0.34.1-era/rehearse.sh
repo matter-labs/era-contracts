@@ -2,8 +2,9 @@
 # Rehearse the v0.34.1 Era verifier patch of one environment on an L1 fork and check the L1 state it leaves. The
 # environment is UPGRADE_ENV (stage, testnet3). Expected values come from $UPGRADE_ENV.toml, permanent-values, the
 # genesis, AllContractsHashes.json and the chain, never from the output being checked.
-#   1. prepare (standalone only): CTMUpgrade_v34_1Era.prepare as DEPLOYER; writes output/$UPGRADE_ENV/ecosystem.toml,
-#      which a standalone run overwrites (compare it with git diff)
+#   1. prepare (standalone only): CTMUpgrade_v34_1Era.prepare as a dry run from DEPLOYER, then its deployer
+#      transactions sent impersonated; forge builds into FOUNDRY_OUT (default: a temp dir), never out/. Writes
+#      output/$UPGRADE_ENV/ecosystem.toml
 #   2. CREATE2 provenance of the four deployer transactions
 #   3. deployed code and keys; the Airbender fixture proof against the new and the old Airbender verifier
 #   4. the output decoded, only what step 5 can't show: the cut, the exact governance calls, the test calls'
@@ -79,6 +80,15 @@ differs() {
 }
 call() { cast call "$@" --rpc-url "$RPC"; }
 first() { awk '{print $1}'; }
+# send FROM TO DATA LABEL — impersonated; cast waits for the receipt, kept in $S/receipt.json (empty if none).
+send() {
+  local status
+  : > "$S/receipt.json"
+  { cast send --unlocked --from "$1" "$2" "$3" --rpc-url "$RPC" --json 2> "$S/send.err" | grep '^{' | tail -1 > "$S/send.json"; } || true
+  python3 "$S/unwrap.py" "$S/send.json" "$S/receipt.json" 2>> "$S/send.err" || true
+  status=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("status"))' "$S/receipt.json" 2> /dev/null) || status=
+  if [ "$status" = "0x1" ]; then echo "  OK   $4"; else fail "$4 (status ${status:-none}: $(head -c 300 "$S/send.err"))"; fi
+}
 
 : "${UPGRADE_ENV:?set UPGRADE_ENV to the environment (stage, testnet3)}"
 [ -f "$HERE/$UPGRADE_ENV.toml" ] || die "no $HERE/$UPGRADE_ENV.toml"
@@ -203,22 +213,52 @@ if [ -n "${ECOSYSTEM_TOML:-}" ] || [ "$PUBLISHED_ONLY" = "1" ]; then
   echo "using the prepared output at $OUT"
   [ -f "$OUT" ] || die "$OUT not found"
 else
+  # As protocol_ops does: a dry run, then only the deployer's transactions, sent impersonated with gas the fork
+  # estimates (Sepolia charges far more per deployed byte than forge's simulation assumes). forge builds into a scratch
+  # dir: the script deploys the CI build it reads from out/, which a local compile must not overwrite.
+  FORGE_OUT=${FOUNDRY_OUT:-$S/forge/out}
+  FORGE_CACHE=${FOUNDRY_CACHE_PATH:-$S/forge/cache}
+  realpath_lc() { python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]).lower())' "$1"; }
+  for d in "$FORGE_OUT" "$FORGE_CACHE"; do
+    case "$(realpath_lc "$d")/" in "$(realpath_lc "$WT")/out/"* | "$(realpath_lc "$WT")/cache-forge/"*)
+      die "FOUNDRY_OUT and FOUNDRY_CACHE_PATH must be outside l1-contracts/out and cache-forge: they hold the CI build" ;;
+    esac
+  done
   cast rpc anvil_setBalance "$DEPLOYER" 0x56BC75E2D63100000 --rpc-url "$RPC" > /dev/null
   mkdir -p "$(dirname "$OUT")"
   # Never assert against an output left over from an earlier run; only a broadcast log of this run counts.
   rm -f "$OUT"
   touch "$S/before-prepare"
   PREPARE_EXIT=0
-  (cd "$WT" && forge script deploy-scripts/upgrade/v34-era/CTMUpgrade_v34_1Era.s.sol:CTMUpgrade_v34_1Era \
+  (cd "$WT" && FOUNDRY_OUT=$FORGE_OUT FOUNDRY_CACHE_PATH=$FORGE_CACHE forge script \
+    deploy-scripts/upgrade/v34-era/CTMUpgrade_v34_1Era.s.sol:CTMUpgrade_v34_1Era \
     --sig 'prepare(string,string,string)' "/upgrade-envs/permanent-values/$UPGRADE_ENV.toml" \
     "/upgrade-envs/v0.34.1-era/$UPGRADE_ENV.toml" "$OUT_REL" \
-    --rpc-url "$RPC" --broadcast --unlocked --sender "$DEPLOYER" --legacy --slow > "$S/prepare.log" 2>&1) \
-    || PREPARE_EXIT=$?
-  echo "prepare exit: $PREPARE_EXIT"
-  grep -E 'v34\.1:|Error|revert|ONCHAIN EXECUTION' "$S/prepare.log" | tail -8 || true
+    --rpc-url "$RPC" --sender "$DEPLOYER" > "$S/prepare.log" 2>&1) || PREPARE_EXIT=$?
+  echo "prepare (dry run) exit: $PREPARE_EXIT"
+  grep -E 'v34\.1:|Error|revert' "$S/prepare.log" | tail -8 || true
   [ "$PREPARE_EXIT" = "0" ] && [ -f "$OUT" ] || die "prepare did not produce an output (log: $S/prepare.log)"
   BROADCAST_LOG=$(find "$WT/broadcast/CTMUpgrade_v34_1Era.s.sol" -name 'prepare-latest.json' -newer "$S/before-prepare" | head -1)
-  [ -n "$BROADCAST_LOG" ] || die "prepare wrote no broadcast log"
+  [ -n "$BROADCAST_LOG" ] || die "prepare wrote no transaction log"
+  # Forge's deploys of the script's own deploy-scripts/ libraries never reach the bundle (protocol_ops drops them).
+  python3 - "$BROADCAST_LOG" > "$S/deployer_txs.txt" <<'PYDRYRUN' || die "cannot read the transactions in $BROADCAST_LOG"
+import json, sys
+log = json.load(open(sys.argv[1]))
+libs = {lib.rsplit(":", 1)[1].lower() for lib in log.get("libraries", []) if lib.startswith("deploy-scripts/")}
+for t in log["transactions"]:
+    if t.get("transactionType") == "CREATE2" and (t.get("contractAddress") or "").lower() in libs:
+        continue
+    x = t["transaction"]
+    print(x.get("to") or "-", x.get("input") or x.get("data") or "0x", int(str(x.get("value") or "0x0"), 16))
+PYDRYRUN
+  FAILED_BEFORE=$FAILED
+  N=0
+  while read -r to data value <&3; do
+    N=$((N + 1))
+    [ "$value" = "0" ] || die "deployer transaction $N sends value $value"
+    send "$DEPLOYER" "$to" "$data" "deployer transaction $N to $to (${data:0:10}…), impersonated"
+  done 3< "$S/deployer_txs.txt"
+  [ "$FAILED" = "$FAILED_BEFORE" ] || die "deployer transactions failed on the fork"
 fi
 export BROADCAST_LOG
 
@@ -358,13 +398,13 @@ PYFIXTURE
   echo "  OK   fixture: 1 public input, 44 proof words"
   { read -r FIX_INPUTS; read -r FIX_PROOF; } < "$S/fixture.txt"
   chk "new AirbenderVerifierPlonk.verify(fixture) = true" \
-    "$(call "$AIRBENDER" 'verify(uint256[],uint256[])(bool)' "$FIX_INPUTS" "$FIX_PROOF" 2>&1)" true
-  if out=$(call "$OLD_AIRBENDER" 'verify(uint256[],uint256[])(bool)' "$FIX_INPUTS" "$FIX_PROOF" 2>&1); then
+    "$(call "$AIRBENDER" 'verify(uint256[],uint256[])(bool)' "$FIX_INPUTS" "$FIX_PROOF" 2> "$S/fixture.err")" true
+  if out=$(call "$OLD_AIRBENDER" 'verify(uint256[],uint256[])(bool)' "$FIX_INPUTS" "$FIX_PROOF" 2> "$S/fixture.err"); then
     chk "old AirbenderVerifierPlonk $OLD_AIRBENDER rejects it (returns false)" "$out" false
-  elif grep -qi revert <<< "$out"; then
+  elif grep -qi revert "$S/fixture.err"; then
     echo "  OK   old AirbenderVerifierPlonk $OLD_AIRBENDER rejects it (reverts)"
   else
-    fail "old AirbenderVerifierPlonk: the call failed without a revert: $(tail -1 <<< "$out" | head -c 200)"
+    fail "old AirbenderVerifierPlonk: the call failed without a revert: $(tail -1 "$S/fixture.err" | head -c 200)"
   fi
 else
   fail "fixture unreadable (see above)"
@@ -399,6 +439,7 @@ word BASE_TOKEN "$BRIDGEHUB" 'baseTokenAssetId(uint256)(bytes32)' "$FIRST_ID"
 export PUH BH_ADMIN INITIAL_CUT_HASH FDD_HASH BASE_TOKEN MAX_UINT
 
 echo "== The inputs against the chain"
+FAILED_BEFORE=$FAILED
 chk "PUH: the CTM's owner() = the bridgehub's owner()" "$(call "$BRIDGEHUB" 'owner()(address)')" "$PUH"
 chk "the CTM's BRIDGE_HUB() = bridgehub_proxy_addr" "$(call "$CTM" 'BRIDGE_HUB()(address)')" "$BRIDGEHUB"
 chk "CTM protocolVersion = v0.34.0 (old)" "$(call "$CTM" 'protocolVersion()(uint256)' | first)" "$OLD"
@@ -412,7 +453,7 @@ while read -r id diamond admin owner upgrader <&3; do
   chk "chain $id: settles on L1" "$(call "$diamond" 'getSettlementLayer()(address)')" "$ZERO"
   echo "     chain $id: diamond $diamond, ChainAdmin $admin (owner $owner), UPGRADER_ROLE holder $upgrader"
 done 3< "$S/chains.txt"
-[ "$FAILED" = "0" ] || die "the inputs differ from the chain"
+[ "$FAILED" = "$FAILED_BEFORE" ] || die "the inputs differ from the chain"
 
 # ---------------------------------------------------------------- 4. the output, decoded
 # Only what step 5 can't show on its own: the cut, the exact governance calls, the test calls' arguments and the keys
@@ -580,15 +621,6 @@ PYSTATIC
 . "$S/expected.env"
 
 # ---------------------------------------------------------------- 5. the fork flow
-# send FROM TO DATA LABEL — impersonated; cast waits for the receipt, kept in $S/receipt.json (empty if none).
-send() {
-  local status
-  : > "$S/receipt.json"
-  { cast send --unlocked --from "$1" "$2" "$3" --rpc-url "$RPC" --json 2> "$S/send.err" | grep '^{' | tail -1 > "$S/send.json"; } || true
-  python3 "$S/unwrap.py" "$S/send.json" "$S/receipt.json" 2>> "$S/send.err" || true
-  status=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("status"))' "$S/receipt.json" 2> /dev/null) || status=
-  if [ "$status" = "0x1" ]; then echo "  OK   $4"; else fail "$4 (status ${status:-none}: $(head -c 300 "$S/send.err"))"; fi
-}
 # reverts LABEL FROM TO DATA ERROR_SIGNATURE — eth_call must revert with that error.
 reverts() {
   local out sel
