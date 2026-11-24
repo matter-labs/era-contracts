@@ -36,8 +36,8 @@ and referenced from here rather than restated: the interop send/execute wiring i
 {docs/bridging.md#atomic-recovery-hook}, and the generic IMT / chain-batch-root / interop-root
 machinery in {docs/message-root.md}.
 
-To build on atomic interop rather than review it, start with the [developer guide](../atomic-interop/README.md): the
-flows, a tutorial on two local chains, and a reference.
+To build on atomic interop, start with the [developer guide](../atomic-interop/README.md): the flows, a tutorial on two
+local chains, and a reference.
 
 ## Key values
 
