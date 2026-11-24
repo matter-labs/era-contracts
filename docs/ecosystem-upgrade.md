@@ -106,7 +106,7 @@ flowchart LR
 Only `upgrade-broadcast` sends transactions. The verify commands only read; every other
 `protocol_ops` command in the table runs on an Anvil fork and writes Safe bundles, and a phase
 touches L1 when its signer executes those bundles (with `upgrade-broadcast`, `dev execute-safe`,
-or the signer's multisig).
+or the signer's multisig). [Release tags](./release-tags.md) says which commits of a rollout get a git tag, and when.
 
 The `generate-upgrade-calldata-*` workflows and the per-chain
 `generate-chain-{add-validator,remove-validator,set-upgrade-timestamp,upgrade}-calldata` workflows
@@ -121,7 +121,8 @@ committed only for `stage-interop-tests` (with a placeholder deployer).
 rehearse the bundles on the fork, run the verifier) into one command; the
 `regenerate-upgrade-calldata` skill under `.claude/skills/` is the step-by-step runbook, and
 `l1-contracts/upgrade-envs/v0.33.0-atomic-interop/output/testnet/README.md` is a complete worked
-example of one environment's rollout.
+example of one environment's rollout. [v31 ecosystem upgrade: generate → deploy](./ecosystem-upgrade-deploy.md) is
+the runbook for phases 1 to 3 as they ran for v31, from the `draft-v31` line and its `protocol_ops`.
 
 ### 1. Prepare
 

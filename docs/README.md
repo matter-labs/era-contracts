@@ -42,7 +42,7 @@ instead of carrying its own prose.
 | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [ecosystem-deployment.md](./ecosystem-deployment.md)         | Deploying a fresh ecosystem: the hub, CTM and chain layers, what each script deploys and wires, the inputs, ownership after deployment, verification, the tooling (`protocol_ops`, CI) |
 | [ecosystem-upgrade.md](./ecosystem-upgrade.md)               | Upgrading an ecosystem to a new release: artifacts, the prepare / deploy / verify / governance / per-chain pipeline, who signs what, authoring a release's scripts                     |
-| [ecosystem-upgrade-deploy.md](./ecosystem-upgrade-deploy.md) | The v31 ecosystem upgrade's two steps, generating the calldata and deploying it, locally and in CI                                                                                     |
+| [ecosystem-upgrade-deploy.md](./ecosystem-upgrade-deploy.md) | The v31 ecosystem upgrade's runbook: generating the calldata, deploying it and verifying the deployment, locally and in CI                                                             |
 | [release-tags.md](./release-tags.md)                         | How release tags are named and created, and the daily check that every live CTM version is tagged                                                                                      |
 
 ## Internal

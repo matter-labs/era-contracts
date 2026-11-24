@@ -96,6 +96,9 @@ For a contract-oriented tour, read:
 7. [ZKsync OS system hooks](./system-hooks.md)
 8. [ZKsync OS genesis and built-ins](../chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins)
 
+The [contracts overview](./contracts/overview.md) summarizes the four groups the contracts fall into, and the
+[contracts index](./contracts/README.md) links each contract domain's pages.
+
 For the operational side, [deploying an ecosystem](../ecosystem-deployment.md) and
 [upgrading an ecosystem](../ecosystem-upgrade.md) describe the scripts and tooling that put this
 architecture on an L1 and move it between releases.

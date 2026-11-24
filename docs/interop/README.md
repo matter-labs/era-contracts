@@ -30,6 +30,8 @@ destination handler.
    recovery protocol, followed by its detailed pages: [commitment tree](../atomicity/imt.md),
    [lifecycle](../atomicity/flow.md), [proofs](../atomicity/proofs.md),
    [recovery](../atomicity/recovery.md), and [security](../atomicity/security.md).
+2. [Developer guide](../atomic-interop/README.md) — building on atomic interop: the flows, a tutorial on two local
+   chains, and a reference.
 
 ### Related subsystems
 
