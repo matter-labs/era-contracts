@@ -11,6 +11,8 @@ import {IValidatorTimelock} from "contracts/state-transition/validators/interfac
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {IChainUpgrader} from "contracts/state-transition/chain-interfaces/IChainUpgrader.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 import {AddressHasNoCode, RoleAccessDenied} from "contracts/common/L1ContractErrors.sol";
@@ -41,11 +43,14 @@ contract EraMultisigValidatorTest is Test {
     uint256 chainId;
     uint32 executionDelay;
 
+    uint256 constant OLD_PROTOCOL_VERSION = 42;
+
     bytes32 precommitterRole;
     bytes32 committerRole;
     bytes32 reverterRole;
     bytes32 proverRole;
     bytes32 executorRole;
+    bytes32 upgraderRole;
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -95,6 +100,11 @@ contract EraMultisigValidatorTest is Test {
             abi.encodeWithSelector(IValidatorTimelock.precommitSharedBridge.selector),
             ""
         );
+        vm.mockCall(
+            address(validatorTimelock),
+            abi.encodeWithSelector(IChainUpgrader.upgradeChainFromVersion.selector),
+            ""
+        );
 
         // Deploy EraMultisigValidator via proxy
         eraMultisig = EraMultisigValidator(_deployEraMultisig(owner, executionDelay, address(validatorTimelock)));
@@ -105,6 +115,7 @@ contract EraMultisigValidatorTest is Test {
         reverterRole = eraMultisig.REVERTER_ROLE();
         proverRole = eraMultisig.PROVER_ROLE();
         executorRole = eraMultisig.EXECUTOR_ROLE();
+        upgraderRole = eraMultisig.UPGRADER_ROLE();
 
         // Grant executor all validator roles on the EraMultisigValidator
         vm.prank(owner);
@@ -151,6 +162,22 @@ contract EraMultisigValidatorTest is Test {
 
     function _sampleBatchData() internal pure returns (uint256, uint256, bytes memory) {
         return (1, 10, hex"aabbccdd");
+    }
+
+    function _sampleDiamondCut() internal pure returns (Diamond.DiamondCutData memory cut) {
+        cut.initAddress = address(0x1234);
+        cut.initCalldata = hex"aabbccdd";
+    }
+
+    function _sampleUpgradeHash() internal view returns (bytes32) {
+        return eraMultisig.calculateUpgradeHash(chainAddress, OLD_PROTOCOL_VERSION, _sampleDiamondCut());
+    }
+
+    function _approveBy(bytes32 _hash, address _a, address _b) internal {
+        vm.prank(_a);
+        eraMultisig.approveHash(_hash);
+        vm.prank(_b);
+        eraMultisig.approveHash(_hash);
     }
 
     function _sampleHash() internal view returns (bytes32) {
@@ -603,6 +630,146 @@ contract EraMultisigValidatorTest is Test {
         vm.prank(executor);
         vm.expectRevert(NotEnoughSignatures.selector);
         eraMultisig.executeBatchesSharedBridge(chainAddress, from, to, data);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //                      UPGRADE CHAIN FROM VERSION
+    // ═══════════════════════════════════════════════════════════════════
+
+    function test_upgradeChainFromVersion_forwardsWhenThresholdMet() public {
+        Diamond.DiamondCutData memory cut = _sampleDiamondCut();
+        _approveBy(_sampleUpgradeHash(), member1, member2);
+
+        vm.expectCall(
+            address(validatorTimelock),
+            abi.encodeCall(IChainUpgrader.upgradeChainFromVersion, (chainAddress, OLD_PROTOCOL_VERSION, cut))
+        );
+        vm.prank(executor);
+        eraMultisig.upgradeChainFromVersion(chainAddress, OLD_PROTOCOL_VERSION, cut);
+    }
+
+    function test_upgradeChainFromVersion_revertsWhenBelowThreshold() public {
+        bytes32 hash = _sampleUpgradeHash();
+        vm.prank(member1);
+        eraMultisig.approveHash(hash);
+
+        vm.expectCall(
+            address(validatorTimelock),
+            abi.encodeWithSelector(IChainUpgrader.upgradeChainFromVersion.selector),
+            0
+        );
+        vm.prank(executor);
+        vm.expectRevert(NotEnoughSignatures.selector);
+        eraMultisig.upgradeChainFromVersion(chainAddress, OLD_PROTOCOL_VERSION, _sampleDiamondCut());
+    }
+
+    function test_upgradeChainFromVersion_revertsIfNotUpgraderRole() public {
+        _approveBy(_sampleUpgradeHash(), member1, member2);
+
+        vm.prank(nonMember);
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, chainAddress, upgraderRole, nonMember));
+        eraMultisig.upgradeChainFromVersion(chainAddress, OLD_PROTOCOL_VERSION, _sampleDiamondCut());
+    }
+
+    function test_upgradeChainFromVersion_revertsIfApprovedForOtherParams() public {
+        Diamond.DiamondCutData memory otherCut = _sampleDiamondCut();
+        otherCut.initCalldata = hex"ee";
+        _approveBy(eraMultisig.calculateUpgradeHash(chainAddress, OLD_PROTOCOL_VERSION, otherCut), member1, member2);
+        _approveBy(
+            eraMultisig.calculateUpgradeHash(chainAddress, OLD_PROTOCOL_VERSION + 1, _sampleDiamondCut()),
+            member1,
+            member2
+        );
+
+        vm.prank(executor);
+        vm.expectRevert(NotEnoughSignatures.selector);
+        eraMultisig.upgradeChainFromVersion(chainAddress, OLD_PROTOCOL_VERSION, _sampleDiamondCut());
+    }
+
+    /// @dev Batch-execution approvals must not authorize an upgrade, even for colliding raw parameters.
+    function test_upgradeChainFromVersion_revertsWithBatchExecutionApprovals() public {
+        _approveBy(
+            eraMultisig.calculateHash(chainAddress, OLD_PROTOCOL_VERSION, 0, abi.encode(_sampleDiamondCut())),
+            member1,
+            member2
+        );
+
+        vm.prank(executor);
+        vm.expectRevert(NotEnoughSignatures.selector);
+        eraMultisig.upgradeChainFromVersion(chainAddress, OLD_PROTOCOL_VERSION, _sampleDiamondCut());
+    }
+
+    function test_upgradeChainFromVersion_failsAfterMemberRemovalDropsBelowThreshold() public {
+        _approveBy(_sampleUpgradeHash(), member1, member2);
+
+        address[] memory toAdd = new address[](0);
+        address[] memory toRemove = new address[](1);
+        toRemove[0] = member1;
+        vm.prank(owner);
+        eraMultisig.changeExecutionMultisigMember(toAdd, toRemove);
+
+        vm.prank(executor);
+        vm.expectRevert(NotEnoughSignatures.selector);
+        eraMultisig.upgradeChainFromVersion(chainAddress, OLD_PROTOCOL_VERSION, _sampleDiamondCut());
+    }
+
+    function test_upgradeChainFromVersion_succeedsWithThresholdZero() public {
+        vm.prank(owner);
+        eraMultisig.changeThreshold(0);
+
+        vm.expectCall(
+            address(validatorTimelock),
+            abi.encodeWithSelector(IChainUpgrader.upgradeChainFromVersion.selector)
+        );
+        vm.prank(executor);
+        eraMultisig.upgradeChainFromVersion(chainAddress, OLD_PROTOCOL_VERSION, _sampleDiamondCut());
+    }
+
+    /// @dev The downstream timelock is not mocked here, so the call reaches the chain through it.
+    function test_upgradeChainFromVersion_reachesChainThroughDownstreamTimelock() public {
+        vm.clearMockedCalls();
+        vm.mockCall(chainAddress, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(owner));
+        vm.mockCall(chainAddress, abi.encodeCall(IGetters.getChainId, ()), abi.encode(chainId));
+        vm.prank(owner);
+        validatorTimelock.addValidatorForChainId(chainId, address(eraMultisig));
+
+        Diamond.DiamondCutData memory cut = _sampleDiamondCut();
+        bytes memory upgradeCall = abi.encodeCall(
+            IChainUpgrader.upgradeChainFromVersion,
+            (chainAddress, OLD_PROTOCOL_VERSION, cut)
+        );
+        vm.mockCall(chainAddress, upgradeCall, "");
+        _approveBy(_sampleUpgradeHash(), member1, member2);
+
+        vm.expectCall(chainAddress, upgradeCall);
+        vm.prank(executor);
+        eraMultisig.upgradeChainFromVersion(chainAddress, OLD_PROTOCOL_VERSION, cut);
+    }
+
+    function test_calculateUpgradeHash_matchesEip712Digest() public view {
+        Diamond.DiamondCutData memory cut = _sampleDiamondCut();
+        bytes32 domainSeparator = keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256("EraMultisigValidator"),
+                keccak256("1"),
+                block.chainid,
+                address(eraMultisig)
+            )
+        );
+        bytes32 structHash = keccak256(
+            abi.encode(
+                keccak256(
+                    "UpgradeChainFromVersion(address chainAddress,uint256 oldProtocolVersion,bytes32 diamondCutHash)"
+                ),
+                chainAddress,
+                OLD_PROTOCOL_VERSION,
+                keccak256(abi.encode(cut))
+            )
+        );
+        bytes32 expected = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+
+        assertEq(eraMultisig.calculateUpgradeHash(chainAddress, OLD_PROTOCOL_VERSION, cut), expected);
     }
 
     // ═══════════════════════════════════════════════════════════════════

@@ -357,7 +357,7 @@ contract ValidatorTimelock is
         address _chainAddress,
         uint256, // _oldProtocolVersion (unused in this specific implementation)
         Diamond.DiamondCutData calldata // _diamondCut (unused in this specific implementation)
-    ) external onlyRole(_chainAddress, UPGRADER_ROLE) {
+    ) external virtual onlyRole(_chainAddress, UPGRADER_ROLE) {
         _propagateToAddress(_getPropagationAddress(_chainAddress));
     }
 

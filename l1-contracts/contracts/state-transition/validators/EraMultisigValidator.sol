@@ -14,6 +14,8 @@ import {
 } from "../L1StateTransitionErrors.sol";
 import {ValidatorTimelock} from "./ValidatorTimelock.sol";
 import {IValidatorTimelock} from "./interfaces/IValidatorTimelock.sol";
+import {IChainUpgrader} from "../chain-interfaces/IChainUpgrader.sol";
+import {Diamond} from "../libraries/Diamond.sol";
 import {IEraMultisigValidator} from "./interfaces/IEraMultisigValidator.sol";
 
 /// @author Matter Labs
@@ -23,8 +25,8 @@ import {IEraMultisigValidator} from "./interfaces/IEraMultisigValidator.sol";
 /// additional security through 2FA: independent nodes verify the execution and sign off on the
 /// state transition before it can be finalized on L1.
 /// @dev This contract sits between the executor EOA and the `ValidatorTimelock`. Commit and prove
-/// calls are forwarded directly, while execute calls require that enough multisig members have
-/// pre-approved the exact execution parameters via `approveHash`.
+/// calls are forwarded directly, while execute and `upgradeChainFromVersion` calls require that enough
+/// multisig members have pre-approved the exact parameters via `approveHash`.
 /// @dev Expected to be deployed as a TransparentUpgradeableProxy.
 /// @dev This contract does NOT enforce the timelock, it only forwards calls to the underlying `ValidatorTimelock`
 /// after checking multisig approvals. The delay getters therefore read through to it and the setters revert.
@@ -34,6 +36,11 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
         keccak256(
             "ExecuteBatches(address chainAddress,uint256 processBatchFrom,uint256 processBatchTo,bytes batchData)"
         );
+
+    /// @dev EIP-712 typehash for the UpgradeChainFromVersion struct.
+    /// `diamondCutHash` is `keccak256(abi.encode(diamondCut))`, same as `ChainTypeManager.upgradeCutHash`.
+    bytes32 internal constant UPGRADE_CHAIN_FROM_VERSION_TYPEHASH =
+        keccak256("UpgradeChainFromVersion(address chainAddress,uint256 oldProtocolVersion,bytes32 diamondCutHash)");
 
     /// @inheritdoc IEraMultisigValidator
     address public override validatorTimelock;
@@ -168,6 +175,21 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
         _propagateToAddress(_getPropagationAddress(_chainAddress));
     }
 
+    /// @inheritdoc IChainUpgrader
+    /// @dev In addition to the base role check, requires that the upgrade parameters have been approved
+    /// by at least `threshold` multisig members before forwarding.
+    function upgradeChainFromVersion(
+        address _chainAddress,
+        uint256 _oldProtocolVersion,
+        Diamond.DiamondCutData calldata _diamondCut
+    ) external override(ValidatorTimelock, IChainUpgrader) onlyRole(_chainAddress, UPGRADER_ROLE) {
+        bytes32 approvedHash = calculateUpgradeHash(_chainAddress, _oldProtocolVersion, _diamondCut);
+        if (getApprovals(approvedHash) < threshold) {
+            revert NotEnoughSignatures();
+        }
+        _propagateToAddress(_getPropagationAddress(_chainAddress));
+    }
+
     /// @dev Returns `validatorTimelock` so that all inherited forwarding functions route calls
     /// to the downstream `ValidatorTimelock` rather than directly to the ZK chain.
     function _getPropagationAddress(address) internal view override returns (address) {
@@ -230,6 +252,25 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
                         _processBatchFrom,
                         _processBatchTo,
                         keccak256(_batchData)
+                    )
+                )
+            );
+    }
+
+    /// @inheritdoc IEraMultisigValidator
+    function calculateUpgradeHash(
+        address _chainAddress,
+        uint256 _oldProtocolVersion,
+        Diamond.DiamondCutData calldata _diamondCut
+    ) public view returns (bytes32) {
+        return
+            _hashTypedDataV4(
+                keccak256(
+                    abi.encode(
+                        UPGRADE_CHAIN_FROM_VERSION_TYPEHASH,
+                        _chainAddress,
+                        _oldProtocolVersion,
+                        keccak256(abi.encode(_diamondCut))
                     )
                 )
             );
