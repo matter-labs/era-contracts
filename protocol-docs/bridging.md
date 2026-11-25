@@ -60,7 +60,8 @@ returns `bridgeMintData`; the destination-side handler's `bridgeMint` consumes t
 ### Deposit initiation (source side)
 
 - `bridgehubDeposit` (L1, called only by the Bridgehub via `requestL2TransactionTwoBridges`) or
-  `initiateIndirectCall` (L2, called only by the `InteropCenter`) decode the user data. Only encoding
+  `initiateIndirectCall` (L2, called only by the `InteropCenter`; L1, called only by the `L1InteropCenter`, see
+  [below](#one-way-bundles-and-the-deposit-accounting)) decode the user data. Only encoding
   version `0x01` (`NEW_ENCODING_VERSION`) is supported for asset transfers; depositing the destination
   chain's base token through this path is rejected (`AssetIdNotSupported`).
 - The router calls `bridgeBurn` on the handler and builds the destination calldata:
@@ -72,8 +73,9 @@ returns `bridgeMintData`; the destination-side handler's `bridgeMint` consumes t
   `L1Nullifier.bridgehubConfirmL2TransactionForwarded`; the nullifier records
   `depositHappened[chainId][l2TxHash] = txDataHash` (rejecting duplicates).
 - For L2 -> L2 the `InteropCallStarter` targets the L2 asset router (same address on every ZK chain); for an
-  L2 -> L1 withdrawal it targets the known `L1_ASSET_ROUTER` address instead — the `finalizeDeposit`
-  calldata is identical. The bridged amount travels inside that calldata, not as call value: the returned
+  L2 -> L1 withdrawal it targets the known `L1_ASSET_ROUTER` address instead, and for a chain the L2 has interop
+  counterparts for, the counterparts' asset router ({protocol-docs/interop.md#counterpart-addressing}) — the
+  `finalizeDeposit` calldata is identical. The bridged amount travels inside that calldata, not as call value: the returned
   starter merely echoes the requested `interopCallValue` (always zero for an indirect call) so the
   InteropCenter's `IndirectCallValueMismatch` check passes.
 - `bridgehubDepositBaseToken` lets the Bridgehub (L1) / `InteropCenter` (L2) acquire the destination
@@ -122,6 +124,35 @@ only. Triggering it requires any contract to exist at exactly the alias of the c
 ~2^160 grind unless one party deliberately deploys both); stealing the refund additionally requires
 controlling the doubly-aliased address on L2.
 
+### One-way bundles and the deposit accounting
+
+A one-way bundle from an L1 ({protocol-docs/interop.md#one-way-bundles-from-an-l1}) moves an asset with the
+accounting of a deposit, on both sides, without being a priority transaction.
+
+- **L1.** `L1AssetRouter.initiateIndirectCall(chainId, originalCaller, data)` is callable only by
+  `l1InteropCenter` and takes the second-bridge data of a deposit. It checks the asset handler as a deposit does
+  ({protocol-docs/interop-gating.md#asset-handler-restriction}), runs the same `bridgeBurn`, and returns the
+  `finalizeDeposit` call for the destination's asset router. The vault's `bridgeBurn` does its accounting
+  whichever way it is reached: `bridgedOut` for an L1-native asset and `chainTotalDeposited` (or the interop
+  pool). The router also checks that the chain settles on this L1, whatever its caller checked, and refuses a
+  zero receiver for a vault asset: the bridged token could not mint to it, and a bundle has no refund. The
+  destination's base token is refused as for a deposit, and ETH can't be sent, since there is no value.
+- **What is not recorded.** Nothing is written to `L1Nullifier.depositHappened`, and `claimFailedDeposit` does not
+  apply: a bundle does not fail, it waits until someone executes it. A transfer whose mint can never succeed
+  stays locked, as an L2 -> L1 withdrawal that can never be finalized does.
+- **L2.** The mint goes through `finalizeDeposit` and the vault like any other, so the asset tracker's
+  `handleFinalizeBridgingOnL2` counts it in `totalSuccessfulDepositsFromL1`, which it does only while the chain
+  settles on L1. A bundle of L1 is therefore executable only while the chain settles on L1 (`NotSettlingOnL1`):
+  executed on another settlement layer it would be in L1's `chainTotalDeposited` and missing from the L2's
+  counter for good. Between the send and the execution a bundle is "deposited on L1, not yet successful on L2",
+  the same class as an unprocessed priority deposit; a future settlement-layer migration that reads
+  `interopInfo` has to treat it so.
+- **Same token.** The first transfer of an asset deploys its bridged token from the mint data, at the address a
+  deposit through the Bridgehub would deploy it at.
+
+`setL1InteropCenter` sets the caller of `initiateIndirectCall`; the owner or the upgrade authority can replace it
+({protocol-docs/interop.md#replacing-the-counterparts}).
+
 ### Finalization (destination side)
 
 `finalizeDeposit(sourceChainId, assetId, transferData)` is the finalization entry point: there is no
@@ -138,9 +169,10 @@ Authorization:
   chain's interop handler (`L2InteropHandler` system contract on L2, configured `l1InteropHandler` on L1)
   while executing an interop bundle. `receiveMessage` re-invokes the payload via a self-call and enforces:
   - the ERC-7930 sender is the asset-router counterpart on the source chain
-    (`_isValidInteropSender`): on L1, any non-L1 chain with sender `L2_ASSET_ROUTER_ADDR`; on L2, any
-    non-L1 chain with sender equal to this router's own address (identical on all ZK chains; interop is
-    only initiated on L2s, never on L1);
+    (`_isValidInteropSender`): on L1, any non-L1 chain with sender `L2_ASSET_ROUTER_ADDR`; on L2, for a chain
+    the L2 has interop counterparts for ({protocol-docs/interop.md#counterpart-addressing}), exactly the
+    counterparts' asset router, and otherwise any non-L1 chain with sender equal to this router's own address
+    (identical on all ZK chains);
   - the payload selector is exactly `finalizeDeposit` and the payload is long enough;
   - the message sender's chain ID equals the payload's `_sourceChainId`. Under the honest-proof trust
     model these are always equal, but the check guarantees a payload can never finalize a deposit under a
@@ -148,7 +180,9 @@ Authorization:
   - Reverts of the inner call are bubbled up verbatim so callers can react to specific errors (e.g. the
     TBM flow retries withdrawals on `InsufficientChainBalance`).
 - On L2, `finalizeDeposit` is additionally callable by the aliased L1 asset router (L1 -> L2 deposits) and
-  rejects the chain's own base-token asset ID. On L1 it is `onlySelf`, i.e. reachable only through
+  rejects the chain's own base-token asset ID. An asset whose handler is not the native token vault is refused
+  from, and in `initiateIndirectCall` toward, a counterpart other than L1 (`AssetHandlerNotAllowed`): only the
+  vault applies the origin rule of that link ([L2 Asset Tracker](#l2-asset-tracker)). On L1 it is `onlySelf`, i.e. reachable only through
   `receiveMessage`'s self-call.
 - Replay protection is the interop handler's `bundleStatus` mapping: a bundle executes at most once.
 
@@ -280,6 +314,21 @@ to preserve the deployed storage layout.
     re-credit `handleFinalizeBridgingOnL2` performs there is nothing to reverse: the destination was not L1,
     and the base token is never native to the chain (so it has no `chainBalance` at all). Both invariants
     are asserted, for every asset — the vault asks before disbursing a failed transfer.
+- **The origin rule of writer links.** The same hooks decide what crosses the link with a writer source, a chain
+  whose roots come from an interop root writer (`L2InteropRootStorage.isWriterSource`,
+  {protocol-docs/interop.md#one-way-bundles-with-a-writer-source}). Unlike the bookkeeping above, this is a check
+  that transfers depend on (`OneWayAssetOriginNotAllowed`):
+  - inbound from a writer source: the asset's origin must be that source;
+  - outbound to a writer source: the asset's origin must be that source, and the asset must not be the chain's
+    base token. The base-token burn of `BaseTokenHolder` reaches the same check;
+  - outbound to L1: the asset's origin must not be a writer source.
+
+  The origin is the one the vault authenticated from the asset id, so a root a writer forged mints only assets of
+  its own source. Transfers of such an asset between other chains are not restricted. A deposit from L1 and a
+  withdrawal of an asset of L1 or of this chain make no extra call.
+  `assertRecoveryIsAccountingNeutral` also refuses a writer source as the destination
+  (`RecoveryToOneWayDestinationNotSupported`): a one-way burn is never recovered.
+
 - `interopInfo` (`totalWithdrawalsToL1`, `totalSuccessfulDepositsFromL1`) is the L2-side accounting a
   settlement-layer migration would need to compute the amount to keep on L1. Nothing consumes it in this
   release, but `totalWithdrawalsToL1` must stay append-only for that use.

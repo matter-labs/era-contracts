@@ -71,6 +71,12 @@ compiled L2 built-ins as factory dependencies.
 - **Bridge proxies.** `L1Nullifier`, `L1AssetRouter`, `L1NativeTokenVault`, `L1InteropHandler`,
   plus the `BridgedStandardERC20` implementation and its `BridgedTokenBeacon` (owned by the
   configured owner) used for bridged-token deployments.
+- **One-way bundles from L1.** The `L1InteropCenter` proxy and the stateless
+  `InteropAttributeParser` it parses attributes with
+  ({protocol-docs/interop.md#one-way-bundles-from-an-l1}). The script sets the center as the asset
+  router's `l1InteropCenter` and as a local message sender of the `L1MessageRoot`, and nominates
+  governance as its owner. No destination is enabled, so the center sends nothing until governance
+  enables one.
 
 It then wires them: the asset router and nullifier learn the vault and the interop handler, the
 vault registers ETH, and `L1Bridgehub.setAddresses` records the asset router, CTM deployment

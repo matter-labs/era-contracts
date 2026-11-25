@@ -220,9 +220,54 @@ A feature brings its id, by convention the `keccak256` of its name, and the chec
 ships it, without changing `ChainRegistrationSender` or `L2Bridgehub`. Neither checks the id, so setting one that
 nothing reads has no effect. The gated features:
 
-| Feature id                                                         | Gates                                                                              |
-| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| `INTEROP_ROOT_WRITERS_FEATURE` (`keccak256("InteropRootWriters")`) | the chain's interop root writers ({protocol-docs/interop.md#interop-root-writers}) |
+| Feature id                                                         | Gates                                                                                                                                                                                                  |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `INTEROP_ROOT_WRITERS_FEATURE` (`keccak256("InteropRootWriters")`) | the chain's interop root writers ({protocol-docs/interop.md#interop-root-writers}), and its interop counterparts for a writer source ({protocol-docs/interop.md#one-way-bundles-with-a-writer-source}) |
+| `L1_TO_L2_INTEROP_FEATURE` (`keccak256("L1ToL2Interop")`)          | the chain's interop counterparts for its own L1 ([below](#one-way-bundles-from-an-l1))                                                                                                                 |
+
+## One-way bundles from an L1
+
+One-way bundles from an L1 to a chain ({protocol-docs/interop.md#one-way-bundles-from-an-l1}) are off for every
+chain until three switches are set, by two parties:
+
+| Switch                                        | Where                                     | Who                                            |
+| --------------------------------------------- | ----------------------------------------- | ---------------------------------------------- |
+| the chain feature `L1_TO_L2_INTEROP_FEATURE`  | `ChainRegistrationSender`, then the chain | the owner or the Bridgehub admin               |
+| the chain's interop counterparts for L1       | `ChainRegistrationSender`, then the chain | the chain's admin, once the feature is enabled |
+| `L1InteropCenter.destinationEnabled[chainId]` | L1                                        | the owner of the `L1InteropCenter`             |
+
+- The first two reach the chain as service transactions and need the chain to run v0.37.0
+  (`INTEROP_COUNTERPARTS_MIN_PROTOCOL_VERSION`, `InteropCounterpartsNotSupported`). Without counterparts the chain
+  executes no bundle (`InteropCounterpartsNotSet`), and it also re-reads the feature at execution
+  (`ChainFeatureNotEnabled`), so each party has a switch that stops the bundles already sent. The owner and the
+  Bridgehub admin can remove the counterparts too.
+- The third stops new sends on L1. **Enable a destination only after its counterparts are set**: a bundle sent
+  before waits on the chain until they are, and a bundle has no refund.
+- The order is: the chain on v0.37.0, the feature, the counterparts, then the destination.
+
+Dormancy. After the upgrade, on a chain where nothing was set: `L2InteropHandler.executeBundle` reverts at the
+counterparts lookup; the `InteropCenter` has no new destination, since a non-atomic send to anything but L1 still
+reverts with `NonAtomicSendUnsupported`; `L2AssetRouter` keeps its sender rule and its destination; the asset
+tracker's origin rule reads `isWriterSource`, false for every chain. The cost is two static calls on an atomic
+asset transfer, at the send and again at the receive: the asset router reads the counterparts and the asset
+tracker reads `isWriterSource`. A deposit from L1 and a withdrawal to L1 of an asset of L1 or of the chain itself
+make no extra call. On L1,
+`sendLocalMessage` and `L1AssetRouter.initiateIndirectCall` each accept one caller, and that caller sends to no
+chain.
+
+What a bundle from L1 bypasses, compared to a deposit through the Bridgehub. It mints the same token with the same
+accounting ({protocol-docs/bridging.md#one-way-bundles-and-the-deposit-accounting}), but it is not a priority
+transaction:
+
+- the chain's **transaction filterer** is not consulted. A chain that relies on one to control what is deposited
+  must not set the counterparts;
+- pausing the Bridgehub does not stop it; pausing the `L1InteropCenter` or the `L1AssetRouter` does;
+- the chain's node chooses when to import an L1 root and whether to include the execution: there is no forced
+  inclusion. The bundle stays executable by anyone.
+
+A writer source has the same switches on its own side of the link, with the roles of its own deployment; on the
+chain's side the feature is `INTEROP_ROOT_WRITERS_FEATURE` and the counterparts come second to the writer
+({protocol-docs/interop.md#counterpart-addressing}).
 
 ## Governance procedure
 

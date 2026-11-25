@@ -31,6 +31,43 @@ Both trees use the same empty-entry hash, the keccak256 of 96 zero bytes (`0x467
 
 `addNewChain(chainId, startingBatchNumber)` (Bridgehub or ChainAssetHandler only) assigns the next `chainIndex`, seeds an empty chain tree, pushes a `chainIdLeafHash(bytes32(0), chainId)` leaf into the shared tree, and sets `currentChainBatchNumber[chainId] = startingBatchNumber`. Index 0 is reserved for the chain the contract itself is deployed on. During settlement-layer migration, `setMigratingChainBatchNumber` moves the batch counter to the new layer so consecutive numbering is preserved.
 
+### Local messages
+
+The chain the message root is deployed on has a slot of its own in the shared tree, index 0, registered when the
+tree is set up. No chain settles into it: `addChainBatchRoot` accepts only the diamond registered for a chain id,
+and the Bridgehub never registers its own chain. From v37 `L1MessageRoot` uses the slot for the messages of L1
+itself.
+
+`sendLocalMessage(messageHash)` records one message as one batch of the slot:
+
+- The leaf is the L2 -> L1 log a chain's messenger emits for a message: sender `L2_TO_L1_MESSENGER` (`0x8008`),
+  key the **caller**, value `messageHash`, `txNumberInBatch` 0. The message root builds it, so a sender only
+  sends as itself.
+- The batch's chain batch root is `ChainBatchRootTree.compute(leaf, 0, EMPTY_IMT_ROOT, EMPTY_IMT_ROOT)`
+  ([chain batch root](#chain-batch-root-zksync-os)): a batch whose logs tree is that one leaf, with no multichain
+  root and an empty interop commitment tree.
+- The batch number is `currentChainBatchNumber[block.chainid] + 1`, so the local batches are numbered from 1 and
+  batch `k` is leaf `k - 1` of the slot's chain tree: nothing seeds a genesis batch for the slot.
+- From there it is an ordinary batch: recorded in `chainBatchRoots`, pushed into the slot's chain tree with the
+  block's timestamp, folded into the shared tree, with `NewInteropRoot` and a `historicalRoots` entry.
+
+So a local message is inside the multichain root that every chain settling on L1 imports, and is proven like a
+message of any chain, with L1 as both the chain and the settlement layer
+({protocol-docs/interop.md#proof-of-a-local-message}). On L1 itself it is provable against the slot's batch root.
+
+Only the senders in `isLocalMessageSender` may call, and only the Bridgehub owner or the upgrade authority change
+that list (`setLocalMessageSender`). The reason is cost, not proof safety: every message changes the multichain
+root, and every chain's node imports every root change, so an open function would let anyone make every chain
+import a root per L1 block. The list keeps the slot unused until governance wants it used; the fresh deployment
+puts the `L1InteropCenter` on it ({protocol-docs/interop.md#one-way-bundles-from-an-l1}).
+
+The slot's batch roots are never the end of another chain's proof. A proof of another chain's batch that names this
+chain as the settlement layer is refused (`InvalidSettlementLayerForBatch`) before the slot is read; before v37
+that case ended at a zero root. And nothing on L1 mistakes a local message for something else: the leaf's sender
+field is the messenger, never the bootloader, so it is not a transaction status; `L1InteropHandler` accepts only
+messages of the L2 `InteropCenter` address for bundles destined to L1; `L1AssetRouter` refuses L1 as the source of
+a transfer.
+
 ### `historicalRoots` and interop-root events
 
 Every shared-tree update records `historicalRoots[block.number] = StoredInteropRoot({root, timestamp})` — the `(blockNumber, root, timestamp)` tuple that chains later import (see below) and that the executor double checks at batch execution. Properties:
@@ -118,7 +155,7 @@ All verification goes through `MessageHashing._getProofData` (exposed as `Messag
 
 **Hop 2 — batch leaf to chain root.** For non-final proofs the next words are `[l1Timestamp][batchLeafProofMask][batchLeafProofLen siblings]`. The verifier reconstructs the batch leaf as `batchLeafHash(batchSettlementRoot, batchNumber, l1Timestamp)` — a wrong timestamp makes the leaf mismatch the tree, which is what authenticates the proof-supplied timestamp — and hashes up to the chain root of `chainTree[chainId]`. `MessageHashing.readAggregationHopPath` is the single accessor for this section's word layout (mask + siblings); its output is trustworthy only after the same proof bytes passed the leaf verifier.
 
-**Hop 3 — chain-id leaf to multichain root.** The chain root becomes `chainIdLeafHash(chainRoot, chainId)`, followed by two words: packed `(settlementLayerBatchNumber << 128 | settlementLayerBatchRootMask)` and `settlementLayerChainId`. `MessageHashing.readSettlementLayerReference` is the single accessor for these settlement-layer words (plus the hop-2 `l1Timestamp`); like its hop-2 sibling, its output is trustworthy only after the same proof bytes passed the leaf verifier. Verification recurses with the chain-id leaf as the new leaf: on L1, `L1MessageRoot` first checks the claimed settlement layer via `IL1ChainAssetHandler.isValidSettlementLayer`; on L2, the recursion anchors in the imported multichain root, using the settlement layer's **block** number as `blockOrBatchNumber`. Recursion depth is capped at 1 (`DepthMoreThanOneForRecursiveMerkleProof`).
+**Hop 3 — chain-id leaf to multichain root.** The chain root becomes `chainIdLeafHash(chainRoot, chainId)`, followed by two words: packed `(settlementLayerBatchNumber << 128 | settlementLayerBatchRootMask)` and `settlementLayerChainId`. The settlement layer can be the chain itself: that is how a [local message](#local-messages) of L1, or a message of a chain whose roots a writer brings, is proven on an L2. `MessageHashing.readSettlementLayerReference` is the single accessor for these settlement-layer words (plus the hop-2 `l1Timestamp`); like its hop-2 sibling, its output is trustworthy only after the same proof bytes passed the leaf verifier. Verification recurses with the chain-id leaf as the new leaf: on L1, `L1MessageRoot` first checks the claimed settlement layer via `IL1ChainAssetHandler.isValidSettlementLayer`; on L2, the recursion anchors in the imported multichain root, using the settlement layer's **block** number as `blockOrBatchNumber`. Recursion depth is capped at 1 (`DepthMoreThanOneForRecursiveMerkleProof`).
 
 Full path, innermost to outermost:
 
