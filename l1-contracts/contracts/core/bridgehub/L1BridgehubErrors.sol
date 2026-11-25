@@ -20,6 +20,8 @@ error ChainExists();
 error ChainFeaturesNotSupported(uint256 chainId, uint256 protocolVersion);
 // 0xc21d238a
 error ChainHasNoBatchesInMessageRoot(uint256 chainId);
+// 0xb50a187c
+error ChainIdIsInteropRootSource(uint256 chainId);
 // 0xf8d5f418
 error ChainNotReadyForMigration(uint256 chainId);
 // 0x68d91b49

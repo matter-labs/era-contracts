@@ -22,6 +22,9 @@ import {L2_BRIDGEHUB_ADDR, L2_INTEROP_ROOT_STORAGE_ADDR} from "contracts/common/
 import {INTEROP_ROOT_WRITERS_FEATURE, TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
 import {IL2InteropRootStorage} from "contracts/interop/IL2InteropRootStorage.sol";
 import {
+    InteropRootSourceAlreadyAssigned,
+    InteropRootSourceInUse,
+    InteropRootSourceNotAssigned,
     InteropRootWritersNotEnabled,
     InteropRootWritersNotSupported,
     InvalidInteropRootSource
@@ -539,10 +542,13 @@ contract ChainRegistrationSenderUnitTest is Test {
     /// @dev The chain id of a source chain outside the ecosystem: not registered in the Bridgehub.
     uint256 internal constant SOURCE_CHAIN_ID = UNREGISTERED_CHAIN_ID;
 
+    /// @dev What the ecosystem does before a chain's admin can name a writer: the feature and the source.
     function _enableInteropRootWriters() internal {
         _mockProtocolVersion(INTEROP_ROOT_WRITERS_MIN_PROTOCOL_VERSION);
-        vm.prank(owner);
+        vm.startPrank(owner);
         sender.setChainFeatureEnabled(CHAIN_ID, INTEROP_ROOT_WRITERS_FEATURE, true);
+        sender.assignInteropRootSource(SOURCE_CHAIN_ID, CHAIN_ID);
+        vm.stopPrank();
     }
 
     function _expectWriterPush(address _writer) internal {
@@ -585,8 +591,10 @@ contract ChainRegistrationSenderUnitTest is Test {
         assertEq(INTEROP_ROOT_WRITERS_MIN_PROTOCOL_VERSION, 0x2400000000, "v0.36.0");
         uint256 oldVersion = INTEROP_ROOT_WRITERS_MIN_PROTOCOL_VERSION - 1;
         _mockProtocolVersion(CHAIN_FEATURES_MIN_PROTOCOL_VERSION);
-        vm.prank(owner);
+        vm.startPrank(owner);
         sender.setChainFeatureEnabled(CHAIN_ID, INTEROP_ROOT_WRITERS_FEATURE, true);
+        sender.assignInteropRootSource(SOURCE_CHAIN_ID, CHAIN_ID);
+        vm.stopPrank();
         _mockProtocolVersion(oldVersion);
 
         address[2] memory writers = [makeAddr("writer"), address(0)];
@@ -634,52 +642,203 @@ contract ChainRegistrationSenderUnitTest is Test {
         sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, address(0));
     }
 
-    /// @notice The roots of L1, of the chain itself and of every ZK chain reach the chain through its settlement
-    /// layer; a writer can't be named for them.
-    function test_setInteropRootWriter_revertWhen_sourceIsL1SelfOrZKChain() public {
+    /// @notice A writer stays removable, by the same three, after the ecosystem disabled the feature: a removal
+    /// only takes trust away.
+    function test_setInteropRootWriter_removalAfterFeatureDisabled() public {
         _enableInteropRootWriters();
-        uint256[3] memory sources = [block.chainid, CHAIN_ID, PEER_CHAIN_ID];
-        for (uint256 i = 0; i < sources.length; ++i) {
-            vm.prank(chainAdmin);
-            vm.expectRevert(abi.encodeWithSelector(InvalidInteropRootSource.selector, sources[i]));
-            sender.setInteropRootWriter(CHAIN_ID, sources[i], makeAddr("writer"));
-        }
-    }
+        vm.prank(chainAdmin);
+        sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("writer"));
+        vm.prank(owner);
+        sender.setChainFeatureEnabled(CHAIN_ID, INTEROP_ROOT_WRITERS_FEATURE, false);
 
-    /// @notice A writer stays removable after its source chain id is registered as a ZK chain, the collision the
-    /// source check exists to prevent.
-    function test_setInteropRootWriter_removalAfterSourceBecameZKChain() public {
-        _enableInteropRootWriters();
-        address ecosystemAdmin = makeAddr("ecosystemAdmin");
-        _mockBridgehubAdmin(ecosystemAdmin);
-        address[3] memory removers = [owner, ecosystemAdmin, chainAdmin];
-        for (uint256 i = 0; i < removers.length; ++i) {
-            vm.mockCall(
-                bridgehub,
-                abi.encodeCall(IBridgehubBase.getZKChain, (SOURCE_CHAIN_ID)),
-                abi.encode(address(0))
-            );
-            vm.prank(chainAdmin);
-            sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("writer"));
+        vm.prank(chainAdmin);
+        vm.expectRevert(InteropRootWritersNotEnabled.selector);
+        sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("newWriter"));
 
-            vm.mockCall(
-                bridgehub,
-                abi.encodeCall(IBridgehubBase.getZKChain, (SOURCE_CHAIN_ID)),
-                abi.encode(makeAddr("sourceNowAZKChain"))
-            );
-            vm.prank(chainAdmin);
-            vm.expectRevert(abi.encodeWithSelector(InvalidInteropRootSource.selector, SOURCE_CHAIN_ID));
-            sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("writer"));
-
-            _expectWriterPush(address(0));
-            vm.prank(removers[i]);
-            sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, address(0));
-            assertEq(sender.interopRootWriter(CHAIN_ID, SOURCE_CHAIN_ID), address(0));
-        }
+        _expectWriterPush(address(0));
+        vm.prank(chainAdmin);
+        sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, address(0));
+        assertEq(sender.interopRootWriter(CHAIN_ID, SOURCE_CHAIN_ID), address(0));
     }
 
     function test_setInteropRootWriter_revertWhen_chainNotRegistered() public {
         vm.expectRevert(ZKChainNotRegistered.selector);
         sender.setInteropRootWriter(UNREGISTERED_CHAIN_ID, SOURCE_CHAIN_ID, address(0));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    Exclusive interop root sources
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Gives the peer chain the writers feature too, so only the assignment separates it from the source.
+    function _enableInteropRootWritersForPeer() internal {
+        vm.mockCall(
+            peer,
+            abi.encodeCall(IGetters.getProtocolVersion, ()),
+            abi.encode(INTEROP_ROOT_WRITERS_MIN_PROTOCOL_VERSION)
+        );
+        vm.prank(owner);
+        sender.setChainFeatureEnabled(PEER_CHAIN_ID, INTEROP_ROOT_WRITERS_FEATURE, true);
+    }
+
+    /// @notice The ecosystem assigns a source chain to one chain: asset ids are derived from the source's chain id,
+    /// so a second chain with its own writer for the same id could mint the first chain's assets.
+    function test_assignInteropRootSource_byOwnerOrBridgehubAdmin() public {
+        address ecosystemAdmin = makeAddr("ecosystemAdmin");
+        _mockBridgehubAdmin(ecosystemAdmin);
+        uint256 otherSourceChainId = SOURCE_CHAIN_ID + 1;
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.getZKChain, (otherSourceChainId)), abi.encode(address(0)));
+        assertEq(sender.interopRootSourceChain(SOURCE_CHAIN_ID), 0);
+
+        vm.expectEmit(true, true, false, false, address(sender));
+        emit IChainRegistrationSender.InteropRootSourceAssigned(SOURCE_CHAIN_ID, CHAIN_ID);
+        vm.prank(owner);
+        sender.assignInteropRootSource(SOURCE_CHAIN_ID, CHAIN_ID);
+        assertEq(sender.interopRootSourceChain(SOURCE_CHAIN_ID), CHAIN_ID);
+        assertFalse(sender.isInteropRootSourceUsed(SOURCE_CHAIN_ID));
+
+        // A chain can have several sources; a source has one chain.
+        vm.prank(ecosystemAdmin);
+        sender.assignInteropRootSource(otherSourceChainId, CHAIN_ID);
+        assertEq(sender.interopRootSourceChain(otherSourceChainId), CHAIN_ID);
+
+        address[2] memory assigners = [owner, ecosystemAdmin];
+        uint256[2] memory chains = [PEER_CHAIN_ID, CHAIN_ID];
+        for (uint256 i = 0; i < assigners.length; ++i) {
+            vm.prank(assigners[i]);
+            vm.expectRevert(
+                abi.encodeWithSelector(InteropRootSourceAlreadyAssigned.selector, SOURCE_CHAIN_ID, CHAIN_ID)
+            );
+            sender.assignInteropRootSource(SOURCE_CHAIN_ID, chains[i]);
+        }
+    }
+
+    /// @notice A chain's admin does not pick its own sources: with first-come claims a chain could take the id of
+    /// another chain's source, or of a chain about to be registered.
+    function testFuzz_assignInteropRootSource_revertWhen_notOwnerNorBridgehubAdmin(address _caller) public {
+        _mockBridgehubAdmin(makeAddr("ecosystemAdmin"));
+        vm.assume(_caller != owner && _caller != makeAddr("ecosystemAdmin"));
+        vm.assume(_caller != makeAddr("proxyAdmin"));
+        vm.prank(_caller);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, _caller));
+        sender.assignInteropRootSource(SOURCE_CHAIN_ID, CHAIN_ID);
+    }
+
+    function test_assignInteropRootSource_revertWhen_chainAdmin() public {
+        _mockBridgehubAdmin(makeAddr("ecosystemAdmin"));
+        vm.prank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, chainAdmin));
+        sender.assignInteropRootSource(SOURCE_CHAIN_ID, CHAIN_ID);
+    }
+
+    /// @notice The roots of L1 and of every ZK chain, the chain itself included, reach a chain through its
+    /// settlement layer; none of them is a source of written roots.
+    function test_assignInteropRootSource_revertWhen_sourceIsL1OrZKChain() public {
+        uint256[3] memory sources = [block.chainid, CHAIN_ID, PEER_CHAIN_ID];
+        for (uint256 i = 0; i < sources.length; ++i) {
+            vm.prank(owner);
+            vm.expectRevert(abi.encodeWithSelector(InvalidInteropRootSource.selector, sources[i]));
+            sender.assignInteropRootSource(sources[i], CHAIN_ID);
+        }
+    }
+
+    function test_assignInteropRootSource_revertWhen_chainNotRegistered() public {
+        vm.prank(owner);
+        vm.expectRevert(ZKChainNotRegistered.selector);
+        sender.assignInteropRootSource(SOURCE_CHAIN_ID, UNREGISTERED_CHAIN_ID);
+    }
+
+    /// @notice Only the chain a source is assigned to names a writer for it, and the first writer makes the
+    /// assignment permanent: what the chain minted from the source's roots stays on it.
+    function test_setInteropRootWriter_revertWhen_sourceNotAssignedToTheChain() public {
+        _mockProtocolVersion(INTEROP_ROOT_WRITERS_MIN_PROTOCOL_VERSION);
+        vm.prank(owner);
+        sender.setChainFeatureEnabled(CHAIN_ID, INTEROP_ROOT_WRITERS_FEATURE, true);
+        _enableInteropRootWritersForPeer();
+
+        // Not assigned to anyone.
+        vm.prank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(InteropRootSourceNotAssigned.selector, CHAIN_ID, SOURCE_CHAIN_ID));
+        sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("writer"));
+
+        vm.prank(owner);
+        sender.assignInteropRootSource(SOURCE_CHAIN_ID, CHAIN_ID);
+        vm.expectEmit(true, true, false, false, address(sender));
+        emit IChainRegistrationSender.InteropRootSourceUsed(SOURCE_CHAIN_ID, CHAIN_ID);
+        vm.prank(chainAdmin);
+        sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("writer"));
+        assertTrue(sender.isInteropRootSourceUsed(SOURCE_CHAIN_ID));
+
+        // Assigned to another chain, whatever that chain does with its writer afterwards.
+        vm.prank(chainAdmin);
+        sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, address(0));
+        vm.prank(makeAddr("peerAdmin"));
+        vm.expectRevert(abi.encodeWithSelector(InteropRootSourceNotAssigned.selector, PEER_CHAIN_ID, SOURCE_CHAIN_ID));
+        sender.setInteropRootWriter(PEER_CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("peerWriter"));
+        assertEq(sender.interopRootWriter(PEER_CHAIN_ID, SOURCE_CHAIN_ID), address(0));
+        assertEq(sender.interopRootSourceChain(SOURCE_CHAIN_ID), CHAIN_ID);
+    }
+
+    /// @notice The owner or the Bridgehub admin undoes an assignment the chain never used, and the source can
+    /// then go to another chain.
+    function test_releaseInteropRootSource_beforeUse() public {
+        _enableInteropRootWritersForPeer();
+        address ecosystemAdmin = makeAddr("ecosystemAdmin");
+        _mockBridgehubAdmin(ecosystemAdmin);
+        address[2] memory releasers = [owner, ecosystemAdmin];
+        for (uint256 i = 0; i < releasers.length; ++i) {
+            vm.prank(owner);
+            sender.assignInteropRootSource(SOURCE_CHAIN_ID, CHAIN_ID);
+
+            vm.expectEmit(true, true, false, false, address(sender));
+            emit IChainRegistrationSender.InteropRootSourceReleased(SOURCE_CHAIN_ID, CHAIN_ID);
+            vm.prank(releasers[i]);
+            sender.releaseInteropRootSource(SOURCE_CHAIN_ID);
+            assertEq(sender.interopRootSourceChain(SOURCE_CHAIN_ID), 0);
+        }
+
+        vm.prank(owner);
+        sender.assignInteropRootSource(SOURCE_CHAIN_ID, PEER_CHAIN_ID);
+        vm.prank(makeAddr("peerAdmin"));
+        sender.setInteropRootWriter(PEER_CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("peerWriter"));
+        assertEq(sender.interopRootWriter(PEER_CHAIN_ID, SOURCE_CHAIN_ID), makeAddr("peerWriter"));
+    }
+
+    /// @notice An assignment the chain used is never undone, even after the chain removed its writer: the tokens the
+    /// chain minted from the source's roots outlive it, and a second chain backing the same asset ids would have to
+    /// honour them.
+    function test_releaseInteropRootSource_revertWhen_used() public {
+        _enableInteropRootWriters();
+        address ecosystemAdmin = makeAddr("ecosystemAdmin");
+        _mockBridgehubAdmin(ecosystemAdmin);
+        vm.prank(chainAdmin);
+        sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("writer"));
+
+        _expectReleaseRefused(owner);
+        vm.prank(chainAdmin);
+        sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, address(0));
+        _expectReleaseRefused(owner);
+        _expectReleaseRefused(ecosystemAdmin);
+
+        assertEq(sender.interopRootSourceChain(SOURCE_CHAIN_ID), CHAIN_ID);
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(InteropRootSourceAlreadyAssigned.selector, SOURCE_CHAIN_ID, CHAIN_ID));
+        sender.assignInteropRootSource(SOURCE_CHAIN_ID, PEER_CHAIN_ID);
+    }
+
+    function _expectReleaseRefused(address _releaser) internal {
+        vm.prank(_releaser);
+        vm.expectRevert(abi.encodeWithSelector(InteropRootSourceInUse.selector, SOURCE_CHAIN_ID, CHAIN_ID));
+        sender.releaseInteropRootSource(SOURCE_CHAIN_ID);
+    }
+
+    /// @notice A chain's admin can't free its own source: the ecosystem decides when a source changes hands.
+    function testFuzz_releaseInteropRootSource_revertWhen_notOwnerNorBridgehubAdmin(address _caller) public {
+        _mockBridgehubAdmin(makeAddr("ecosystemAdmin"));
+        vm.assume(_caller != owner && _caller != makeAddr("ecosystemAdmin"));
+        vm.assume(_caller != makeAddr("proxyAdmin"));
+        vm.prank(_caller);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, _caller));
+        sender.releaseInteropRootSource(SOURCE_CHAIN_ID);
     }
 }

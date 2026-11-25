@@ -31,6 +31,9 @@ import {
 import {IL2Bridgehub} from "../bridgehub/IL2Bridgehub.sol";
 import {IL2InteropRootStorage} from "../../interop/IL2InteropRootStorage.sol";
 import {
+    InteropRootSourceAlreadyAssigned,
+    InteropRootSourceInUse,
+    InteropRootSourceNotAssigned,
     InteropRootWritersNotEnabled,
     InteropRootWritersNotSupported,
     InvalidInteropRootSource
@@ -72,6 +75,12 @@ contract ChainRegistrationSender is
 
     /// @inheritdoc IChainRegistrationSender
     mapping(uint256 chainId => mapping(uint256 sourceChainId => address writer)) public interopRootWriter;
+
+    /// @inheritdoc IChainRegistrationSender
+    mapping(uint256 sourceChainId => uint256 chainId) public interopRootSourceChain;
+
+    /// @inheritdoc IChainRegistrationSender
+    mapping(uint256 sourceChainId => bool used) public isInteropRootSourceUsed;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
@@ -116,7 +125,7 @@ contract ChainRegistrationSender is
 
     /// @inheritdoc IChainRegistrationSender
     function setChainFeatureEnabled(uint256 _chainId, bytes32 _feature, bool _enabled) external nonReentrant {
-        require(msg.sender == owner() || msg.sender == BRIDGE_HUB.admin(), Unauthorized(msg.sender));
+        _requireGovernance();
         address zkChain = BRIDGE_HUB.getZKChain(_chainId);
         require(zkChain != address(0), ZKChainNotRegistered());
         // The chain's L2 runs its upgrade transaction before this service transaction, so a chain that
@@ -144,20 +153,9 @@ contract ChainRegistrationSender is
         address chainAdmin = IGetters(zkChain).getAdmin();
         if (_writer != address(0)) {
             require(msg.sender == chainAdmin, Unauthorized(msg.sender));
-            require(isChainFeatureEnabled[_chainId][INTEROP_ROOT_WRITERS_FEATURE], InteropRootWritersNotEnabled());
-            // The roots of L1 and of every ZK chain reach the chain through its settlement layer, never through a
-            // writer. Checked only when setting: a writer whose source later became a ZK chain must stay removable.
-            require(
-                _sourceChainId != block.chainid &&
-                    _sourceChainId != _chainId &&
-                    BRIDGE_HUB.getZKChain(_sourceChainId) == address(0),
-                InvalidInteropRootSource(_sourceChainId)
-            );
+            _useInteropRootSource(_chainId, _sourceChainId);
         } else {
-            require(
-                msg.sender == chainAdmin || msg.sender == owner() || msg.sender == BRIDGE_HUB.admin(),
-                Unauthorized(msg.sender)
-            );
+            _requireChainAdminOrGovernance(chainAdmin);
         }
         // The chain's L2 runs its upgrade transaction before this service transaction, so a chain that reports the
         // version already has the setter on L2. Setting a writer needs the chain feature, which implies the version;
@@ -177,6 +175,32 @@ contract ChainRegistrationSender is
             L2_INTEROP_ROOT_STORAGE_ADDR,
             abi.encodeCall(IL2InteropRootStorage.setInteropRootWriter, (_sourceChainId, _writer))
         );
+    }
+
+    /// @inheritdoc IChainRegistrationSender
+    function assignInteropRootSource(uint256 _sourceChainId, uint256 _chainId) external {
+        _requireGovernance();
+        require(BRIDGE_HUB.getZKChain(_chainId) != address(0), ZKChainNotRegistered());
+        // The roots of L1 and of every ZK chain reach a chain through its settlement layer, never through a writer.
+        // The Bridgehub registers no chain under an assigned source id afterwards.
+        require(
+            _sourceChainId != block.chainid && BRIDGE_HUB.getZKChain(_sourceChainId) == address(0),
+            InvalidInteropRootSource(_sourceChainId)
+        );
+        uint256 assignedTo = interopRootSourceChain[_sourceChainId];
+        require(assignedTo == 0, InteropRootSourceAlreadyAssigned(_sourceChainId, assignedTo));
+
+        interopRootSourceChain[_sourceChainId] = _chainId;
+        emit InteropRootSourceAssigned(_sourceChainId, _chainId);
+    }
+
+    /// @inheritdoc IChainRegistrationSender
+    function releaseInteropRootSource(uint256 _sourceChainId) external {
+        _requireGovernance();
+        uint256 assignedTo = interopRootSourceChain[_sourceChainId];
+        require(!isInteropRootSourceUsed[_sourceChainId], InteropRootSourceInUse(_sourceChainId, assignedTo));
+        delete interopRootSourceChain[_sourceChainId];
+        emit InteropRootSourceReleased(_sourceChainId, assignedTo);
     }
 
     /// @inheritdoc IChainRegistrationSender
@@ -265,6 +289,33 @@ contract ChainRegistrationSender is
             BRIDGE_HUB.settlementLayer(_peerChainId) == _chainId
         ) {
             revert InvalidInteropPeer(_chainId, _peerChainId);
+        }
+    }
+
+    /// @dev Only the owner and the Bridgehub admin decide what the ecosystem as a whole depends on.
+    function _requireGovernance() internal view {
+        require(msg.sender == owner() || msg.sender == BRIDGE_HUB.admin(), Unauthorized(msg.sender));
+    }
+
+    /// @dev Removals are also open to the owner and to the Bridgehub admin.
+    function _requireChainAdminOrGovernance(address _chainAdmin) internal view {
+        require(
+            msg.sender == _chainAdmin || msg.sender == owner() || msg.sender == BRIDGE_HUB.admin(),
+            Unauthorized(msg.sender)
+        );
+    }
+
+    /// @dev Checks that `_chainId` may have a writer for `_sourceChainId`, and makes the source's assignment to it
+    /// permanent. See {protocol-docs/interop.md#interop-root-writers}.
+    function _useInteropRootSource(uint256 _chainId, uint256 _sourceChainId) internal {
+        require(isChainFeatureEnabled[_chainId][INTEROP_ROOT_WRITERS_FEATURE], InteropRootWritersNotEnabled());
+        require(
+            interopRootSourceChain[_sourceChainId] == _chainId,
+            InteropRootSourceNotAssigned(_chainId, _sourceChainId)
+        );
+        if (!isInteropRootSourceUsed[_sourceChainId]) {
+            isInteropRootSourceUsed[_sourceChainId] = true;
+            emit InteropRootSourceUsed(_sourceChainId, _chainId);
         }
     }
 

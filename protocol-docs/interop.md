@@ -211,10 +211,21 @@ of the source chain that the chain's admin trusts. The writer can be any address
   - setting a writer is up to the chain's admin, as the trust it adds is the chain's own, once the ecosystem enabled
     `INTEROP_ROOT_WRITERS_FEATURE` for the chain (`InteropRootWritersNotEnabled`);
   - removing one is also open to the owner and the Bridgehub admin;
-  - a writer can't be set for L1, the chain itself or a registered ZK chain (`InvalidInteropRootSource`): their
-    roots reach the chain through its settlement layer, and the bootloader and a writer never share a key space. The
-    L2 rejects the chain itself as well. Removal is not refused on this ground, so a writer whose source chain id
-    was later registered as a ZK chain can still be removed.
+  - a source chain belongs to one chain, which the ecosystem picks: the owner or the Bridgehub admin assigns it
+    (`assignInteropRootSource(sourceChainId, chainId)`, recorded in `interopRootSourceChain`), and a writer can be
+    set only for a source assigned to the chain (`InteropRootSourceNotAssigned`). Asset ids are derived from the
+    origin chain's id ({protocol-docs/bridging.md#asset-ids-asset-handlers-deployment-trackers}), so a second chain
+    with its own writer for the same source id could mint, with a root of its own, the bridged tokens the first
+    chain backs with real deposits. A chain admin does not pick its own sources, since first-come claims would let a
+    chain take the id of another chain's source;
+  - only a chain outside the ecosystem is assigned: not L1 and not a registered ZK chain
+    (`InvalidInteropRootSource`), as their roots reach the chain through its settlement layer, and the bootloader
+    and a writer never share a key space. The L2 rejects the chain itself as well. In turn the Bridgehub registers
+    no chain under an assigned id (`ChainIdIsInteropRootSource`), so a source never becomes a ZK chain;
+  - the first writer the chain sets for a source makes the assignment permanent (`isInteropRootSourceUsed`):
+    whatever the chain minted from the source's roots stays on it, so the source can't move to another chain.
+    Before that, the owner or the Bridgehub admin can undo a mistaken assignment (`releaseInteropRootSource`,
+    `InteropRootSourceInUse` once used).
 - The writer mapping and `isWriterSource` are appended to `L2InteropRootStorage`'s storage (slots 2 and 3, after
   `storedInteropRoots` and `latestInteropRootTimestamp`), so the built-in upgrades in place; both start empty.
 

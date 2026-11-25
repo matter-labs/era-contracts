@@ -51,7 +51,8 @@ import {
     TWO_BRIDGES_MAGIC_VALUE
 } from "contracts/common/Config.sol";
 
-import {SecondBridgeAddressTooLow} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {ChainIdIsInteropRootSource, SecondBridgeAddressTooLow} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {IChainRegistrationSender} from "contracts/core/chain-registration/IChainRegistrationSender.sol";
 import {
     AssetIdAlreadyRegistered,
     AssetIdNotSupported,
@@ -719,6 +720,36 @@ contract ExperimentalBridgeTest is Test {
         vm.prank(deployerAddress);
         IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: HARD_CODED_CHAIN_ID,
+            _chainTypeManager: address(mockCTM),
+            _baseTokenAssetId: tokenAssetId,
+            _admin: admin
+        });
+    }
+
+    /// @dev A chain id assigned as a source of written interop roots stays a chain outside the ecosystem.
+    /// Mock justification: the assignment itself is covered in `ChainRegistrationSender.t.sol`; only its lookup
+    /// matters here.
+    function test_RevertWhen_chainIdIsInteropRootSource(uint256 randomValue) public useRandomToken(randomValue) {
+        uint256 sourceChainId = 7777;
+        admin = makeAddr("NEW_CHAIN_ADMIN");
+        address chainRegistrationSender = makeAddr("chainRegistrationSender");
+
+        vm.prank(bridgeOwner);
+        bridgehub.setPendingAdmin(deployerAddress);
+        vm.prank(deployerAddress);
+        bridgehub.acceptAdmin();
+        vm.prank(bridgeOwner);
+        bridgehub.setAddressesV31(chainRegistrationSender);
+        vm.mockCall(
+            chainRegistrationSender,
+            abi.encodeCall(IChainRegistrationSender.interopRootSourceChain, (sourceChainId)),
+            abi.encode(uint256(1))
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(ChainIdIsInteropRootSource.selector, sourceChainId));
+        vm.prank(deployerAddress);
+        IL1Bridgehub(address(bridgehub)).createNewChain({
+            _chainId: sourceChainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
             _admin: admin

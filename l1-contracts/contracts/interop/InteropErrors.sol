@@ -47,6 +47,12 @@ error InteroperableAddressNotEmpty(bytes interoperableAddress);
 error InteropPreviewHash(bytes32 bundleHash);
 // 0x2d48e8cf
 error InteropRootAlreadyExists();
+// 0x466ffc88
+error InteropRootSourceAlreadyAssigned(uint256 sourceChainId, uint256 assignedToChainId);
+// 0xda97a9c2
+error InteropRootSourceInUse(uint256 sourceChainId, uint256 assignedToChainId);
+// 0x722f0f07
+error InteropRootSourceNotAssigned(uint256 chainId, uint256 sourceChainId);
 // 0x8a011102
 error InteropRootTimestampIsZero();
 // 0x3cebbbfd
