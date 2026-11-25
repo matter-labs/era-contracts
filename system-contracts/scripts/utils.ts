@@ -290,7 +290,8 @@ export function getLastCompilationTime(timestampFile: string): Date | null {
   try {
     if (fs.existsSync(timestampFile)) {
       const timestamp = fs.readFileSync(timestampFile, "utf-8");
-      return new Date(parseInt(timestamp, 10));
+      const compilationTime = new Date(parseInt(timestamp, 10));
+      return Number.isNaN(compilationTime.getTime()) ? null : compilationTime;
     }
   } catch (error) {
     const err = error as Error; // Cast `error` to `Error`
