@@ -27,8 +27,8 @@ so the pinned values differ from that revision; they match the paired ZKsync OS 
 The vectors with exactly one flag enabled detect swaps of the boolean words.
 Batch-proving tests explicitly cover all four combinations.
 
-The commitment code lives in the `ZKsyncOSBatchCommitment` library, which the `CommitterFacet` uses. The
-stored batch commitment is the full, untruncated public-input hash:
+The commitment code lives in the `ZKsyncOSBatchCommitment` library, which the `CommitterFacet` and the batch
+mirror ({protocol-docs/batch-mirror.md}) share. The stored batch commitment is the full, untruncated public-input hash:
 
 ```
 keccak256(previousState || newState || chainConfigHash || batchOutputHash)

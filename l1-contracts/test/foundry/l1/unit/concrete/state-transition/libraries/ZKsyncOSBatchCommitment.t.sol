@@ -131,7 +131,8 @@ struct FuzzedCommitBatchInfo {
 }
 
 /// @notice Differential tests of `ZKsyncOSBatchCommitment` against the frozen committer code, plus the
-/// ZKsync OS golden vectors. That the facets use the library is covered by the batch-processing suites.
+/// ZKsync OS golden vectors. That the facets use the library is covered by the batch-processing suites and
+/// by `BatchMirrorReplayTest`, which compares a committer's stored hashes with the library's.
 contract ZKsyncOSBatchCommitmentTest is Test {
     function testFuzz_chainConfigHash_matchesFrozenCommitter(
         uint256 _chainId,

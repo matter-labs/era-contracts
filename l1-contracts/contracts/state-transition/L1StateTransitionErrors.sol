@@ -6,6 +6,8 @@ pragma solidity ^0.8.21;
 error AdminZero();
 // 0xca1c3cbc
 error AlreadyMigrated();
+// 0xb9f8882b
+error BatchMirrorLengthMismatch(uint256 expected, uint256 actual);
 // 0x125d99b0
 error BlobHashBlobCommitmentMismatchValue();
 // 0xafda12bf
