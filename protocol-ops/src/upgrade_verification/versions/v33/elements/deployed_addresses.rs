@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 
 use crate::upgrade_verification::{
     artifacts::{
+        optional_address_in_value as optional_address,
         required_address_in_value as required_address, CtmArtifact, CtmFlavor,
         EcosystemUpgradeArtifact,
     },
@@ -106,6 +107,18 @@ mod ctm_signatures {
         }
         contract V33ZKsyncOSVerifier {
             constructor(address _plonkVerifier);
+        }
+        contract V34ZiskVerifier {
+            constructor(address _snarkVerifier);
+        }
+        contract V34ZiskTestnetVerifier {
+            constructor(address _innerVerifier);
+        }
+        contract V34MultiProofVerifier {
+            constructor(address _airbenderVerifier, address _ziskRangeVerifier);
+        }
+        contract V34MultiProofTestnetVerifier {
+            constructor(address _innerVerifier);
         }
         contract V33GovernanceUpgradeTimer {
             constructor(
@@ -948,12 +961,7 @@ fn verify_ctm_base_provenance(
 
     let scope = format!("ctms.{}", ctm.flavor.label());
 
-    // ZKsync OS verifier file names — `AllContractsHashes.json` ships
-    // per-flavor verifiers since v30; only the ZKsync OS set remains on
-    // this OS-only build.
     let verifier_plonk_file = "l1-contracts/ZKsyncOSVerifierPlonk";
-    let main_verifier_file = "l1-contracts/ZKsyncOSVerifier";
-    let testnet_verifier_file = "l1-contracts/ZKsyncOSTestnetVerifier";
     // No-arg CTM contracts. `eip7702_checker_addr` lives in the da-contracts
     // tree; everything else is l1-contracts.
     let no_args: &[(&[&str], &str)] = &[
@@ -1069,27 +1077,373 @@ fn verify_ctm_base_provenance(
         "l1-contracts/AdminFacet",
     );
 
-    // Main verifier / ZKsyncOSTestnetVerifier. ZKsync OS receives only PLONK.
-    let verifier = required_address(&ctm.value, &scope, &["state_transition", "verifier_addr"])?;
-    let plonk = required_address(
-        &ctm.value,
-        &scope,
-        &["state_transition", "verifier_plonk_addr"],
-    )?;
-    let verifier_file = if !verifiers.env.is_mainnet() {
-        testnet_verifier_file
-    } else {
-        main_verifier_file
-    };
-    let encoded = V33ZKsyncOSVerifier::constructorCall::new((plonk,)).abi_encode();
-    result.expect_create2_params(verifiers, &verifier, encoded, verifier_file);
+    let layout = expected_verifier_layout(&ctm.value, &scope, verifiers.env.is_mainnet())?;
+    for deployment in &layout.deployments {
+        result.expect_create2_params(
+            verifiers,
+            &deployment.address,
+            &deployment.constructor_args,
+            deployment.file,
+        );
+    }
+    if let Some(range_verifier) = layout.operator_range_verifier {
+        result.report_warn(&format!(
+            "{scope}: ZiSK range verifier {range_verifier:#x} was supplied by the operator \
+             (no zisk_snark_verifier_addr), so its bytecode is not checked"
+        ));
+    }
+    if let Some(error) = layout.error {
+        result.report_error(&error);
+    }
 
     Ok(())
+}
+
+/// A CREATE2 deployment a CTM's artifact must record.
+#[derive(Debug, PartialEq, Eq)]
+struct ExpectedDeployment {
+    address: Address,
+    file: &'static str,
+    constructor_args: Vec<u8>,
+}
+
+/// What `verify_ctm_base_provenance` holds a CTM's verifier addresses to.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct ExpectedVerifierLayout {
+    deployments: Vec<ExpectedDeployment>,
+    /// The ZiSK range verifier, when the operator supplied it (`zisk_range_verifier_addr`)
+    /// instead of the script deploying one: there is no deployment of it to check.
+    operator_range_verifier: Option<Address>,
+    /// A mismatch between two recorded addresses that no deployment check would catch.
+    error: Option<String>,
+}
+
+/// The verifiers `DeployCTM.deployMultiProofVerifiers` installs
+/// ({protocol-docs/multi-proof-verification.md}), each with the constructor arguments that tie it
+/// to the next one, from the addresses under `[ctms.<flavor>.state_transition]`:
+///
+/// - `airbender_verifier_addr`: the ZKsync OS verifier, over `verifier_plonk_addr`;
+/// - `zisk_verifier_addr`: the ZiSK range verifier, over `zisk_snark_verifier_addr` when the
+///   script deployed both;
+/// - off mainnet, `zisk_testnet_verifier_addr`, wrapping the range verifier;
+/// - `multi_proof_verifier_addr`, over the Airbender verifier and the range verifier (the testnet
+///   wrapper off mainnet);
+/// - `verifier_addr`, the one chains use: the multi-proof verifier itself on mainnet, its testnet
+///   wrapper elsewhere.
+fn expected_verifier_layout(
+    ctm: &toml::Value,
+    scope: &str,
+    is_mainnet: bool,
+) -> Result<ExpectedVerifierLayout> {
+    use ctm_signatures::*;
+
+    let address = |key: &str| required_address(ctm, scope, &["state_transition", key]);
+    let mut layout = ExpectedVerifierLayout::default();
+    let mut expect = |address: Address, file: &'static str, constructor_args: Vec<u8>| {
+        layout.deployments.push(ExpectedDeployment {
+            address,
+            file,
+            constructor_args,
+        })
+    };
+
+    let airbender = address("airbender_verifier_addr")?;
+    expect(
+        airbender,
+        if is_mainnet {
+            "l1-contracts/ZKsyncOSVerifier"
+        } else {
+            "l1-contracts/ZKsyncOSTestnetVerifier"
+        },
+        V33ZKsyncOSVerifier::constructorCall::new((address("verifier_plonk_addr")?,)).abi_encode(),
+    );
+
+    let zisk = address("zisk_verifier_addr")?;
+    let zisk_snark = optional_address(
+        ctm,
+        scope,
+        &["state_transition", "zisk_snark_verifier_addr"],
+    )?;
+    if let Some(snark) = zisk_snark {
+        expect(snark, "l1-contracts/PilfflonkVerifier", Vec::new());
+        expect(
+            zisk,
+            "l1-contracts/ZiskVerifier",
+            V34ZiskVerifier::constructorCall::new((snark,)).abi_encode(),
+        );
+    }
+
+    let zisk_range = if is_mainnet {
+        zisk
+    } else {
+        let wrapper = address("zisk_testnet_verifier_addr")?;
+        expect(
+            wrapper,
+            "l1-contracts/ZiskTestnetVerifier",
+            V34ZiskTestnetVerifier::constructorCall::new((zisk,)).abi_encode(),
+        );
+        wrapper
+    };
+
+    let multi_proof = address("multi_proof_verifier_addr")?;
+    expect(
+        multi_proof,
+        "l1-contracts/MultiProofVerifier",
+        V34MultiProofVerifier::constructorCall::new((airbender, zisk_range)).abi_encode(),
+    );
+
+    let verifier = address("verifier_addr")?;
+    if is_mainnet {
+        if verifier != multi_proof {
+            layout.error = Some(format!(
+                "{scope}.state_transition.verifier_addr is {verifier:#x}, not the \
+                 multi_proof_verifier_addr {multi_proof:#x}"
+            ));
+        }
+    } else {
+        layout.deployments.push(ExpectedDeployment {
+            address: verifier,
+            file: "l1-contracts/MultiProofTestnetVerifier",
+            constructor_args: V34MultiProofTestnetVerifier::constructorCall::new((multi_proof,))
+                .abi_encode(),
+        });
+    }
+    if zisk_snark.is_none() {
+        layout.operator_range_verifier = Some(zisk);
+    }
+
+    Ok(layout)
 }
 
 #[cfg(test)]
 mod tests {
     use alloy::sol_types::SolConstructor;
+
+    use super::{expected_verifier_layout, ExpectedDeployment};
+    use alloy::primitives::Address;
+
+    const PLONK: Address = Address::repeat_byte(0x01);
+    const AIRBENDER: Address = Address::repeat_byte(0x02);
+    const ZISK_SNARK: Address = Address::repeat_byte(0x03);
+    const ZISK: Address = Address::repeat_byte(0x04);
+    const ZISK_TESTNET: Address = Address::repeat_byte(0x05);
+    const MULTI_PROOF: Address = Address::repeat_byte(0x06);
+    const MULTI_PROOF_TESTNET: Address = Address::repeat_byte(0x07);
+
+    /// A `[ctms.<flavor>]` table whose `state_transition` holds `entries`.
+    fn ctm(entries: &[(&str, Address)]) -> toml::Value {
+        let mut state_transition = toml::Table::new();
+        for (key, address) in entries {
+            state_transition.insert(key.to_string(), format!("{address:#x}").into());
+        }
+        let mut ctm = toml::Table::new();
+        ctm.insert("state_transition".to_string(), state_transition.into());
+        ctm.into()
+    }
+
+    /// Constructor arguments as the deploy scripts encode them: one word per address.
+    fn words(addresses: &[Address]) -> Vec<u8> {
+        addresses
+            .iter()
+            .flat_map(|address| address.into_word().0)
+            .collect()
+    }
+
+    fn deployment(address: Address, file: &'static str, args: &[Address]) -> ExpectedDeployment {
+        ExpectedDeployment {
+            address,
+            file,
+            constructor_args: words(args),
+        }
+    }
+
+    // The regression: off mainnet `verifier_addr` is the multi-proof testnet wrapper, which the
+    // check used to hold to the ZKsync OS testnet verifier's bytecode. Every verifier is now tied
+    // to the next one by its constructor arguments.
+    #[test]
+    fn testnet_verifier_is_the_multi_proof_testnet_wrapper() {
+        let layout = expected_verifier_layout(
+            &ctm(&[
+                ("verifier_plonk_addr", PLONK),
+                ("airbender_verifier_addr", AIRBENDER),
+                ("zisk_snark_verifier_addr", ZISK_SNARK),
+                ("zisk_verifier_addr", ZISK),
+                ("zisk_testnet_verifier_addr", ZISK_TESTNET),
+                ("multi_proof_verifier_addr", MULTI_PROOF),
+                ("verifier_addr", MULTI_PROOF_TESTNET),
+            ]),
+            "ctms.zksync_os",
+            false,
+        )
+        .unwrap();
+
+        assert_eq!(
+            layout.deployments,
+            vec![
+                deployment(AIRBENDER, "l1-contracts/ZKsyncOSTestnetVerifier", &[PLONK]),
+                deployment(ZISK_SNARK, "l1-contracts/PilfflonkVerifier", &[]),
+                deployment(ZISK, "l1-contracts/ZiskVerifier", &[ZISK_SNARK]),
+                deployment(ZISK_TESTNET, "l1-contracts/ZiskTestnetVerifier", &[ZISK]),
+                deployment(
+                    MULTI_PROOF,
+                    "l1-contracts/MultiProofVerifier",
+                    &[AIRBENDER, ZISK_TESTNET]
+                ),
+                deployment(
+                    MULTI_PROOF_TESTNET,
+                    "l1-contracts/MultiProofTestnetVerifier",
+                    &[MULTI_PROOF]
+                ),
+            ]
+        );
+        assert_eq!(layout.operator_range_verifier, None);
+        assert_eq!(layout.error, None);
+    }
+
+    // Mainnet has no testnet wrappers: chains use the multi-proof verifier itself, which takes the
+    // ZiSK range verifier directly.
+    #[test]
+    fn mainnet_verifier_is_the_multi_proof_verifier_itself() {
+        let entries = [
+            ("verifier_plonk_addr", PLONK),
+            ("airbender_verifier_addr", AIRBENDER),
+            ("zisk_snark_verifier_addr", ZISK_SNARK),
+            ("zisk_verifier_addr", ZISK),
+            ("multi_proof_verifier_addr", MULTI_PROOF),
+        ];
+        let with_verifier = |verifier: Address| {
+            let mut entries = entries.to_vec();
+            entries.push(("verifier_addr", verifier));
+            expected_verifier_layout(&ctm(&entries), "ctms.zksync_os", true).unwrap()
+        };
+
+        let layout = with_verifier(MULTI_PROOF);
+        assert_eq!(
+            layout.deployments,
+            vec![
+                deployment(AIRBENDER, "l1-contracts/ZKsyncOSVerifier", &[PLONK]),
+                deployment(ZISK_SNARK, "l1-contracts/PilfflonkVerifier", &[]),
+                deployment(ZISK, "l1-contracts/ZiskVerifier", &[ZISK_SNARK]),
+                deployment(
+                    MULTI_PROOF,
+                    "l1-contracts/MultiProofVerifier",
+                    &[AIRBENDER, ZISK]
+                ),
+            ]
+        );
+        assert_eq!(layout.error, None);
+
+        // Any other `verifier_addr` is an error: no deployment check covers it on mainnet.
+        let error = with_verifier(MULTI_PROOF_TESTNET).error.unwrap();
+        assert!(error.contains("verifier_addr"), "{error}");
+        assert!(error.contains("multi_proof_verifier_addr"), "{error}");
+    }
+
+    // With `zisk_range_verifier_addr` the script deploys neither the SNARK verifier nor the range
+    // verifier, so neither has a deployment to check; the rest is still tied together.
+    #[test]
+    fn an_operator_supplied_range_verifier_has_no_deployment_to_check() {
+        let layout = expected_verifier_layout(
+            &ctm(&[
+                ("verifier_plonk_addr", PLONK),
+                ("airbender_verifier_addr", AIRBENDER),
+                ("zisk_verifier_addr", ZISK),
+                ("zisk_testnet_verifier_addr", ZISK_TESTNET),
+                ("multi_proof_verifier_addr", MULTI_PROOF),
+                ("verifier_addr", MULTI_PROOF_TESTNET),
+            ]),
+            "ctms.zksync_os",
+            false,
+        )
+        .unwrap();
+
+        assert_eq!(layout.operator_range_verifier, Some(ZISK));
+        let files: Vec<_> = layout.deployments.iter().map(|d| d.file).collect();
+        assert_eq!(
+            files,
+            vec![
+                "l1-contracts/ZKsyncOSTestnetVerifier",
+                "l1-contracts/ZiskTestnetVerifier",
+                "l1-contracts/MultiProofVerifier",
+                "l1-contracts/MultiProofTestnetVerifier",
+            ]
+        );
+    }
+
+    // An artifact without the multi-proof addresses is refused, not checked as a single verifier.
+    #[test]
+    fn an_artifact_without_the_multi_proof_addresses_is_refused() {
+        let error = expected_verifier_layout(
+            &ctm(&[("verifier_plonk_addr", PLONK), ("verifier_addr", AIRBENDER)]),
+            "ctms.zksync_os",
+            false,
+        )
+        .unwrap_err();
+        assert!(
+            format!("{error:#}")
+                .contains("ctms.zksync_os.state_transition.airbender_verifier_addr"),
+            "{error:#}"
+        );
+    }
+
+    // Each mirror encodes one word per parameter of the Solidity constructor it stands for.
+    #[test]
+    fn verifier_constructor_mirrors_match_solidity_sources() {
+        use super::ctm_signatures::*;
+
+        let a = Address::ZERO;
+        for (name, source, encoded) in [
+            (
+                "ZKsyncOSVerifier",
+                include_str!(
+                    "../../../../../../l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifier.sol"
+                ),
+                V33ZKsyncOSVerifier::constructorCall::new((a,)).abi_encode(),
+            ),
+            (
+                "ZiskVerifier",
+                include_str!(
+                    "../../../../../../l1-contracts/contracts/state-transition/verifiers/ZiskVerifier.sol"
+                ),
+                V34ZiskVerifier::constructorCall::new((a,)).abi_encode(),
+            ),
+            (
+                "ZiskTestnetVerifier",
+                include_str!(
+                    "../../../../../../l1-contracts/contracts/state-transition/verifiers/ZiskTestnetVerifier.sol"
+                ),
+                V34ZiskTestnetVerifier::constructorCall::new((a,)).abi_encode(),
+            ),
+            (
+                "MultiProofVerifier",
+                include_str!(
+                    "../../../../../../l1-contracts/contracts/state-transition/verifiers/MultiProofVerifier.sol"
+                ),
+                V34MultiProofVerifier::constructorCall::new((a, a)).abi_encode(),
+            ),
+            (
+                "MultiProofTestnetVerifier",
+                include_str!(
+                    "../../../../../../l1-contracts/contracts/state-transition/verifiers/MultiProofTestnetVerifier.sol"
+                ),
+                V34MultiProofTestnetVerifier::constructorCall::new((a,)).abi_encode(),
+            ),
+        ] {
+            let params = source
+                .split_once("constructor(")
+                .unwrap_or_else(|| panic!("{name} has no constructor"))
+                .1
+                .split_once(')')
+                .unwrap()
+                .0;
+            assert_eq!(encoded.len(), params.split(',').count() * 32, "{name}");
+        }
+        // PilfflonkVerifier is deployed with no arguments.
+        assert!(!include_str!(
+            "../../../../../../l1-contracts/contracts/state-transition/verifiers/PilfflonkVerifier.sol"
+        )
+        .contains("constructor("));
+    }
 
     #[test]
     fn current_constructor_mirrors_match_canonical_contracts() {
