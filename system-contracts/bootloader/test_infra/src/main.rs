@@ -222,6 +222,31 @@ fn check_expectations(
         }
     }
 
+    let mint_topic = H256(keccak256(b"Mint(address,uint256)"));
+    for (account, amount) in &expectations.minted {
+        let account_topic = u256_to_h256(*account);
+        let actual = result
+            .logs
+            .events
+            .iter()
+            .filter(|event| {
+                event.address == L2_BASE_TOKEN_ADDRESS
+                    && event.indexed_topics.first() == Some(&mint_topic)
+                    && event.indexed_topics.get(1) == Some(&account_topic)
+            })
+            .fold(U256::zero(), |total, event| {
+                total + U256::from_big_endian(&event.value)
+            });
+        if actual != *amount {
+            return Err(format!(
+                "Base token minted to {:?} is {}, expected {}.",
+                u256_to_address(account),
+                actual,
+                amount
+            ));
+        }
+    }
+
     Ok(())
 }
 
