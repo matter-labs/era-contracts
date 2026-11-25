@@ -157,9 +157,6 @@ interface IBridgehubBase {
         TokenBridgingData calldata _baseTokenBridgingData
     ) external returns (address zkChain, address ctm);
 
-    /// @notice Registers an already deployed chain with the Bridgehub and the `MessageRoot`.
-    function registerAlreadyDeployedZKChain(uint256 _chainId, address _zkChain) external;
-
     function registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) external;
 
     function forwardedBridgeConfirmTransferResult(

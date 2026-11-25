@@ -668,24 +668,6 @@
   },
   {
     "type": "function",
-    "name": "registerAlreadyDeployedZKChain",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_zkChain",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "registerNewZKChain",
     "inputs": [
       {
@@ -1174,48 +1156,12 @@
   },
   {
     "type": "error",
-    "name": "AssetIdNotSupported",
-    "inputs": [
-      {
-        "name": "assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "BridgeHubAlreadyRegistered",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "CTMAlreadyRegistered",
     "inputs": []
   },
   {
     "type": "error",
     "name": "CTMNotRegistered",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ChainIdAlreadyExists",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ChainIdCantBeCurrentChain",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ChainIdIsHardcoded",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ChainIdMismatch",
     "inputs": []
   },
   {
@@ -1231,24 +1177,8 @@
   },
   {
     "type": "error",
-    "name": "ChainIdTooBig",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "EmptyAssetId",
     "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "IncorrectBridgeHubAddress",
-    "inputs": [
-      {
-        "name": "bridgehub",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
   },
   {
     "type": "error",
@@ -1294,11 +1224,6 @@
   },
   {
     "type": "error",
-    "name": "SharedBridgeNotSet",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "SlotOccupied",
     "inputs": []
   },
@@ -1321,11 +1246,6 @@
   {
     "type": "error",
     "name": "ZeroAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ZeroChainId",
     "inputs": []
   }
 ]

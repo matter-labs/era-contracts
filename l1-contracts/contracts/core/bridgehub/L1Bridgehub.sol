@@ -18,12 +18,20 @@ import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
+import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
 import {SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
 import {SettlementLayersMustSettleOnL1} from "../../common/L1ContractErrors.sol";
-import {MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {
+    ChainIdAlreadyExists,
+    ChainIdMismatch,
+    IncorrectBridgeHubAddress,
+    MsgValueMismatch,
+    WrongMagicValue,
+    ZeroAddress
+} from "../../common/L1ContractErrors.sol";
 import {IL1CrossChainSender} from "../../bridge/interfaces/IL1CrossChainSender.sol";
 
 /// @author Matter Labs
@@ -276,5 +284,44 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         messageRoot = _messageRoot;
         chainAssetHandler = _chainAssetHandler;
         chainRegistrationSender = _chainRegistrationSender;
+    }
+
+    /// @dev Registers an already deployed chain with the bridgehub
+    /// @param _chainId The chain Id of the chain
+    /// @param _zkChain Address of the zkChain
+    function registerAlreadyDeployedZKChain(uint256 _chainId, address _zkChain) external onlyOwner {
+        if (_zkChain == address(0)) {
+            revert ZeroAddress();
+        }
+        // slither-disable-next-line unused-return
+        (bool exists, ) = zkChainMap.tryGet(_chainId);
+        if (exists) {
+            revert ChainIdAlreadyExists();
+        }
+        if (IZKChain(_zkChain).getChainId() != _chainId) {
+            revert ChainIdMismatch();
+        }
+
+        address ctm = IZKChain(_zkChain).getChainTypeManager();
+        address chainAdmin = IZKChain(_zkChain).getAdmin();
+        bytes32 chainBaseTokenAssetId = IZKChain(_zkChain).getBaseTokenAssetId();
+        address bridgeHub = IZKChain(_zkChain).getBridgehub();
+        uint256 batchNumber = IZKChain(_zkChain).getTotalBatchesExecuted();
+
+        if (bridgeHub != address(this)) {
+            revert IncorrectBridgeHubAddress(bridgeHub);
+        }
+
+        _validateChainParams({_chainId: _chainId, _assetId: chainBaseTokenAssetId, _chainTypeManager: ctm});
+
+        chainTypeManager[_chainId] = ctm;
+
+        baseTokenAssetId[_chainId] = chainBaseTokenAssetId;
+        settlementLayer[_chainId] = block.chainid;
+
+        _registerNewZKChain(_chainId, _zkChain, true);
+        messageRoot.addNewChain(_chainId, batchNumber);
+
+        emit NewChain(_chainId, ctm, chainAdmin);
     }
 }
