@@ -54,7 +54,8 @@ already verified.
 ## Executing it
 
 1. Deploy: done.
-2. Governance: done. As the Governance owner, the six txs of [`EXECUTE.md`](EXECUTE.md):
+2. Governance: done. As the Governance owner, the six txs of `EXECUTE.md` (written by the generate run, not
+   committed for this env):
    `stageN_schedule_calldata` then `stageN_execute_calldata` to the Governance for N = 0, 1, 2
    (`[governance_operations]`; `yarn execute-governance-instant` in the transaction-simulator sends the same
    transactions).

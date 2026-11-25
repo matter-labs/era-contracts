@@ -56,8 +56,7 @@ directly; the other three were matched by Etherscan to identical bytecode it had
    `executeEmergencyUpgrade`. Before stage 1 carried the repeated pause, stage 1 on its own reverted with
    `MigrationsNotPaused` (reproduced on a fork at block 11947772).
 3. Per chain, once the v0.33.2 prover is live and the chain has no unexecuted batches, the ChainAdmin's owner
-   follows `chain-upgrades/<id>/EXECUTE.md`: `01_*` (`setUpgradeTimestamp`), then `02_*` (the cut). See
-   [`chain-upgrades/README.md`](./chain-upgrades/README.md).
+   follows `chain-upgrades/<id>/EXECUTE.md`: `01_*` (`setUpgradeTimestamp`), then `02_*` (the cut).
 
 ## Validation
 
