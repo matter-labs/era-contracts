@@ -6,6 +6,11 @@ l1_chain_id = 11155111
 # Read from Sepolia on 2026-10-16. Its only CTM is ZKsync OS; chains 2727, 2728, 2729, 27271, 27272, 27273.
 testnet_verifier = true
 
+# The ZK token asset id in the force-deployment data this ecosystem creates chains with. Taken from
+# the v0.33.2 rehearsal of 2026-10-16 (`contracts_config.force_deployments_data`, the data its test
+# chain creation passed), not re-read from L1 since: check it before a real upgrade.
+zk_token_asset_id = "0x21e55cffc931f6d7b0b5b920bd47803ee382b94b8f82ec4c66025dfed5d897d4"
+
 [permanent_contracts]
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 

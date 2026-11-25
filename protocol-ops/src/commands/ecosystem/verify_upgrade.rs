@@ -98,6 +98,9 @@ pub enum VerifyUpgradeEnv {
     /// Our ZKsync-OS ecosystem on Ethereum mainnet, separate from `Mainnet` (the Era ecosystem):
     /// one ZKsync-OS CTM, owned by a legacy `Governance.sol`.
     ZksyncOsMainnet,
+    /// The atomic-interop ZKsync-OS stage ecosystem on Sepolia, separate from `Stage` (the older
+    /// stage ecosystem): one ZKsync-OS CTM, owned by a legacy `Governance.sol`.
+    Stage3,
 }
 
 impl VerifyUpgradeEnv {
@@ -108,6 +111,7 @@ impl VerifyUpgradeEnv {
             Self::Mainnet => "mainnet",
             Self::Adi => "adi",
             Self::ZksyncOsMainnet => "zksync-os-mainnet",
+            Self::Stage3 => "stage3",
         }
     }
 

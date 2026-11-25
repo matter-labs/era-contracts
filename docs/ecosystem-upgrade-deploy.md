@@ -104,7 +104,7 @@ plus `v0.31.0-interopB/<env>.toml` — and the L1 to fork is read from that env'
 needs no workflow edit: commit the config pair, add its anvil port to
 `ENV_ANVIL_PORTS` in `protocol-ops/src/commands/ecosystem/bundle.rs` if it needs its own fork, and (if PUVT
 should accept it) a variant in `VerifyUpgradeEnv`. Committed today: `stage`,
-`testnet`, `mainnet`, `adi`, `zksync-os-mainnet`. PUVT must pass for both the generate job and the
+`stage3`, `testnet`, `mainnet`, `adi`, `zksync-os-mainnet`. PUVT must pass for both the generate job and the
 independent bundle-handoff verification job.
 
 `adi` is the first standalone ecosystem in this list: single-chain, ZKsync-OS, on L1

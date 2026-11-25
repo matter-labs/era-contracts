@@ -1564,6 +1564,7 @@ mod tests {
             "adi",
             "testnet3",
             "zksync-os-mainnet",
+            "stage3",
         ] {
             let cfg = EnvConfig::load(env).unwrap_or_else(|e| panic!("{env}: {e:#}"));
             assert_ne!(cfg.bridgehub(), Address::ZERO, "{env}: bridgehub is unset");

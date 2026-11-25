@@ -1,0 +1,22 @@
+# Upgrade input for the stage3 environment on the v34 release. See protocol-ops/README.md "Environment inputs".
+
+# What this ecosystem's L1AssetRouter reports (`ERA_CHAIN_ID()`); no Era chain is registered on it.
+era_chain_id = 270
+
+# Delay armed on the `GovernanceUpgradeTimer` this upgrade deploys, bounding the window between stage 0
+# and stage 1 becoming executable. The timer is a fresh contract each upgrade, so it is a per-release input.
+governance_upgrade_timer_initial_delay = 1200
+
+# `bridgehub.owner()`, the signer of every governance stage.
+owner_address = "0xFF657F253C0FbdE6A7DeCdc958F4153C1179D3aa"
+
+[contracts]
+# Rotated every release: CREATE2 returns the previously deployed contract if a salt is reused.
+create2_factory_salt = "0xe53c2865e67b1da7813107f34b5d5122cbd42fb3e311cd2de0aab8e8d86c6f5c"
+# Salt for legacy `Governance.sol` op ids, rotated so they do not collide with executed ones.
+legacy_gov_salt = "0x6e00969ba216109aa7e0136f83c91090ba45e69a26b923f3f3f144aaf0545e3e"
+
+# Per-CTM CREATE2 salts, keyed by CTM proxy: each CTM prepare deploys its own `GovernanceUpgradeTimer`
+# with env-wide constructor args, so two CTMs need distinct salts.
+[create2_factory_salts]
+"0x94d8784d719181EA00f58ab4a85333959FFA5a79" = "0x93436ecabd71925dc585ecbf86969cef20336f5e5f5e5de33b11a1dbf2c44d96"
