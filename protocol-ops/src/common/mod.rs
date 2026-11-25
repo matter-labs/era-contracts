@@ -2,6 +2,8 @@ pub mod abi;
 pub mod addresses;
 pub mod anvil;
 pub mod args;
+pub mod call_description;
+pub mod calldata;
 pub mod cmd;
 pub mod config;
 pub mod ecosystem;
@@ -19,6 +21,7 @@ pub mod paths;
 pub mod preflight;
 pub mod private_key;
 pub mod traits;
+pub mod tx_origin;
 pub mod upgrade_descriptor;
 pub mod wallets;
 

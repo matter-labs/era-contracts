@@ -7,6 +7,8 @@ import {IProtocolUpgradeHandler} from "./IProtocolUpgradeHandler.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IEmergencyUpgrageBoard {
+    function PROTOCOL_UPGRADE_HANDLER() external view returns (address);
+
     function GUARDIANS() external view returns (address);
 
     function SECURITY_COUNCIL() external view returns (address);

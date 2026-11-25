@@ -20,9 +20,11 @@ pub mod broadcast;
 pub mod bundle;
 pub mod init;
 pub mod simulator;
+pub mod sync_executed;
 pub mod upgrade;
 pub mod upgrade_full;
 pub mod upgrade_inner;
+pub mod verifier_only_check;
 pub mod verify_upgrade;
 pub mod zk_governance;
 
@@ -77,6 +79,10 @@ pub enum EcosystemCommands {
     /// Convert a protocol-ops governance TOML into transaction-simulator JSON.
     #[command(name = "governance-toml-to-simulator")]
     GovernanceTomlToSimulator(GovernanceTomlToSimulatorArgs),
+
+    /// Mark the transactions of a transaction-simulator scenario that already ran on L1.
+    #[command(name = "sync-already-executed")]
+    SyncAlreadyExecuted(sync_executed::SyncAlreadyExecutedArgs),
 }
 
 pub async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
@@ -94,5 +100,6 @@ pub async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
         EcosystemCommands::VerifyBundle(args) => bundle::run_verify_bundle(args),
         EcosystemCommands::ListCtms(args) => upgrade::run_list_ctms(args).await,
         EcosystemCommands::GovernanceTomlToSimulator(args) => simulator::run(args).await,
+        EcosystemCommands::SyncAlreadyExecuted(args) => sync_executed::run(args).await,
     }
 }

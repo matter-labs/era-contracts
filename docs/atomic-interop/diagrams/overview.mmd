@@ -1,0 +1,30 @@
+sequenceDiagram
+  autonumber
+  box rgb(241,245,249)
+    actor U as Alice, Bob
+  end
+  box rgb(219,234,254)
+    participant A as Chain A
+  end
+  box rgb(237,233,254)
+    participant E as Ethereum
+  end
+  box rgb(220,252,231)
+    participant B as Chain B
+  end
+  box rgb(254,243,199)
+    participant X as Executor
+  end
+  Note over U: agree on legs<br/>and a deadline
+  U->>A: Alice sends<br/>leg 1 on chain A
+  U->>B: Bob sends leg 2 on chain B
+  rect rgb(254,226,226)
+    Note over A,B: both legs must settle<br/>by the deadline (Ethereum time)
+    A->>E: settle batch<br/>with leg 1
+    B->>E: settle batch<br/>with leg 2
+  end
+  E->>A: import the<br/>interop root
+  E->>B: import the<br/>interop root
+  X->>B: execute leg 1<br/>(proves both legs)
+  X->>A: execute leg 2<br/>(proves both legs)
+  Note over A,B: Bob receives on chain B, Alice on chain A.<br/>Execution has no deadline.

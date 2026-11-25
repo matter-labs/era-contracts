@@ -2,7 +2,7 @@
 
 This directory holds the inputs and the committed outputs of ecosystem upgrades, per release and
 per environment. The pipeline that consumes them is described in
-[protocol-docs/ecosystem-upgrade.md](../../protocol-docs/ecosystem-upgrade.md).
+[docs/ecosystem-upgrade.md](../../docs/ecosystem-upgrade.md).
 
 ## Layout
 
@@ -11,7 +11,6 @@ upgrade-envs/
   permanent-values/<env>.toml           # per-environment facts, independent of the release
   <release>/<env>.toml                  # per-release inputs for that environment
   <release>/output/<env>/               # the committed artifacts of that rollout
-  <release>/sim-descriptions.toml       # labels for the transaction-simulator scenarios
 ```
 
 `<release>` is the full release name (`v0.34.0-chain-config`); `<env>` is `stage`, `testnet`,
@@ -29,6 +28,16 @@ the governance kind (`puh` for a `ProtocolUpgradeHandler`, otherwise the legacy 
 the testnet-verifier flag (`testnet_verifier`, true everywhere except mainnet; the prepare refuses
 to run without it), the ZK token asset id and owners that must be wrapped rather than
 impersonated. Update it when a release moves an address; never put per-release values here.
+
+An environment whose chain batches must be sent by a known executor names its `TxOriginAsserter` as
+`[permanent_contracts] tx_origin_asserter_addr`. `chain upgrade` and `chain set-upgrade-timestamp`
+then end every bundle with `assertTxOrigin()` on it, which reverts unless `tx.origin` is the
+asserter's authority or, when the authority is a Safe, one of its owners. A Safe batch can otherwise
+be sent by anyone who holds enough signatures. `--skip-tx-origin-assertion` (the chain workflows'
+`assert_tx_origin` input, on by default) leaves the call out, for a chain whose own multisig executes
+the bundle through an executor the asserter does not authorize. Fork replays send the call from an
+address the asserter authorizes, so they check that it is deployed and accepts an executor, not who
+executes on L1.
 
 ### `<release>/<env>.toml`
 

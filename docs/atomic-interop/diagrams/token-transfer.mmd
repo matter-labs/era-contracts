@@ -1,0 +1,26 @@
+sequenceDiagram
+  autonumber
+  box rgb(241,245,249)
+    actor U as Your app
+  end
+  box rgb(219,234,254)
+    participant A as Chain A
+  end
+  box rgb(237,233,254)
+    participant E as Ethereum
+  end
+  box rgb(220,252,231)
+    participant B as Chain B
+  end
+  box rgb(254,243,199)
+    participant X as Executor
+  end
+  U->>A: register (if needed)<br/>and approve the token
+  U->>A: preview the<br/>bundle hash
+  U->>A: send transfer through<br/>the asset router
+  Note over A: token vault locks<br/>or burns the tokens
+  A->>E: settle batch<br/>with the leg
+  E->>B: import the<br/>interop root
+  X->>A: get finality proof<br/>for the leg
+  X->>B: execute the<br/>bundle with proof
+  Note over B: token vault mints<br/>or releases the tokens

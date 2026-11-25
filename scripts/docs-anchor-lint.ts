@@ -2,37 +2,42 @@ import { execSync } from "child_process";
 import * as fs from "fs";
 import { join } from "path";
 
-// Validates every `{protocol-docs/<file>.md(#anchor)?}` reference embedded in the
-// source tree: the target file must exist, and any `#anchor` must resolve to a real
-// heading in that file (GitHub slug rules). Keeps doc pointers from silently rotting
-// as `protocol-docs/` evolves. See AGENTS.md "Documentation and Comments".
+// Validates every `{docs/<file>.md(#anchor)?}` reference embedded in the source tree:
+// the target file must exist, and any `#anchor` must resolve to a real heading in that
+// file (GitHub slug rules). Keeps doc pointers from silently rotting as `docs/` evolves.
+// See AGENTS.md "Documentation and Comments".
+//
+// `{protocol-docs/...}` is the same pointer under the folder's old name and resolves
+// against `docs/` too: contract sources keep it, since rewriting a comment changes the
+// contract's metadata hash.
 //
 // Parsing is deliberately two-phase, so the lint fails CLOSED:
-//   1. DISCOVERY finds every `{protocol-docs…}` candidate with a permissive pattern.
+//   1. DISCOVERY finds every `{docs/…}` / `{protocol-docs…}` candidate with a permissive pattern.
 //   2. VALIDATION checks each candidate against the strict grammar, then resolves it.
 // A single-phase strict regex would silently ignore malformed pointers (a typo like
 // `#does.not-exist` simply wouldn't match), which is exactly the rot this guards against.
 // Run with `--selftest` to exercise the parser against the cases below.
 
-const DOCS_DIR = "protocol-docs";
-// Extensions carrying `{protocol-docs/...}` pointers. `*.md` is included because the docs
+const DOCS_DIR = "docs";
+// Extensions carrying `{docs/...}` pointers. `*.md` is included because the docs
 // cross-reference each other with the same syntax, and those pointers rot just as easily.
 const SOURCE_GLOBS = ["*.sol", "*.ts", "*.rs", "*.md"];
 
-// Phase 1 — permissive discovery: anything that opens `{protocol-docs` and closes on the
-// same line. Deliberately loose so malformed pointers are *found* and then rejected.
-const CANDIDATE_RE = /\{protocol-docs[^}\n]*\}/g;
+// Phase 1 — permissive discovery: anything that opens `{docs/` or `{protocol-docs` and closes on
+// the same line. Deliberately loose so malformed pointers are *found* and then rejected. The new
+// prefix needs its slash: a bare `{docs` is also a Rust format argument.
+const CANDIDATE_RE = /\{(?:docs\/|protocol-docs)[^}\n]*\}/g;
 // An opener with no closing brace on the line: also malformed, and invisible to the above.
-const UNTERMINATED_RE = /\{protocol-docs[^}\n]*$/gm;
+const UNTERMINATED_RE = /\{(?:docs\/|protocol-docs)[^}\n]*$/gm;
 
 // Prose that documents the pointer *syntax* writes templates rather than real pointers. This is an
 // EXACT allowlist keyed by file: a pattern-based exemption (e.g. "skip anything containing `...`")
-// would fail open, silently passing a real-looking typo such as `{protocol-docs/interop.md#a...b}`.
+// would fail open, silently passing a real-looking typo such as `{docs/interop.md#a...b}`.
 // Adding a template here is a deliberate, reviewable act.
 const SYNTAX_DOC_TEMPLATES: ReadonlyMap<string, ReadonlySet<string>> = new Map([
-  ["AGENTS.md", new Set(["{protocol-docs/<path>.md}"])],
-  ["CLAUDE.md", new Set(["{protocol-docs/<path>.md}"])],
-  ["protocol-docs/README.md", new Set(["{protocol-docs/<name>.md}", "{protocol-docs/...}"])],
+  ["AGENTS.md", new Set(["{docs/<path>.md}", "{protocol-docs/<path>.md}"])],
+  ["CLAUDE.md", new Set(["{docs/<path>.md}", "{protocol-docs/<path>.md}"])],
+  ["docs/README.md", new Set(["{docs/<name>.md}", "{protocol-docs/<name>.md}"])],
 ]);
 
 // True only for an exact (file, candidate) pair on the allowlist above.
@@ -44,7 +49,7 @@ export function isSyntaxTemplate(file: string, candidate: string): boolean {
 // Path segments allow dots so filenames like `foo.bar.md` parse; the anchor accepts
 // Unicode letters/numbers (GitHub keeps them) and a backslash before a character, because
 // prettier escapes underscores in markdown prose (`#\_recoverbundle`).
-const STRICT_RE = /^\{protocol-docs\/((?:[A-Za-z0-9._-]+\/)*[A-Za-z0-9._-]+\.md)(#(?:\\?[\p{L}\p{N}_-])+)?\}$/u;
+const STRICT_RE = /^\{(?:protocol-)?docs\/((?:[A-Za-z0-9._-]+\/)*[A-Za-z0-9._-]+\.md)(#(?:\\?[\p{L}\p{N}_-])+)?\}$/u;
 
 // GitHub heading -> anchor slug (mirrors github-slugger): lowercase, drop every character
 // that is not a letter, number, space, hyphen or underscore, then turn spaces into hyphens.
@@ -144,7 +149,7 @@ function listedSourceFiles(): string[] {
 }
 
 // Keyed by path relative to DOCS_DIR (e.g. `atomicity/flow.md`), so nested docs are addressable
-// exactly as they appear in a `{protocol-docs/<relPath>}` pointer.
+// exactly as they appear in a `{docs/<relPath>}` pointer.
 function loadDocAnchors(): Map<string, Set<string>> {
   const map = new Map<string, Set<string>>();
   const walk = (dir: string, prefix: string): void => {
@@ -209,11 +214,11 @@ function check(docAnchors: Map<string, Set<string>>): number {
   }
 
   if (violations.length) {
-    console.error(`docs-anchor-lint: ${violations.length} broken protocol-docs reference(s):`);
+    console.error(`docs-anchor-lint: ${violations.length} broken docs reference(s):`);
     for (const v of violations) console.error(`  ${v}`);
     return 1;
   }
-  console.log(`docs-anchor-lint: all ${checked} protocol-docs references resolve.`);
+  console.log(`docs-anchor-lint: all ${checked} docs references resolve.`);
   return 0;
 }
 
@@ -232,28 +237,33 @@ function selftest(): number {
   };
 
   // well-formed
-  expectOk("{protocol-docs/interop.md}", "interop.md", undefined);
-  expectOk("{protocol-docs/interop.md#send-flow}", "interop.md", "#send-flow");
-  expectOk("{protocol-docs/atomicity/flow.md#data-structures}", "atomicity/flow.md", "#data-structures");
-  expectOk("{protocol-docs/a/b/c.md#x}", "a/b/c.md", "#x");
+  expectOk("{docs/interop.md}", "interop.md", undefined);
+  expectOk("{docs/interop.md#send-flow}", "interop.md", "#send-flow");
+  expectOk("{docs/atomicity/flow.md#data-structures}", "atomicity/flow.md", "#data-structures");
+  expectOk("{docs/a/b/c.md#x}", "a/b/c.md", "#x");
   // prettier-escaped underscore must parse, not be skipped
-  expectOk("{protocol-docs/atomicity/recovery.md#\\_recoverbundle}", "atomicity/recovery.md", "#\\_recoverbundle");
+  expectOk("{docs/atomicity/recovery.md#\\_recoverbundle}", "atomicity/recovery.md", "#\\_recoverbundle");
   // unicode anchors are legal on GitHub
-  expectOk("{protocol-docs/interop.md#überblick}", "interop.md", "#überblick");
+  expectOk("{docs/interop.md#überblick}", "interop.md", "#überblick");
+  // the folder's old name resolves to the same doc
+  expectOk("{protocol-docs/interop.md#send-flow}", "interop.md", "#send-flow");
+  expectOk("{protocol-docs/atomicity/flow.md}", "atomicity/flow.md", undefined);
 
   // malformed — each of these used to be silently ignored
-  expectBad("{protocol-docs/interop.md#does.not-exist}"); // '.' illegal in an anchor
+  expectBad("{docs/interop.md#does.not-exist}"); // '.' illegal in an anchor
+  expectBad("{docs/interop.md#has space}");
+  expectBad("{docs/interop.md#}"); // empty anchor
+  expectBad("{docs/interop.txt}"); // not a .md target
+  expectBad("{docs/interop.md#a#b}");
+  expectBad("{docs/}"); // no file at all
+  expectBad("{protocol-docs}");
+  expectBad("{docs/interop.md #send-flow}");
   expectBad("{protocol-docs/interop.md#has space}");
-  expectBad("{protocol-docs/interop.md#}"); // empty anchor
-  expectBad("{protocol-docs/interop.txt}"); // not a .md target
-  expectBad("{protocol-docs/interop.md#a#b}");
-  expectBad("{protocol-docs}"); // no file at all
-  expectBad("{protocol-docs/}");
-  expectBad("{protocol-docs/interop.md #send-flow}");
+  expectBad("{protocol-docsx/interop.md}"); // only the exact old folder name is an alias
 
   // ellipsis/angle-bracket typos must be reported as malformed, never treated as templates
-  expectBad("{protocol-docs/interop.md#does...not-exist}");
-  expectBad("{protocol-docs/interop.md#a<b}");
+  expectBad("{docs/interop.md#does...not-exist}");
+  expectBad("{docs/interop.md#a<b}");
 
   // the template exemption is an exact (file, string) allowlist — not a pattern
   const expectTemplate = (file: string, s: string, want: boolean) => {
@@ -261,13 +271,26 @@ function selftest(): number {
       failures.push(`isSyntaxTemplate('${file}', '${s}') should be ${want}`);
     }
   };
+  expectTemplate("AGENTS.md", "{docs/<path>.md}", true);
   expectTemplate("AGENTS.md", "{protocol-docs/<path>.md}", true);
-  expectTemplate("protocol-docs/README.md", "{protocol-docs/...}", true);
+  expectTemplate("docs/README.md", "{docs/<name>.md}", true);
   // same string, file not on the allowlist -> not exempt
-  expectTemplate("protocol-docs/interop.md", "{protocol-docs/...}", false);
+  expectTemplate("docs/interop.md", "{docs/<name>.md}", false);
   // allowlisted file, string not on its list -> not exempt (this is the fail-open case)
-  expectTemplate("AGENTS.md", "{protocol-docs/interop.md#does...not-exist}", false);
-  expectTemplate("protocol-docs/README.md", "{protocol-docs/interop.md#a...b}", false);
+  expectTemplate("AGENTS.md", "{docs/interop.md#does...not-exist}", false);
+  expectTemplate("docs/README.md", "{docs/interop.md#a...b}", false);
+
+  // discovery: both prefixes are found (a typo after them included); a bare `{docs` is not
+  const found = (s: string) => [...s.matchAll(CANDIDATE_RE)].map((m) => m[0]).join("|");
+  if (
+    found("{docs/a.md} {protocol-docs/b.md#c} {protocol-docsx/d.md} {docs} {docsx}") !==
+    "{docs/a.md}|{protocol-docs/b.md#c}|{protocol-docsx/d.md}"
+  ) {
+    failures.push("discovery: CANDIDATE_RE regressed");
+  }
+  if (!"see {docs/a.md".match(UNTERMINATED_RE) || !"see {protocol-docs/a.md".match(UNTERMINATED_RE)) {
+    failures.push("discovery: UNTERMINATED_RE regressed");
+  }
 
   // fence handling — a heading-like line inside ANY fence must not become an anchor
   const hasSlug = (md: string, slug: string) => headingSlugs(md).has(slug);

@@ -1,0 +1,6 @@
+# How the generate / replay / deploy pipeline handles this upgrade
+# (protocol-ops/src/common/upgrade_descriptor.rs): `upgrade-prepare-all --verifier-only`, whose input is
+# `<env>.toml` next to this file. Its only L1 transactions are four CREATE2 deployments (both verifiers, the
+# stage validator and the governance timer); its checks and the execution transactions are built in.
+prepare = "prepare-all"
+verifier_only = true

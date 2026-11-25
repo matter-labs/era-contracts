@@ -20,6 +20,9 @@ struct SetUpgradeTimestampOutput {
     bridgehub: Address,
     chain_id: u64,
     upgrade_timestamp: String,
+    /// The `TxOriginAsserter` whose `assertTxOrigin()` ends the bundle, if any.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tx_origin_asserter: Option<Address>,
 }
 
 /// Set chain-upgrade timestamp, prepare-only.
@@ -43,6 +46,14 @@ pub struct ChainSetUpgradeTimestampArgs {
     #[clap(long)]
     pub upgrade_timestamp: String,
 
+    /// Leave `TxOriginAsserter.assertTxOrigin()` out of the bundle on an env that configures an
+    /// asserter (`[permanent_contracts] tx_origin_asserter_addr`), where every bundle ends with
+    /// it by default. For a chain whose own multisig executes the bundle through an executor
+    /// the asserter does not authorize.
+    #[clap(long, default_value_t = false)]
+    #[serde(default)]
+    pub skip_tx_origin_assertion: bool,
+
     #[clap(flatten)]
     #[serde(flatten)]
     pub shared: SharedRunArgs,
@@ -50,6 +61,12 @@ pub struct ChainSetUpgradeTimestampArgs {
 
 pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     let (bridgehub, chain_id) = args.topology.resolve()?;
+    let tx_origin_asserter = args
+        .topology
+        .ecosystem
+        .env_config()?
+        .and_then(|cfg| cfg.tx_origin_asserter())
+        .filter(|_| !args.skip_tx_origin_assertion);
     let mut runner = ForgeRunner::new(&args.shared)?;
     let upgrade_timestamp = args
         .upgrade_timestamp
@@ -93,12 +110,15 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     logger::info(format!("Chain ID: {}", chain_id));
     logger::info(format!("Upgrade timestamp: {}", args.upgrade_timestamp));
     logger::info(format!("RPC URL: {}", args.shared.l1_rpc_url));
+    if let Some(asserter) = tx_origin_asserter {
+        logger::info(format!("Ends with assertTxOrigin() on: {asserter:#x}"));
+    }
 
     runner
         .run(forge)
         .context("Failed to prepare set-upgrade-timestamp")?;
 
-    crate::common::output::write_output_if_requested(
+    crate::common::output::write_chain_output_if_requested(
         "chain.set-upgrade-timestamp",
         &args.shared,
         &runner,
@@ -111,7 +131,9 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
             bridgehub,
             chain_id,
             upgrade_timestamp: args.upgrade_timestamp.clone(),
+            tx_origin_asserter,
         },
+        tx_origin_asserter,
     )
     .await?;
 
