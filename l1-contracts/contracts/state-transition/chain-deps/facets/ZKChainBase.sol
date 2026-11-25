@@ -23,7 +23,6 @@ import {
     ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE,
     ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
-    ZKSYNC_OS_FRI_PROOF_VERIFICATION_DISABLED,
     L2DACommitmentScheme
 } from "../../../common/Config.sol";
 import {CantRevertExecutedBatch, RevertedBatchNotAfterNewLastBatch} from "../../../common/L1ContractErrors.sol";
@@ -31,6 +30,7 @@ import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IZKsyncOSVerifier} from "../../chain-interfaces/IZKsyncOSVerifier.sol";
 import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 import {StoredBatchHashing} from "../StoredBatchHashing.sol";
+import {ZKsyncOSBatchCommitment} from "../../libraries/ZKsyncOSBatchCommitment.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
@@ -204,16 +204,13 @@ contract ZKChainBase is ReentrancyGuard {
     /// @notice Returns the current runtime configuration hash. See {protocol-docs/chain-config.md}.
     function _getZKsyncOSChainConfigHash() internal view returns (bytes32) {
         return
-            keccak256(
-                abi.encodePacked(
-                    s.chainId,
-                    ZKSYNC_OS_FRI_PROOF_VERIFICATION_DISABLED,
-                    uint256(_getZKsyncOSMaxTxGasLimit()),
-                    uint256(s.pubdataContent),
-                    uint256(s.zksyncOSL1TxFilteringEnabled ? 1 : 0),
-                    uint256(s.zksyncOSLargeContractsEnabled ? 1 : 0)
-                )
-            );
+            ZKsyncOSBatchCommitment.chainConfigHash({
+                _chainId: s.chainId,
+                _maxTxGasLimit: _getZKsyncOSMaxTxGasLimit(),
+                _pubdataContent: s.pubdataContent,
+                _l1TxFilteringEnabled: s.zksyncOSL1TxFilteringEnabled,
+                _largeContractsEnabled: s.zksyncOSLargeContractsEnabled
+            });
     }
 
     /// @notice Returns the effective ZKsync OS single-transaction gas limit (EIP-7825).

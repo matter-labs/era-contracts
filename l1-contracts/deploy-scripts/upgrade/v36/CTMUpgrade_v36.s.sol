@@ -100,7 +100,10 @@ contract CTMUpgrade_v36 is DefaultCTMUpgrade {
         if (UpgradeHelperLib.isPatchEdge(getOldProtocolVersion(), getNewProtocolVersion())) {
             return members;
         }
-        members = new string[](1);
+        members = new string[](3);
         members[0] = "AdminFacet";
+        // Both now compute the batch commitment through `ZKsyncOSBatchCommitment`: same behaviour, new code.
+        members[1] = "CommitterFacet";
+        members[2] = "GettersFacet";
     }
 }

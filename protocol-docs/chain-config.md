@@ -6,8 +6,9 @@ Starting with protocol v34, every `CommitBatchInfoZKsyncOS` includes `chainConfi
 The committer checks it against the current on-chain runtime configuration before accepting the batch.
 
 The batch proof public input commits to the runtime configuration through
-`chain_config_hash`. Solidity's `ZKChainBase._getZKsyncOSChainConfigHash()` and ZKsync OS's `ChainConfig::hash`
-hash the following six 32-byte big-endian words, in order:
+`chain_config_hash`. Solidity's `ZKsyncOSBatchCommitment.chainConfigHash` (which `ZKChainBase._getZKsyncOSChainConfigHash()`
+calls with the chain's stored configuration) and ZKsync OS's `ChainConfig::hash` hash the following six 32-byte
+big-endian words, in order:
 
 1. Chain ID.
 2. FRI proof verification enabled (always zero on the settlement layer).
@@ -26,7 +27,8 @@ so the pinned values differ from that revision; they match the paired ZKsync OS 
 The vectors with exactly one flag enabled detect swaps of the boolean words.
 Batch-proving tests explicitly cover all four combinations.
 
-The stored batch commitment is the full, untruncated public-input hash:
+The commitment code lives in the `ZKsyncOSBatchCommitment` library, which the `CommitterFacet` and the batch
+mirror ([batch mirror](./batch-mirror.md)) share. The stored batch commitment is the full, untruncated public-input hash:
 
 ```
 keccak256(previousState || newState || chainConfigHash || batchOutputHash)
