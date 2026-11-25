@@ -28,6 +28,16 @@ the testnet-verifier flag (`testnet_verifier`, true everywhere except mainnet; t
 to run without it), the ZK token asset id, owners that must be wrapped rather than impersonated, and the legacy gateway history the verifier
 cross-checks. Update it when a release moves an address; never put per-release values here.
 
+An environment whose chain batches must be sent by a known executor names its `TxOriginAsserter` as
+`[permanent_contracts] tx_origin_asserter_addr`. `chain upgrade` and `chain set-upgrade-timestamp`
+then end every bundle with `assertTxOrigin()` on it, which reverts unless `tx.origin` is the
+asserter's authority or, when the authority is a Safe, one of its owners. A Safe batch can otherwise
+be sent by anyone who holds enough signatures. `--skip-tx-origin-assertion` (the chain workflows'
+`assert_tx_origin` input, on by default) leaves the call out, for a chain whose own multisig executes
+the bundle through an executor the asserter does not authorize. Fork replays send the call from an
+address the asserter authorizes, so they check that it is deployed and accepts an executor, not who
+executes on L1.
+
 ### `<release>/<env>.toml`
 
 What the release needs from the environment: the owner address and Era chain id, the CREATE2 salt

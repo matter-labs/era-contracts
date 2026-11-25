@@ -21,6 +21,7 @@ pub mod paths;
 pub mod preflight;
 pub mod private_key;
 pub mod traits;
+pub mod tx_origin;
 pub mod upgrade_descriptor;
 pub mod wallets;
 

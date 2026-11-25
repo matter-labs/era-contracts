@@ -31,6 +31,9 @@ struct ChainUpgradeOutput {
     access_control_restriction: Address,
     /// What the upgrade changes about the chain's DA setup, if anything.
     da_move: DaMove,
+    /// The `TxOriginAsserter` whose `assertTxOrigin()` ends the bundle, if any.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tx_origin_asserter: Option<Address>,
 }
 
 /// The DA half of a chain upgrade: what the same `ChainAdmin.multicall` sets after the cut. The
@@ -114,6 +117,14 @@ pub struct ChainUpgradeArgs {
     #[clap(long, default_value_t = false, help_heading = "DA")]
     pub acknowledge_unrecommended_noda: bool,
 
+    /// Leave `TxOriginAsserter.assertTxOrigin()` out of the bundle on an env that configures an
+    /// asserter (`[permanent_contracts] tx_origin_asserter_addr`), where every bundle ends with
+    /// it by default. For a chain whose own multisig executes the bundle through an executor
+    /// the asserter does not authorize.
+    #[clap(long, default_value_t = false)]
+    #[serde(default)]
+    pub skip_tx_origin_assertion: bool,
+
     #[clap(flatten)]
     #[serde(flatten)]
     pub shared: SharedRunArgs,
@@ -152,6 +163,11 @@ pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
         ids
     };
 
+    let tx_origin_asserter = env_cfg
+        .as_ref()
+        .and_then(|cfg| cfg.tx_origin_asserter())
+        .filter(|_| !args.skip_tx_origin_assertion);
+
     for cid in chain_ids {
         // When looping, scope each chain's bundle under `<--out>/<cid>/` so
         // they don't collide. Single-chain mode honors `--out` unchanged.
@@ -171,7 +187,7 @@ pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
             shared.out = Some(base.join(cid.to_string()));
         }
 
-        run_one(bridgehub, cid, &args, &shared)
+        run_one(bridgehub, cid, &args, &shared, tx_origin_asserter)
             .await
             .with_context(|| format!("chain {cid} upgrade"))?;
     }
@@ -184,6 +200,7 @@ async fn run_one(
     chain_id: u64,
     args: &ChainUpgradeArgs,
     shared: &SharedRunArgs,
+    tx_origin_asserter: Option<Address>,
 ) -> anyhow::Result<()> {
     let access_control_restriction = args.access_control_restriction;
     let mut runner = ForgeRunner::new(shared)?;
@@ -219,6 +236,9 @@ async fn run_one(
         access_control_restriction
     ));
     logger::info(format!("RPC URL: {}", shared.l1_rpc_url));
+    if let Some(asserter) = tx_origin_asserter {
+        logger::info(format!("Ends with assertTxOrigin() on: {asserter:#x}"));
+    }
     logger::info(format!(
         "DA after the upgrade: pair {}, pubdata content {}",
         da_move
@@ -265,7 +285,7 @@ async fn run_one(
         .run(script)
         .context("Failed to execute forge script for chain upgrade")?;
 
-    crate::common::output::write_output_if_requested(
+    crate::common::output::write_chain_output_if_requested(
         "chain.upgrade",
         shared,
         &runner,
@@ -278,7 +298,9 @@ async fn run_one(
                 .then_some(sender.address),
             access_control_restriction,
             da_move,
+            tx_origin_asserter,
         },
+        tx_origin_asserter,
     )
     .await?;
 

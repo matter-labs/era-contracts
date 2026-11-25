@@ -32,6 +32,11 @@ on:
         required: false
         type: boolean
         default: false
+      assert_tx_origin:
+        description: "End every bundle with TxOriginAsserter.assertTxOrigin() when the environment configures an asserter (`tx_origin_asserter_addr` in its permanent values; today zksync-os-mainnet), so only an executor the asserter authorizes can send it. Turn off for a chain whose own multisig executes the bundle (e.g. Memento, Xsolla). Needs a protocol-ops image that has the step."
+        required: false
+        type: boolean
+        default: true
 
       upgrade_timestamp:
         description: "Also prepare each chain's ServerNotifier.setUpgradeTimestamp bundle first, with this timestamp (1 = no waiting; 0 is rejected). Its bundle comes first in the same manifest, so the simulator scenario replays both in order. BLANK = the upgrade bundle only."
@@ -183,6 +188,7 @@ jobs:
         if: ${{ env.CHAIN_IDS != '' }}
         env:
           ACKNOWLEDGE_UNRECOMMENDED_NODA: ${{ inputs.acknowledge_unrecommended_noda }}
+          ASSERT_TX_ORIGIN: ${{ inputs.assert_tx_origin }}
           UPGRADE_TIMESTAMP: ${{ inputs.upgrade_timestamp }}
           ACR: ${{ inputs.access_control_restriction }}
           TAG: ${{ inputs.protocol_ops_tag }}
@@ -190,19 +196,32 @@ jobs:
           set -euo pipefail
           extra=()
           [ "$ACKNOWLEDGE_UNRECOMMENDED_NODA" != "true" ] || extra+=(--acknowledge-unrecommended-noda)
+          origin=()
+          [ "$ASSERT_TX_ORIGIN" != "false" ] || origin+=(--skip-tx-origin-assertion)
           for id in $CHAIN_IDS; do
             mkdir -p "$WORK_DIR/chains/$id"
             if [ -n "$UPGRADE_TIMESTAMP" ]; then
               bash protocol-ops.sh --tag "$TAG" chain set-upgrade-timestamp \
                 --l1-rpc-url "$L1_RPC_URL" --env "$ENVIRONMENT" --chain-id "$id" \
-                --upgrade-timestamp "$UPGRADE_TIMESTAMP" --access-control-restriction "$ACR" \
+                --upgrade-timestamp "$UPGRADE_TIMESTAMP" --access-control-restriction "$ACR" "${origin[@]}" \
                 --out "/contracts/work/chains/$id/safe"
             fi
             bash protocol-ops.sh --tag "$TAG" chain upgrade \
               --l1-rpc-url "$L1_RPC_URL" --env "$ENVIRONMENT" --chain-id "$id" \
-              --access-control-restriction "$ACR" "${extra[@]}" \
+              --access-control-restriction "$ACR" "${extra[@]}" "${origin[@]}" \
               --out "/contracts/work/chains/$id/safe"
           done
+          # An image that predates the step would leave the call out without saying so.
+          ASSERTER="$(python3 -c "import tomllib,sys; print(tomllib.load(open(sys.argv[1],'rb')).get('permanent_contracts',{}).get('tx_origin_asserter_addr',''))" \
+            "l1-contracts/upgrade-envs/permanent-values/$ENVIRONMENT.toml")"
+          if [ "$ASSERT_TX_ORIGIN" != "false" ] && [ -n "$ASSERTER" ]; then
+            for bundle in "$WORK_DIR"/chains/*/safe/*.safe.json; do
+              jq -e --arg asserter "$ASSERTER" \
+                '.transactions[-1] | (.to | ascii_downcase) == ($asserter | ascii_downcase) and .data == "0xeafb2ef3"' \
+                "$bundle" > /dev/null \
+                || { echo "::error::$bundle does not end with assertTxOrigin() on $ASSERTER: the protocol-ops image $TAG predates the step"; exit 1; }
+            done
+          fi
 
       # One transaction-simulator scenario per chain, in manifest order: the set-upgrade-timestamp
       # txs are tagged chain_upgrade_<id>_schedule and the upgrade txs chain_upgrade_<id>_execute.

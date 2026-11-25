@@ -7,7 +7,7 @@ on:
         description: "Target environment = basename of upgrade-envs/permanent-values/<env>.toml (read by protocol_ops --env)"
         required: true
         type: choice
-        options: [stage, stage3, testnet, mainnet, adi, testnet3]
+        options: [stage, stage3, testnet, mainnet, zksync-os-mainnet, adi, testnet3]
       protocol_ops_tag:
         description: "protocol-ops Docker image tag"
         required: true
@@ -29,6 +29,11 @@ on:
         required: false
         type: string
         default: "0x0000000000000000000000000000000000000000"
+      assert_tx_origin:
+        description: "End every bundle with TxOriginAsserter.assertTxOrigin() when the environment configures an asserter (`tx_origin_asserter_addr` in its permanent values; today zksync-os-mainnet), so only an executor the asserter authorizes can send it. Turn off for a chain whose own multisig executes the bundle (e.g. Memento, Xsolla). Needs a protocol-ops image that has the step."
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -48,6 +53,8 @@ jobs:
       - name: Run set-upgrade-timestamp
         run: |
           mkdir -p "$WORK_DIR"
+          origin=()
+          [ "${{ inputs.assert_tx_origin }}" != "false" ] || origin+=(--skip-tx-origin-assertion)
           bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
             chain set-upgrade-timestamp \
             --l1-rpc-url                 "${{ inputs.l1_rpc_url }}" \
@@ -55,6 +62,7 @@ jobs:
             --chain-id                   "${{ inputs.chain_id }}" \
             --upgrade-timestamp          "${{ inputs.upgrade_timestamp }}" \
             --access-control-restriction "${{ inputs.access_control_restriction }}" \
+            "${origin[@]}" \
             --out /contracts/work/safe
       - uses: actions/upload-artifact@v4
         with:

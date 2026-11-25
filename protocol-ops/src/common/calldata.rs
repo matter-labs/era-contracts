@@ -100,6 +100,8 @@ const KNOWN_FUNCTIONS: &[(&str, &str)] = &[
         "ChainAssetHandler",
         "setHistoricalMigrationInterval(uint256,uint256,(uint256,uint256,uint256,uint256,uint256,bool))",
     ),
+    // TxOriginAsserter, the last call of a chain batch (`common::tx_origin`)
+    ("TxOriginAsserter", "assertTxOrigin()"),
     // ERC20
     ("ERC20", "approve(address,uint256)"),
     // Ownable / Ownable2Step, and the admin role of the bridgehub and chains

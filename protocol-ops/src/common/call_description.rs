@@ -338,6 +338,7 @@ impl Describer {
                     ),
                 }
             }
+            "assertTxOrigin" => "check that an authorized executor sends the batch".to_string(),
             "createNewChain" => format!("create chain {} on {}", uint(0)?, address(1)?),
             "acceptOwnership" => format!("accept ownership of {}", self.names.display(target)),
             "transferOwnership" => format!(

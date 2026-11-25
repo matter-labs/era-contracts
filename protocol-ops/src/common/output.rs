@@ -36,6 +36,7 @@
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use alloy::primitives::Address;
 use serde::Serialize;
 use serde_json::{json, Value};
 
@@ -43,6 +44,7 @@ use crate::common::execution_runbook::{self, LoadOptions, RUNBOOK_FILE};
 use crate::common::files::save_json_file;
 use crate::common::forge::{split_into_bundles, ForgeRunner, SafeBundle};
 use crate::common::logger;
+use crate::common::tx_origin;
 
 /// Commands whose bundles get `EXECUTE.md` next to them: chain operations, sent by hand by a
 /// ChainAdmin owner. Ecosystem prepares are left out: their manifests are mostly the
@@ -62,11 +64,31 @@ where
     I: Serialize,
     O: Serialize,
 {
+    write_chain_output_if_requested(command, shared, runner, input, output, None).await
+}
+
+/// [`write_output_if_requested`] for a chain batch: with `tx_origin_asserter`, every bundle ends
+/// with `assertTxOrigin()` on it (`common::tx_origin`).
+pub async fn write_chain_output_if_requested<I, O>(
+    command: &str,
+    shared: &crate::common::SharedRunArgs,
+    runner: &ForgeRunner,
+    input: &I,
+    output: &O,
+    tx_origin_asserter: Option<Address>,
+) -> anyhow::Result<()>
+where
+    I: Serialize,
+    O: Serialize,
+{
     let Some(bundle_dir) = shared.out.as_ref() else {
         return Ok(());
     };
 
-    let bundles = split_into_bundles(runner, command)?;
+    let mut bundles = split_into_bundles(runner, command)?;
+    if let Some(asserter) = tx_origin_asserter {
+        tx_origin::append_assertion(&mut bundles, asserter, command);
+    }
     let l1_chain_id = fetch_l1_chain_id(&shared.l1_rpc_url).await?;
     let metadata = json!({
         "command": command,

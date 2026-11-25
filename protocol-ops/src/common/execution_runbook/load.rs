@@ -312,11 +312,12 @@ struct SafeManifest {
 }
 
 /// Keys of a manifest `metadata[].output` object that name an address.
-const METADATA_ADDRESS_NAMES: [(&str, &str); 4] = [
+const METADATA_ADDRESS_NAMES: [(&str, &str); 5] = [
     ("admin_address", "ChainAdmin"),
     ("chain_admin_owner", "ChainAdmin owner"),
     ("chain_address", "ZK chain"),
     ("bridgehub", "Bridgehub"),
+    ("tx_origin_asserter", "TxOriginAsserter"),
 ];
 /// Key of a manifest `metadata[].output` object holding the L2 chain id.
 const METADATA_CHAIN_ID: &str = "chain_id";

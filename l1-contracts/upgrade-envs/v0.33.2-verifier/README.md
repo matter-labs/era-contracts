@@ -112,7 +112,7 @@ gh workflow run deploy-ecosystem-upgrade.yaml --ref <branch> -f environment=<env
 # 4. the chains: every chain still on v0.33.0 (`eligible`), or a list of ids
 gh workflow run generate-chain-upgrade-calldata.yaml --ref <branch> -f environment=<env> -f chains=eligible \
   -f protocol_ops_tag=<tag> -f upgrade=v0.33.2-verifier -f upgrade_timestamp=1 \
-  [-f commit_outputs=true]
+  [-f assert_tx_origin=false] [-f commit_outputs=true]
 ```
 
 The deploy run broadcasts the deploy bundle from `DEPLOYER_PRIVATE_KEY_SEPOLIA`, which must be that

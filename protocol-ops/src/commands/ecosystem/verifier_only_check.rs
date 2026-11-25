@@ -34,6 +34,7 @@ use crate::common::anvil::set_balance;
 use crate::common::ethereum::get_provider;
 use crate::common::governance_calls::{decode_calls, GovernanceCall};
 use crate::common::logger;
+use crate::common::tx_origin;
 
 /// A chain's bundle set: `manifest.json` beside its `.safe.json` files.
 const MANIFEST_FILE: &str = "manifest.json";
@@ -519,8 +520,15 @@ async fn check_chain_bundles(
             continue;
         };
         let dir = chain_bundles.join(chain_id.to_string());
-        let (timestamp_to, timestamp_data) = bundle_tx(&dir, "01_")?;
-        let (cut_to, cut_data) = bundle_tx(&dir, "02_")?;
+        let (timestamp_to, timestamp_data, timestamp_asserter) = bundle_tx(&dir, "01_")?;
+        let (cut_to, cut_data, cut_asserter) = bundle_tx(&dir, "02_")?;
+        for asserter in [timestamp_asserter, cut_asserter].into_iter().flatten() {
+            if let Err(error) = send_assertion(rpc_url, asserter).await {
+                report.fail(format!(
+                    "chain {chain_id} assertTxOrigin() on {asserter:#x} from an authorized origin: {error:#}"
+                ));
+            }
+        }
         report.check(
             &format!("chain {chain_id} bundles go to its ChainAdmin"),
             (timestamp_to, cut_to),
@@ -688,8 +696,22 @@ fn committed_chain_ids(chain_bundles: &Path) -> anyhow::Result<Vec<u64>> {
     Ok(ids)
 }
 
-/// The single transaction of the `<prefix>*.safe.json` bundle in `dir`.
-fn bundle_tx(dir: &Path, prefix: &str) -> anyhow::Result<(Address, Bytes)> {
+/// `assertTxOrigin()` on `asserter`, sent as the replays send it (`tx_origin::authorized_origin`).
+async fn send_assertion(rpc_url: &str, asserter: Address) -> anyhow::Result<()> {
+    let origin = tx_origin::authorized_origin(rpc_url, asserter).await?;
+    send(
+        rpc_url,
+        origin,
+        asserter,
+        U256::ZERO,
+        tx_origin::assertion_calldata(),
+    )
+    .await
+}
+
+/// The transaction of the `<prefix>*.safe.json` bundle in `dir`, and the `TxOriginAsserter` whose
+/// `assertTxOrigin()` follows it when the bundle ends with one.
+fn bundle_tx(dir: &Path, prefix: &str) -> anyhow::Result<(Address, Bytes, Option<Address>)> {
     let path: PathBuf = fs::read_dir(dir)
         .with_context(|| format!("read {}", dir.display()))?
         .filter_map(|entry| entry.ok().map(|e| e.path()))
@@ -706,22 +728,37 @@ fn bundle_tx(dir: &Path, prefix: &str) -> anyhow::Result<(Address, Bytes)> {
     let txs = bundle["transactions"]
         .as_array()
         .with_context(|| format!("{}: no transactions", path.display()))?;
-    anyhow::ensure!(
-        txs.len() == 1,
-        "{}: expected one transaction",
-        path.display()
-    );
-    let to = txs[0]["to"]
-        .as_str()
-        .with_context(|| format!("{}: no `to`", path.display()))?
-        .parse()
-        .with_context(|| format!("{}: `to`", path.display()))?;
-    let data = hex_bytes(
-        txs[0]["data"]
+    let tx = |index: usize| -> anyhow::Result<(Address, Bytes)> {
+        let to = txs[index]["to"]
             .as_str()
-            .with_context(|| format!("{}: no `data`", path.display()))?,
-    )?;
-    Ok((to, data))
+            .with_context(|| format!("{}: no `to`", path.display()))?
+            .parse()
+            .with_context(|| format!("{}: `to`", path.display()))?;
+        let data = hex_bytes(
+            txs[index]["data"]
+                .as_str()
+                .with_context(|| format!("{}: no `data`", path.display()))?,
+        )?;
+        Ok((to, data))
+    };
+    let asserter = match txs.len() {
+        1 => None,
+        2 => {
+            let (asserter, data) = tx(1)?;
+            anyhow::ensure!(
+                tx_origin::is_assertion(&data),
+                "{}: the second transaction is not assertTxOrigin()",
+                path.display()
+            );
+            Some(asserter)
+        }
+        _ => anyhow::bail!(
+            "{}: expected one transaction, or one followed by assertTxOrigin()",
+            path.display()
+        ),
+    };
+    let (to, data) = tx(0)?;
+    Ok((to, data, asserter))
 }
 
 /// The transactions whoever executes sends by hand (`source`: a list of transactions, or an object
@@ -995,8 +1032,40 @@ mod tests {
             "02_chain.upgrade_0x1.safe.json",
             serde_json::json!({"transactions": [{"to": format!("{target:#x}"), "data": "0xbeef"}]}),
         );
-        let (to, data) = bundle_tx(&dir.path().join("2727"), "02_").unwrap();
+        let (to, data, asserter) = bundle_tx(&dir.path().join("2727"), "02_").unwrap();
         assert_eq!((to, data.to_vec()), (target, vec![0xbe, 0xef]));
+        assert_eq!(asserter, None);
         assert!(bundle_tx(&dir.path().join("2727"), "01_").is_err());
+    }
+
+    #[test]
+    fn a_chain_bundle_may_end_with_the_tx_origin_assertion() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = Address::with_last_byte(7);
+        let asserter = Address::with_last_byte(9);
+        let admin_tx = serde_json::json!({"to": format!("{target:#x}"), "data": "0xbeef"});
+        let assertion = serde_json::json!({"to": format!("{asserter:#x}"), "data": "0xeafb2ef3"});
+        write_json(
+            dir.path(),
+            "02_chain.upgrade_0x1.safe.json",
+            serde_json::json!({"transactions": [admin_tx, assertion]}),
+        );
+        let (to, data, read_asserter) = bundle_tx(dir.path(), "02_").unwrap();
+        assert_eq!((to, data.to_vec()), (target, vec![0xbe, 0xef]));
+        assert_eq!(read_asserter, Some(asserter));
+
+        // Any other second transaction, or a third one, is refused.
+        write_json(
+            dir.path(),
+            "01_chain.set-upgrade-timestamp_0x1.safe.json",
+            serde_json::json!({"transactions": [admin_tx, admin_tx]}),
+        );
+        assert!(bundle_tx(dir.path(), "01_").is_err());
+        write_json(
+            dir.path(),
+            "03_chain.upgrade_0x1.safe.json",
+            serde_json::json!({"transactions": [admin_tx, assertion, assertion]}),
+        );
+        assert!(bundle_tx(dir.path(), "03_").is_err());
     }
 }

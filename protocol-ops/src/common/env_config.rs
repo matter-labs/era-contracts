@@ -213,6 +213,10 @@ pub struct CtmEntry {
 pub struct PermanentContracts {
     #[serde(default)]
     pub create2_factory_addr: Option<Address>,
+    /// The env's `TxOriginAsserter`, when its chain batches end with `assertTxOrigin()`
+    /// (`common::tx_origin`).
+    #[serde(default)]
+    pub tx_origin_asserter_addr: Option<Address>,
     // NOTE: `create2_factory_salt` deliberately does NOT live here. The salt
     // rotates every regen (the CREATE2 deployer would collide with previously
     // deployed addresses if reused), so it belongs in the v31 input TOML
@@ -300,6 +304,13 @@ impl EnvConfig {
             .permanent_contracts
             .as_ref()
             .and_then(|p| p.create2_factory_addr)
+    }
+
+    pub fn tx_origin_asserter(&self) -> Option<Address> {
+        self.permanent
+            .permanent_contracts
+            .as_ref()
+            .and_then(|p| p.tx_origin_asserter_addr)
     }
 
     /// Per-upgrade-version CREATE2 salt from
