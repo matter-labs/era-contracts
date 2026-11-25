@@ -18,7 +18,6 @@ import {MultiProofTestnetVerifier} from "contracts/state-transition/verifiers/Mu
 import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
 import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {AcceptingVerifier} from "contracts/dev-contracts/test/AcceptingVerifier.sol";
-import {BridgehubBase} from "contracts/core/bridgehub/BridgehubBase.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {MessageRootBase} from "contracts/core/message-root/MessageRootBase.sol";
