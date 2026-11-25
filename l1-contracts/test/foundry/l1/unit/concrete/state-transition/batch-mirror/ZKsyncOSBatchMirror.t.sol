@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {L2HostStack, ZKsyncOSBatchMirrorSharedTest, RejectingVerifier} from "./_ZKsyncOSBatchMirror_Shared.t.sol";
+import {ZKsyncOSBatchMirrorSharedTest, RejectingVerifier} from "./_ZKsyncOSBatchMirror_Shared.t.sol";
 
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 
@@ -744,13 +744,5 @@ contract ZKsyncOSBatchMirrorTest is ZKsyncOSBatchMirrorSharedTest {
         vm.prank(newOwner);
         mirror.acceptOwnership();
         assertEq(mirror.getAdmin(), newOwner);
-    }
-}
-
-/// @notice Every mirror test, with the mirror registered in the L2 Bridgehub and appending to the L2
-/// `MessageRoot`.
-contract ZKsyncOSBatchMirrorL2HostTest is ZKsyncOSBatchMirrorTest, L2HostStack {
-    function _deployHostStack() internal override(ZKsyncOSBatchMirrorSharedTest, L2HostStack) returns (address) {
-        return L2HostStack._deployHostStack();
     }
 }

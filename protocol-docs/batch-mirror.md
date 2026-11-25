@@ -117,16 +117,13 @@ mirror is the address `addChainBatchRootV32` accepts for the chain, and proofs n
 proof that ends at the chain batch root (`zks_getL2ToL1LogProof` for a chain settling on its settlement layer
 directly) is checked against `chainBatchRoots`.
 
-A host chain that also runs the interop contracts (`InteropCenter`, `InteropHandler`, the asset router and
-the native token vault) runs the L2 flavour of the Bridgehub and the `MessageRoot` at their built-in
-addresses, because those contracts read the L2 Bridgehub, for example its `isPeerAllowed`. So
-`registerAlreadyDeployedZKChain` lives in `BridgehubBase` and works on both flavours; before the mirror it
-existed on `L1Bridgehub` only, and an L2 Bridgehub registered chains only through the chain asset handler
-when they migrated. The mirror's tests run against both flavours.
+The host chain runs the L1 flavour of these contracts (`L1Bridgehub`, `L1MessageRoot`), deployed with the
+ordinary L1 deployment scripts, so `registerAlreadyDeployedZKChain` is used exactly as it exists today. The
+L2 Bridgehub is unchanged.
 
 The alternative, a `MessageRoot` extension where an owner names a batch-root source per chain, was rejected.
-Both options change a core contract. Registration moves one existing owner-only function from
-`L1Bridgehub` to the base contract, with no new storage or role, and keeps a single way for any chain to
+Both options change a core contract. Registration uses an existing owner-only function of
+`L1Bridgehub`, with no new storage or role, and keeps a single way for any chain to
 reach the `MessageRoot`: the Bridgehub's `getZKChain`. The extension would add storage and an owner to the
 `MessageRoot`, which has neither, a second way for roots to enter it, and it would still need the Bridgehub
 for `addNewChain`. Registration also gives the host chain the same view of the followed chain that a
