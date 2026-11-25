@@ -88,7 +88,7 @@ pub fn verifier_only_prepare(upgrade: &str) -> anyhow::Result<ForgeScriptUpgrade
 pub fn verifier_only_execution(upgrade: &str) -> anyhow::Result<ExecutionScript> {
     validate_upgrade_name(upgrade)?;
     Ok(ExecutionScript {
-        script: "deploy-scripts/upgrade/EmergencyStageUpgradeCalldata.s.sol:EmergencyStageUpgradeCalldata"
+        script: "deploy-scripts/upgrade/EmergencyUpgradeCalldata.s.sol:EmergencyUpgradeCalldata"
             .to_string(),
         signature: "emergencyUpgradeEachStage(string,string,string)".to_string(),
         args: vec![
@@ -353,7 +353,7 @@ verify_chain = ["bash", "upgrade-envs/v0.33.0-compiler/rehearse-stage.sh", "--pu
 
     const EXECUTION: &str = r#"
 [execution]
-script = "deploy-scripts/upgrade/EmergencyStageUpgradeCalldata.s.sol:EmergencyStageUpgradeCalldata"
+script = "deploy-scripts/upgrade/EmergencyUpgradeCalldata.s.sol:EmergencyUpgradeCalldata"
 signature = "emergencyUpgradeAllStages(string,string,string)"
 args = ["/upgrade-envs/permanent-values/{env}.toml", "/upgrade-envs/v0.33.0-compiler/output/{env}/ecosystem.toml", "/upgrade-envs/v0.33.0-compiler/output/{env}/emergency-upgrade-board.json"]
 output = "emergency-upgrade-board.json"

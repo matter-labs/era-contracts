@@ -5,7 +5,7 @@ import { createProvider } from "../core/utils";
 
 /**
  * Helpers for asserting L1NativeTokenVault.bridgedOut in bridge tests. See
- * {protocol-docs/bridging.md#native-token-vault} for the accounting semantics. bridgedOut is per-asset (aggregate
+ * {docs/bridging.md#native-token-vault} for the accounting semantics. bridgedOut is per-asset (aggregate
  * across chains), so tests assert the delta around a single operation, not an absolute balance.
  */
 function l1NativeTokenVault(l1RpcUrl: string, l1NativeTokenVaultAddr: string): Contract {

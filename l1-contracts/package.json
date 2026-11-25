@@ -106,6 +106,7 @@
     "sync-layer": "ts-node scripts/sync-layer.ts",
     "size": "hardhat size-contracts",
     "errors-lint": "ts-node scripts/errors-lint.ts",
+    "check-release-tags": "ts-node scripts/check-release-tags.ts",
     "selectors": "ts-node ../scripts/selectors.ts",
     "zksync-os-genesis": "ts-node scripts/zksync-os-genesis.ts",
     "write-factory-deps-zksync-os": "ts-node scripts/write-factory-deps-zksync-os.ts",

@@ -3,7 +3,7 @@
 //!
 //! The runbook is rendered from the upgrade's executable transaction list, which stays the
 //! source of truth. Three list formats are read:
-//! - an **emergency-upgrade-board JSON** (`EmergencyStageUpgradeCalldata.s.sol`): `approveHash`
+//! - an **emergency-upgrade-board JSON** (`EmergencyUpgradeCalldata.s.sol`): `approveHash`
 //!   on each approving member Safe, then `executeEmergencyUpgrade` on the board, all from the
 //!   Safes' owner;
 //! - a **Safe-bundle `manifest.json`** plus the Safe Transaction Builder files it lists, each

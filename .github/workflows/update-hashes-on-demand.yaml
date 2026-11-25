@@ -27,7 +27,7 @@ jobs:
         with:
           fetch-depth: 0 # We need full history to fetch PR branch
           submodules: recursive
-          token: ${{ secrets.RELEASE_TOKEN }}
+          persist-credentials: false # the commit below goes through the API with an App token
 
       - name: Get PR branch info
         id: pr
@@ -92,18 +92,44 @@ jobs:
           # Scoped to the generated files so this cannot sweep unrelated formatting into the commit.
           npx prettier --write "l1-contracts/zkstack-out/**/*.json" "AllContractsHashes.json"
 
-      - name: Commit and push changes
+      # ghcommit-action lists changes with `git status --porcelain` without `-uall`, which collapses a
+      # wholly untracked directory into one entry (a new zkstack-out/<Contract>/ is exactly that).
+      # Staging first makes git report the files individually.
+      - name: Stage generated artifacts
+        id: stage
         run: |
           set -euo pipefail
-          git config user.name "zksync[bot]"
-          git config user.email "zksync[bot]@users.noreply.github.com"
+          git add -A -- AllContractsHashes.json l1-contracts/zkstack-out l1-contracts/selectors
+          if git diff --cached --quiet; then
+            echo "No generated-artifact changes to commit"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            # Report what moved, so the dispatch log says which checks this should clear.
+            git --no-pager diff --cached --stat
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
 
-          git add AllContractsHashes.json l1-contracts/zkstack-out l1-contracts/selectors
-          # Check if there are any changes to commit
-          git diff --cached --quiet && { echo "No generated-artifact changes to commit"; exit 0; }
+      # Minted only after the PR's own build scripts have run, so no write-capable credential exists
+      # while they execute. Scoped to this repository's contents, valid for an hour, revoked at job end.
+      - name: Mint GitHub App token
+        if: steps.stage.outputs.changed == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.MATTERLABS_BOTS_APP_ID }}
+          private-key: ${{ secrets.MATTERLABS_BOTS_PRIVATE_KEY }}
+          permission-contents: write
 
-          # Report what moved, so the dispatch log says which checks this should clear.
-          git --no-pager diff --cached --stat
-
-          git commit -m "chore: Updated generated artifacts from CI (hashes, zkstack-out, selectors)"
-          git push origin HEAD
+      # Committed through the GitHub API, so GitHub signs the commit (Verified) and the org's
+      # required-signatures rule no longer blocks the PR. The App token, unlike GITHUB_TOKEN, also
+      # triggers the PR's workflows on the new commit.
+      - name: Commit and push changes (signed by GitHub)
+        if: steps.stage.outputs.changed == 'true'
+        uses: planetscale/ghcommit-action@a6b150b81dca5dd027baa898604418eec9e11465 # v0.2.22
+        with:
+          commit_message: "chore: Updated generated artifacts from CI (hashes, zkstack-out, selectors)"
+          repo: ${{ github.repository }}
+          branch: ${{ steps.pr.outputs.head_ref }}
+          file_pattern: AllContractsHashes.json l1-contracts/zkstack-out l1-contracts/selectors
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}

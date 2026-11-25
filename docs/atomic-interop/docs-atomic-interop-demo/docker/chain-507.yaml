@@ -1,0 +1,53 @@
+# zksync-os-server config for chain 507. Same as chain-506.yaml except the chain ID and the operator
+# keys, which docker/generate-l1-state.sh registered for chain 507. The keys are local test keys.
+genesis:
+  bridgehub_address: "0x24420e672f8711a040e8ab27ac33026d277a7e2d"
+  bytecode_supplier_address: "0xba5e24dcab189e2b523d58f9d770763e9b92c4a8"
+  genesis_input_path: /config/genesis.json
+  chain_id: 507
+
+general:
+  rocks_db_path: /db
+
+rpc:
+  address: 0.0.0.0:3050
+
+l1_sender:
+  pubdata_mode: Blobs
+  poll_interval: 100ms
+  operator_commit_sk: "0x0aa843c8f892d05563c8de0971e08626cc70e3d9b1f4dc219d7946481c77c7c2"
+  operator_prove_sk: "0x8d0ad29d7ee2d8122023fc8a6754d461125601d50046f38d3da3bff57a750cdb"
+  operator_execute_sk: "0x730a64eb8b9e8f76748cac2f61f2777f56e8114b0777f152f2253a9c16eb650f"
+
+l1_watcher:
+  poll_interval: 100ms
+  finalized_poll_interval: 100ms
+  confirmations: 0
+
+batcher:
+  batch_timeout: 1s
+
+prover_api:
+  fake_fri_provers:
+    enabled: true
+  fake_snark_provers:
+    enabled: true
+
+observability:
+  log:
+    format: terminal
+    use_color: false
+
+sequencer:
+  revm_consistency_checker_revert_on_divergence: true
+
+# The server prices pubdata by how full each batch's blob is. The sandbox's batches are nearly empty,
+# so without a cap the price climbs about 300 times within a minute, and contract deployments go over
+# the per-transaction gas limit. 1 gwei per byte is about the price at start, with half-full blobs.
+fee:
+  pubdata_price_cap: "0x3b9aca00"
+
+external_price_api_client:
+  source: Forced
+  forced_prices:
+    "0x0000000000000000000000000000000000000001": 3000

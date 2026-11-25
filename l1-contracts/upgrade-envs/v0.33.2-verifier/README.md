@@ -44,7 +44,7 @@ How the CTM owner sends the stages depends on the ecosystem:
   again first (as the release's stage 1 does); a `Governance` runs the calls as given and needs no repeat.
 
 Either way the pipeline writes the transactions to `output/<env>/execution.json` and renders them as
-`output/<env>/EXECUTE.md`: for a ProtocolUpgradeHandler through `EmergencyStageUpgradeCalldata.emergencyUpgradeEachStage`, for a
+`output/<env>/EXECUTE.md`: for a ProtocolUpgradeHandler through `EmergencyUpgradeCalldata.emergencyUpgradeEachStage`, for a
 `Governance` from `[governance_operations]` itself.
 
 `createNewVerifierOnlyUpgrade` builds the cut itself: no facet cuts, `initAddress` = the stored
