@@ -43,8 +43,10 @@ import {
     UnauthorizedMessageSender,
     WrongDestinationBaseTokenAssetId,
     WrongDestinationChainId,
-    WrongSourceChainId
+    WrongSourceChainId,
+    WriterRootNotCurrent
 } from "contracts/interop/InteropErrors.sol";
+import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 
 import {SharedL2OneWayBundles} from "./_SharedL2OneWayBundles.sol";
@@ -201,6 +203,46 @@ contract L2OneWayBundleExecuteL1Test is SharedL2OneWayBundles {
         _setCounterparts(WRITER_SOURCE_CHAIN_ID, newCenter, sourceAssetRouter);
 
         vm.expectRevert(abi.encodeWithSelector(UnauthorizedMessageSender.selector, newCenter, sourceInteropCenter));
+        interopHandler.executeBundle(bundle, proof);
+    }
+
+    /// @notice Replacing a compromised writer stops the bundles proven against the roots it wrote, even ones not
+    /// executed yet. The new writer writes the roots it vouches for again.
+    function test_executeBundle_revertWhen_writerReplaced() public {
+        _setUpWriterSource();
+        (bytes memory bundle, MessageInclusionProof memory proof) = _deliver(
+            WRITER_SOURCE_CHAIN_ID,
+            _nativeTransferBundle(WRITER_SOURCE_CHAIN_ID)
+        );
+        uint256 generation = rootStorage.interopRootWriterGeneration(WRITER_SOURCE_CHAIN_ID);
+        assertTrue(rootStorage.isCurrentWriterRoot(WRITER_SOURCE_CHAIN_ID, ROOT_BLOCK));
+
+        address newWriter = makeAddr("newWriter");
+        _setWriter(WRITER_SOURCE_CHAIN_ID, newWriter);
+        assertEq(rootStorage.interopRootWriterGeneration(WRITER_SOURCE_CHAIN_ID), generation + 1);
+        assertFalse(rootStorage.isCurrentWriterRoot(WRITER_SOURCE_CHAIN_ID, ROOT_BLOCK));
+
+        vm.expectRevert(abi.encodeWithSelector(WriterRootNotCurrent.selector, WRITER_SOURCE_CHAIN_ID, ROOT_BLOCK));
+        interopHandler.executeBundle(bundle, proof);
+
+        // The new writer writes the source's roots from then on. The source's message root is cumulative, so a
+        // later root holds the bundle as well.
+        writer = newWriter;
+        rootBlock = ROOT_BLOCK + 1;
+        (bundle, proof) = _deliver(WRITER_SOURCE_CHAIN_ID, _nativeTransferBundle(WRITER_SOURCE_CHAIN_ID));
+        interopHandler.executeBundle(bundle, proof);
+    }
+
+    /// @notice Removing the writer stops the bundles proven against its roots as well.
+    function test_executeBundle_revertWhen_writerRemoved() public {
+        _setUpWriterSource();
+        (bytes memory bundle, MessageInclusionProof memory proof) = _deliver(
+            WRITER_SOURCE_CHAIN_ID,
+            _nativeTransferBundle(WRITER_SOURCE_CHAIN_ID)
+        );
+        _setWriter(WRITER_SOURCE_CHAIN_ID, address(0));
+
+        vm.expectRevert(abi.encodeWithSelector(WriterRootNotCurrent.selector, WRITER_SOURCE_CHAIN_ID, ROOT_BLOCK));
         interopHandler.executeBundle(bundle, proof);
     }
 
@@ -512,6 +554,19 @@ contract L2OneWayBundleExecuteL1Test is SharedL2OneWayBundles {
             InteroperableAddress.formatEvmV1(INTEROP_DESTINATION_CHAIN_ID, L2_ASSET_ROUTER_ADDR),
             abi.encodeCall(AssetRouterBase.finalizeDeposit, (INTEROP_DESTINATION_CHAIN_ID, assetId, hex"1234"))
         );
+    }
+
+    /// @notice L1's counterparts restrict nothing for deposits: an asset with a custom handler still arrives from L1
+    /// as a priority deposit. L1 itself refuses to send such an asset in a bundle.
+    /// @dev The custom handler is mocked, to isolate the asset router's check from a real handler.
+    function test_finalizeDeposit_customHandlerFromL1WithCounterparts() public {
+        _setUpL1Source();
+        (bytes32 assetId, address customHandler) = _registerCustomHandler();
+        vm.mockCall(customHandler, abi.encodeWithSelector(IAssetHandler.bridgeMint.selector), "");
+
+        vm.expectCall(customHandler, abi.encodeCall(IAssetHandler.bridgeMint, (L1_CHAIN_ID, assetId, hex"1234")));
+        vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1AssetRouter));
+        AssetRouterBase(L2_ASSET_ROUTER_ADDR).finalizeDeposit(L1_CHAIN_ID, assetId, hex"1234");
     }
 
     /// @notice The chain's base token is never minted through the asset router.

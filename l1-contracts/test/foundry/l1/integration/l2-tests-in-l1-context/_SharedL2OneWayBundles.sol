@@ -51,6 +51,8 @@ abstract contract SharedL2OneWayBundles is Test, SharedL2ContractL1Deployer {
     /// @dev The source block the roots of the tests are recorded for, and the timestamp of the batch and the root.
     uint256 internal constant ROOT_BLOCK = 1234;
     uint256 internal constant ROOT_TIMESTAMP = 5678;
+    /// @dev The source block {_deliver} records the root for; `ROOT_BLOCK` unless a test writes a second root.
+    uint256 internal rootBlock = ROOT_BLOCK;
     uint256 internal constant AMOUNT = 1000;
 
     L2InteropHandler internal interopHandler = L2InteropHandler(payable(L2_INTEROP_HANDLER_ADDR));
@@ -204,12 +206,12 @@ abstract contract SharedL2OneWayBundles is Test, SharedL2ContractL1Deployer {
         return MessageHashing.chainIdLeafHash(chainRoot, _sourceChainId);
     }
 
-    /// @notice The proof of the bundle of {_sourceRoot}, against the root of `_rootChainId` at `ROOT_BLOCK`.
+    /// @notice The proof of the bundle of {_sourceRoot}, against the root of `_rootChainId` at `rootBlock`.
     function _proof(
         uint256 _sourceChainId,
         address _sender,
         uint256 _rootChainId
-    ) internal pure returns (MessageInclusionProof memory) {
+    ) internal view returns (MessageInclusionProof memory) {
         return
             MessageInclusionProof({
                 chainId: _sourceChainId,
@@ -222,7 +224,7 @@ abstract contract SharedL2OneWayBundles is Test, SharedL2ContractL1Deployer {
                     _batchTimestamp: ROOT_TIMESTAMP,
                     _batchLeafIndex: 0,
                     _batchLeafSiblings: new bytes32[](0),
-                    _rootBlockNumber: ROOT_BLOCK,
+                    _rootBlockNumber: rootBlock,
                     _rootChainId: _rootChainId,
                     _chainIndex: 0,
                     _sharedTreeSiblings: new bytes32[](0)
@@ -234,11 +236,10 @@ abstract contract SharedL2OneWayBundles is Test, SharedL2ContractL1Deployer {
         return _proof(_sourceChainId, _interopCenterOf(_sourceChainId), _sourceChainId);
     }
 
-    function _interopRoot(uint256 _chainId, bytes32 _root) internal pure returns (InteropRoot memory) {
+    function _interopRoot(uint256 _chainId, bytes32 _root) internal view returns (InteropRoot memory) {
         bytes32[] memory sides = new bytes32[](1);
         sides[0] = _root;
-        return
-            InteropRoot({chainId: _chainId, blockOrBatchNumber: ROOT_BLOCK, timestamp: ROOT_TIMESTAMP, sides: sides});
+        return InteropRoot({chainId: _chainId, blockOrBatchNumber: rootBlock, timestamp: ROOT_TIMESTAMP, sides: sides});
     }
 
     /// @notice Stores `_root` as the root of `_chainId` the way the chain gets it: the bootloader imports L1's

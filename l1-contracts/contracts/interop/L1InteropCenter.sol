@@ -6,7 +6,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {ZeroAddress} from "../common/L1ContractErrors.sol";
+import {Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {
     BUNDLE_IDENTIFIER,
     BundleAttributes,
@@ -18,8 +18,9 @@ import {
     InteropCallStarter
 } from "../common/Messaging.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
-import {IL1ChainAssetHandler} from "../core/chain-asset-handler/IL1ChainAssetHandler.sol";
 import {IL1MessageRoot} from "../core/message-root/IL1MessageRoot.sol";
+import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
+import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {ChainNotSettlingOnThisChain} from "../bridge/L1BridgeContractErrors.sol";
 import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
@@ -49,7 +50,7 @@ import {
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Sends one-way interop bundles from an L1 to the chains that settle on it, as local messages of the
 /// L1's message root. See {protocol-docs/interop.md#one-way-bundles-from-an-l1}.
-/// @dev Deployed behind a proxy on L1. It never calls a chain's own contract, so the destination can be any
+/// @dev Deployed behind a proxy on L1. Sending never calls a chain's own contract, so the destination can be any
 /// chain registered in the Bridgehub.
 contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     /// @dev The Bridgehub, which names the asset router, the message root and each chain's settlement layer.
@@ -93,7 +94,14 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
     }
 
     /// @inheritdoc IL1InteropCenter
-    function setDestinationEnabled(uint256 _chainId, bool _enabled) external onlyOwner {
+    function setDestinationEnabled(uint256 _chainId, bool _enabled) external {
+        if (msg.sender != owner()) {
+            address zkChain = BRIDGE_HUB.getZKChain(_chainId);
+            require(
+                !_enabled && zkChain != address(0) && msg.sender == IGetters(zkChain).getAdmin(),
+                Unauthorized(msg.sender)
+            );
+        }
         destinationEnabled[_chainId] = _enabled;
         emit DestinationEnabledSet(_chainId, _enabled);
     }
@@ -182,19 +190,18 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
         emit OneWayBundleSent(bundleHash, _bundle.destinationChainId, batchNumber);
     }
 
-    /// @dev The destination must be an enabled chain of this Bridgehub that settles here and is not migrating.
+    /// @dev The destination must be an enabled chain of this Bridgehub that settles here and takes deposits.
     function _parseDestination(bytes calldata _destinationChainId) internal view returns (uint256 destinationChainId) {
         address addressField;
         (destinationChainId, addressField) = InteroperableAddress.parseEvmV1Calldata(_destinationChainId);
         require(addressField == address(0), InteroperableAddressNotEmpty(_destinationChainId));
         require(destinationChainId != block.chainid, InteropToSelfNotSupported());
+        address zkChain = BRIDGE_HUB.getZKChain(destinationChainId);
+        require(zkChain != address(0), DestinationChainNotRegistered(destinationChainId));
+        // `depositsPaused` covers a migration in progress and the window before one starts: a bundle mints like a
+        // deposit, and the chain's balance may already be on its way to another settlement layer.
         require(
-            BRIDGE_HUB.getZKChain(destinationChainId) != address(0),
-            DestinationChainNotRegistered(destinationChainId)
-        );
-        require(
-            BRIDGE_HUB.settlementLayer(destinationChainId) == block.chainid &&
-                !IL1ChainAssetHandler(BRIDGE_HUB.chainAssetHandler()).isMigrationInProgress(destinationChainId),
+            BRIDGE_HUB.settlementLayer(destinationChainId) == block.chainid && !IMailbox(zkChain).depositsPaused(),
             ChainNotSettlingOnThisChain(destinationChainId)
         );
         require(destinationEnabled[destinationChainId], DestinationChainNotAllowed(destinationChainId));

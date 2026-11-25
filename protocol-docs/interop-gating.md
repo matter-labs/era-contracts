@@ -230,19 +230,20 @@ nothing reads has no effect. The gated features:
 One-way bundles from an L1 to a chain ({protocol-docs/interop.md#one-way-bundles-from-an-l1}) are off for every
 chain until three switches are set, by two parties:
 
-| Switch                                        | Where                                     | Who                                            |
-| --------------------------------------------- | ----------------------------------------- | ---------------------------------------------- |
-| the chain feature `L1_TO_L2_INTEROP_FEATURE`  | `ChainRegistrationSender`, then the chain | the owner or the Bridgehub admin               |
-| the chain's interop counterparts for L1       | `ChainRegistrationSender`, then the chain | the chain's admin, once the feature is enabled |
-| `L1InteropCenter.destinationEnabled[chainId]` | L1                                        | the owner of the `L1InteropCenter`             |
+| Switch                                        | Where                                     | Who                                                                  |
+| --------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------- |
+| the chain feature `L1_TO_L2_INTEROP_FEATURE`  | `ChainRegistrationSender`, then the chain | the owner or the Bridgehub admin                                     |
+| the chain's interop counterparts for L1       | `ChainRegistrationSender`, then the chain | the chain's admin, once the feature is enabled                       |
+| `L1InteropCenter.destinationEnabled[chainId]` | L1                                        | the owner of the `L1InteropCenter`; the chain's admin can disable it |
 
 - The first two reach the chain as service transactions and need the chain to run v0.37.0
   (`INTEROP_COUNTERPARTS_MIN_PROTOCOL_VERSION`, `InteropCounterpartsNotSupported`). Without counterparts the chain
   executes no bundle (`InteropCounterpartsNotSet`), and it also re-reads the feature at execution
   (`ChainFeatureNotEnabled`), so each party has a switch that stops the bundles already sent. The owner and the
   Bridgehub admin can remove the counterparts too.
-- The third stops new sends on L1. **Enable a destination only after its counterparts are set**: a bundle sent
-  before waits on the chain until they are, and a bundle has no refund.
+- The third stops new sends on L1; the chain's admin can switch it off as well, but only the owner switches it on.
+  **Enable a destination only after its counterparts are set**: a bundle sent before waits on the chain until they
+  are, and a bundle has no refund. Sends also stop while the chain's deposits are paused for a migration.
 - The order is: the chain on v0.37.0, the feature, the counterparts, then the destination.
 
 Dormancy. After the upgrade, on a chain where nothing was set: `L2InteropHandler.executeBundle` reverts at the

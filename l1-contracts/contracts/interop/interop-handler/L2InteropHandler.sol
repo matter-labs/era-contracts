@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 
 import {
     L2_BASE_TOKEN_HOLDER,
+    L2_INTEROP_ROOT_STORAGE,
     L2_MESSAGE_VERIFICATION,
     L2_NATIVE_TOKEN_VAULT,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
@@ -40,7 +41,8 @@ import {
     OneWayCallNotToAssetRouter,
     OneWayCallValueNotZero,
     ProofNotSelfRooted,
-    UnauthorizedMessageSender
+    UnauthorizedMessageSender,
+    WriterRootNotCurrent
 } from "../InteropErrors.sol";
 
 /// @title L2InteropHandler
@@ -133,7 +135,7 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
 
         _validateExecutable(bundleHash, interopBundle, status);
         _validateVerifiable(bundleHash, interopBundle, _proof.chainId, status);
-        _checkOneWaySource(_proof.chainId, _proof.message.sender);
+        bool sourceIsL1 = _checkOneWaySource(_proof.chainId, _proof.message.sender);
 
         require(interopBundle.calls.length == 1, OneWayBundleNotSingleCall(interopBundle.calls.length));
         InteropCall memory interopCall = interopBundle.calls[0];
@@ -155,25 +157,43 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
             }),
             MessageNotIncluded()
         );
-        // The source's messages are proven only against the source's own roots, never through the roots of another
-        // chain. See {protocol-docs/interop.md#executing-a-one-way-bundle-on-an-l2}.
-        uint256 rootChainId = MessageHashing.readSettlementLayerReference(_proof.proof).settlementLayerChainId;
-        require(rootChainId == _proof.chainId, ProofNotSelfRooted(_proof.chainId, rootChainId));
+        _checkProofRoot(_proof.chainId, _proof.proof, sourceIsL1);
 
         _markFullyExecutedAndRun(bundleHash, interopBundle);
     }
 
+    /// @dev Reverts unless the proof, already verified, ends at a root of `_sourceChainId` itself that still counts.
+    /// See {protocol-docs/interop.md#executing-a-one-way-bundle-on-an-l2}.
+    function _checkProofRoot(uint256 _sourceChainId, bytes32[] calldata _proof, bool _sourceIsL1) internal view {
+        MessageHashing.SettlementLayerReference memory root = MessageHashing.readSettlementLayerReference(_proof);
+        require(
+            root.settlementLayerChainId == _sourceChainId,
+            ProofNotSelfRooted(_sourceChainId, root.settlementLayerChainId)
+        );
+        if (!_sourceIsL1) {
+            require(
+                L2_INTEROP_ROOT_STORAGE.isCurrentWriterRoot(_sourceChainId, root.settlementLayerBatchNumber),
+                WriterRootNotCurrent(_sourceChainId, root.settlementLayerBatchNumber)
+            );
+        }
+    }
+
     /// @dev Reverts unless this chain has interop counterparts for `_sourceChainId`, the feature behind them is still
     /// enabled, and `_messageSender` is the source's interop center.
-    function _checkOneWaySource(uint256 _sourceChainId, address _messageSender) internal view {
+    /// @return sourceIsL1 Whether the source is the chain's L1, rather than a writer's source chain.
+    function _checkOneWaySource(
+        uint256 _sourceChainId,
+        address _messageSender
+    ) internal view returns (bool sourceIsL1) {
         IL2Bridgehub bridgehub = IL2Bridgehub(L2_BRIDGEHUB_ADDR);
         address interopCenter = bridgehub.interopCounterparts(_sourceChainId).interopCenter;
         require(interopCenter != address(0), InteropCounterpartsNotSet(_sourceChainId));
 
         uint256 l1ChainId = bridgehub.L1_CHAIN_ID();
-        bytes32 feature = _sourceChainId == l1ChainId ? L1_TO_L2_INTEROP_FEATURE : INTEROP_ROOT_WRITERS_FEATURE;
+        sourceIsL1 = _sourceChainId == l1ChainId;
+        bytes32 feature = sourceIsL1 ? L1_TO_L2_INTEROP_FEATURE : INTEROP_ROOT_WRITERS_FEATURE;
         require(bridgehub.isChainFeatureEnabled(feature), ChainFeatureNotEnabled(feature));
-        if (_sourceChainId == l1ChainId) {
+        if (sourceIsL1) {
             // A bundle of L1 mints like a deposit, which the asset tracker counts only while the chain settles on
             // L1. See {protocol-docs/bridging.md#one-way-bundles-and-the-deposit-accounting}.
             uint256 settlementLayerChainId = L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId();

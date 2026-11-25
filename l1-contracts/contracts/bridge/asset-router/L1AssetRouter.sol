@@ -272,8 +272,14 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         require(BRIDGE_HUB.settlementLayer(_chainId) == block.chainid, ChainNotSettlingOnThisChain(_chainId));
 
         (bytes32 assetId, bytes memory transferData) = DataEncoding.decodeAssetRouterBridgehubDepositData(_data);
-        _checkAssetHandlerAllowed(_chainId, assetId);
         address assetHandler = assetHandlerAddress[assetId];
+        // A chain migration is a deposit through the Bridgehub only: it needs the priority transaction to the
+        // settlement layer and the record its recovery reads, and a bundle has neither.
+        require(
+            assetHandler != BRIDGE_HUB.chainAssetHandler(),
+            AssetHandlerNotAllowed(_chainId, assetId, assetHandler)
+        );
+        _checkAssetHandlerAllowed(_chainId, assetId);
         if (assetHandler == address(0) || assetHandler == address(nativeTokenVault)) {
             // A bundle has no refund path, and the vault's bridged token can't mint to the zero address.
             // slither-disable-next-line unused-return

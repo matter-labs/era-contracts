@@ -769,6 +769,22 @@
   },
   {
     "type": "error",
+    "name": "WriterRootNotCurrent",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "blockNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "WrongCallStatusLength",
     "inputs": [
       {

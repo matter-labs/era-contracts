@@ -111,6 +111,11 @@ contract AlreadyDeployedChainStandIn {
         return BASE_TOKEN_ASSET_ID;
     }
 
+    /// @dev `L1InteropCenter` sends bundles only to a chain that takes deposits.
+    function depositsPaused() external pure returns (bool) {
+        return false;
+    }
+
     function getBridgehub() external view returns (address) {
         return BRIDGE_HUB;
     }

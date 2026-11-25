@@ -22,7 +22,7 @@ import {
 } from "contracts/common/Messaging.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {BridgehubBurnCTMAssetData, IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
 import {AtomicFlowPreimage} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
@@ -42,6 +42,10 @@ import {
     OneWayCallNotToAssetRouter,
     OneWayCallValueNotZero
 } from "contracts/interop/InteropErrors.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
+import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 
 import {OneWayBundlesDeployer} from "./_SharedOneWayBundlesDeployer.t.sol";
@@ -95,14 +99,15 @@ contract L1InteropCenterTest is OneWayBundlesDeployer {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice A bundle takes the token into the vault with the accounting of a deposit and becomes the only
-    /// message of L1's next batch in the message root, without a call into the destination chain's contract.
+    /// message of L1's next batch in the message root. The only call into the destination chain's contract is the
+    /// view that says whether it takes deposits.
     function test_sendBundle_locksTheTokenAndSendsALocalMessage() public {
         // `_sendTransfer` mints and approves its own amount.
         vm.prank(user);
         token.approve(address(addresses.l1NativeTokenVault), 0);
         uint256 vaultBalance = token.balanceOf(address(addresses.l1NativeTokenVault));
-        // No call into the chain: the destination may be any chain registered in the Bridgehub.
-        vm.expectCall(zkChain, bytes(""), 0);
+        vm.expectCall(zkChain, bytes(""), 1);
+        vm.expectCall(zkChain, abi.encodeCall(IMailbox.depositsPaused, ()), 1);
 
         SentBundle memory sent = _sendTransfer(AMOUNT, SALT);
 
@@ -251,6 +256,17 @@ contract L1InteropCenterTest is OneWayBundlesDeployer {
         _send(_starters(), _saltAttribute(SALT));
     }
 
+    /// @dev The chain admin starts the window before a migration, in which the chain takes no deposits.
+    function test_sendBundle_revertWhen_destinationPausedDeposits() public {
+        vm.prank(IGetters(zkChain).getAdmin());
+        IMigrator(zkChain).pauseDepositsBeforeInitiatingMigration();
+        vm.warp(block.timestamp + 365 days);
+        assertTrue(IMailbox(zkChain).depositsPaused());
+
+        vm.expectRevert(abi.encodeWithSelector(ChainNotSettlingOnThisChain.selector, chainId));
+        _send(_starters(), _saltAttribute(SALT));
+    }
+
     function test_sendBundle_revertWhen_notASingleCall() public {
         InteropCallStarter[] memory one = _starters();
         InteropCallStarter[] memory two = new InteropCallStarter[](2);
@@ -391,10 +407,47 @@ contract L1InteropCenterTest is OneWayBundlesDeployer {
         assertFalse(l1InteropCenter.destinationEnabled(otherChainId));
     }
 
-    function test_setDestinationEnabled_revertWhen_notOwner() public {
-        vm.prank(user);
-        vm.expectRevert("Ownable: caller is not the owner");
+    /// @notice The chain's admin closes the route into its own chain, which it does before anything that would
+    /// leave a sent bundle unexecutable, and only the owner opens it again.
+    function test_setDestinationEnabled_chainAdminDisables() public {
+        address chainAdmin = IGetters(zkChain).getAdmin();
+        vm.expectEmit(true, false, false, true, address(l1InteropCenter));
+        emit IL1InteropCenter.DestinationEnabledSet(chainId, false);
+        vm.prank(chainAdmin);
+        l1InteropCenter.setDestinationEnabled(chainId, false);
+        assertFalse(l1InteropCenter.destinationEnabled(chainId));
+
+        vm.expectRevert(abi.encodeWithSelector(DestinationChainNotAllowed.selector, chainId));
+        _send(_starters(), _saltAttribute(SALT));
+        assertEq(token.balanceOf(user), AMOUNT, "nothing was taken");
+
+        vm.prank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, chainAdmin));
         l1InteropCenter.setDestinationEnabled(chainId, true);
+    }
+
+    function test_setDestinationEnabled_revertWhen_notOwnerNorChainAdmin() public {
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, user));
+        l1InteropCenter.setDestinationEnabled(chainId, true);
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, user));
+        l1InteropCenter.setDestinationEnabled(chainId, false);
+
+        // The admin of one chain has no say over another, nor over a chain the Bridgehub does not know.
+        address chainAdmin = makeAddr("chainAdmin");
+        vm.prank(IGetters(zkChain).getAdmin());
+        IAdmin(zkChain).setPendingAdmin(chainAdmin);
+        vm.prank(chainAdmin);
+        IAdmin(zkChain).acceptAdmin();
+        _enableDestination(zkChainIds[0]);
+        vm.startPrank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, chainAdmin));
+        l1InteropCenter.setDestinationEnabled(zkChainIds[0], false);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, chainAdmin));
+        l1InteropCenter.setDestinationEnabled(UNREGISTERED_CHAIN_ID, false);
+        vm.stopPrank();
+        assertTrue(l1InteropCenter.destinationEnabled(zkChainIds[0]));
     }
 
     function test_pause_revertWhen_notOwner() public {
@@ -446,7 +499,33 @@ contract L1InteropCenterTest is OneWayBundlesDeployer {
         addresses.sharedBridge.initiateIndirectCall(chainId, user, data);
     }
 
-    /// @notice A chain without interop only receives assets of the native token vault.
+    /// @notice A chain migration is not a bundle: the chain asset handler's asset is refused whatever the
+    /// destination, so a bundle can't move a chain's settlement layer past the priority queue.
+    function test_initiateIndirectCall_revertWhen_chainAssetHandler() public {
+        uint256 migratingChainId = zkChainIds[0];
+        bytes32 ctmAssetId = addresses.bridgehub.ctmAssetIdFromChainId(migratingChainId);
+        address chainAssetHandler = addresses.bridgehub.chainAssetHandler();
+        assertEq(addresses.sharedBridge.assetHandlerAddress(ctmAssetId), chainAssetHandler);
+
+        InteropCallStarter[] memory starters = _starters();
+        starters[0].data = DataEncoding.encodeAssetRouterBridgehubDepositData(
+            ctmAssetId,
+            abi.encode(
+                BridgehubBurnCTMAssetData({
+                    chainId: migratingChainId,
+                    ctmData: abi.encode(user, hex""),
+                    chainData: abi.encode(uint256(0))
+                })
+            )
+        );
+        vm.expectRevert(
+            abi.encodeWithSelector(AssetHandlerNotAllowed.selector, chainId, ctmAssetId, chainAssetHandler)
+        );
+        _send(starters, _saltAttribute(SALT));
+        assertEq(addresses.bridgehub.settlementLayer(migratingChainId), block.chainid);
+    }
+
+    /// @notice A bundle to a chain without interop carries only assets of the native token vault.
     /// See {protocol-docs/interop-gating.md#asset-handler-restriction}.
     function test_initiateIndirectCall_revertWhen_customAssetHandler() public {
         address deploymentTracker = makeAddr("deploymentTracker");

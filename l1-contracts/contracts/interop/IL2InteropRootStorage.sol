@@ -50,8 +50,20 @@ interface IL2InteropRootStorage {
     /// accept such a chain as the settlement layer of another chain. See {protocol-docs/interop.md#interop-root-writers}.
     function isWriterSource(uint256 chainId) external view returns (bool);
 
-    /// @notice Sets or, with zero, removes the writer of `_sourceChainId`'s interop roots. Called by a service
-    /// transaction from the L1 `ChainRegistrationSender`. See {protocol-docs/interop.md#interop-root-writers}.
+    /// @notice The number of times the writer of `sourceChainId` was set or removed. A written root belongs to the
+    /// generation it was written in. See {protocol-docs/interop.md#interop-root-writers}.
+    function interopRootWriterGeneration(uint256 sourceChainId) external view returns (uint256);
+
+    /// @notice Whether a root is stored for `_chainId` at `_blockNumber` and was written in the current generation
+    /// of `_chainId`'s writer, that is, since the writer was last set or removed. Meaningful only for a writer's
+    /// source chain. See {protocol-docs/interop.md#interop-root-writers}.
+    /// @param _chainId The writer's source chain.
+    /// @param _blockNumber The block number of the root.
+    function isCurrentWriterRoot(uint256 _chainId, uint256 _blockNumber) external view returns (bool);
+
+    /// @notice Sets or, with zero, removes the writer of `_sourceChainId`'s interop roots, and starts a new generation
+    /// of its roots. Called by a service transaction from the L1 `ChainRegistrationSender`.
+    /// See {protocol-docs/interop.md#interop-root-writers}.
     /// @param _sourceChainId The chain whose roots the writer adds. Must not be this chain.
     /// @param _writer The writer, any address (an operator key or a contract such as a light client).
     function setInteropRootWriter(uint256 _sourceChainId, address _writer) external;

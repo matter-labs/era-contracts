@@ -23,8 +23,8 @@ interface IL1InteropCenter {
     /// @notice Whether `_sender` already used `_salt`; a (sender, salt) pair sends at most one bundle.
     function isInteropBundleSaltUsed(address _sender, bytes32 _salt) external view returns (bool);
 
-    /// @notice Enables or disables sending bundles to `_chainId`. Callable by the owner.
-    /// See {protocol-docs/interop-gating.md#one-way-bundles-from-an-l1}.
+    /// @notice Enables or disables sending bundles to `_chainId`. Callable by the owner; the admin of `_chainId` can
+    /// disable it too. See {protocol-docs/interop-gating.md#one-way-bundles-from-an-l1}.
     /// @param _chainId The destination chain.
     /// @param _enabled Whether bundles may be sent to it.
     function setDestinationEnabled(uint256 _chainId, bool _enabled) external;

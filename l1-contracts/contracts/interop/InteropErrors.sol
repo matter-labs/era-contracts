@@ -115,6 +115,8 @@ error SidesLengthNotOne();
 error UnauthorizedMessageSender(address expected, address actual);
 // 0x0345c281
 error UnbundlingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes unbundlerAddress);
+// 0x1ef20f93
+error WriterRootNotCurrent(uint256 chainId, uint256 blockNumber);
 // 0x801534e9
 error WrongCallStatusLength(uint256 bundleCallsLength, uint256 providedCallStatusLength);
 // 0xb99d46dc
