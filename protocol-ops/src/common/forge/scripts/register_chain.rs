@@ -46,6 +46,7 @@ impl RegisterChainL1Config {
         create2_factory_salt: Option<B256>,
         initialize_legacy_bridge: bool,
         evm_emulator: bool,
+        reverter_operator: Option<Address>,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             chain: ChainL1Config {
@@ -74,6 +75,7 @@ impl RegisterChainL1Config {
                     VMOption::EraVM => Address::ZERO,
                     VMOption::ZKSyncOsVM => chain_params.execute_operator,
                 },
+                validator_sender_operator_reverter: reverter_operator.filter(|a| !a.is_zero()),
                 allow_evm_emulator: evm_emulator,
             },
             owner_address: chain_params.owner,
@@ -97,6 +99,9 @@ pub struct ChainL1Config {
     pub validator_sender_operator_blobs_eth: Address,
     pub validator_sender_operator_prove: Address,
     pub validator_sender_operator_execute: Address,
+    /// Dedicated REVERTER. Absent: the role stays on the eth-path (prove) operator.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub validator_sender_operator_reverter: Option<Address>,
     pub base_token_gas_price_multiplier_nominator: u64,
     pub base_token_gas_price_multiplier_denominator: u64,
     pub governance_security_council_address: Address,

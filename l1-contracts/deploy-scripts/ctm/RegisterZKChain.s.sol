@@ -214,6 +214,11 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
         } else {
             config.validatorSenderOperatorExecute = address(0);
         }
+        if (vm.keyExistsToml(toml, "$.chain.validator_sender_operator_reverter")) {
+            config.validatorSenderOperatorReverter = toml.readAddress("$.chain.validator_sender_operator_reverter");
+        } else {
+            config.validatorSenderOperatorReverter = address(0);
+        }
 
         if (vm.keyExistsToml(toml, "$.initialize_legacy_bridge")) {
             config.initializeLegacyBridge = toml.readBool("$.initialize_legacy_bridge");
@@ -407,13 +412,14 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
         // and execute operators are set, they receive PROVER / EXECUTOR instead (see below).
         bool zkSyncOsValidatorSplit = config.validatorSenderOperatorProve != address(0) &&
             config.validatorSenderOperatorExecute != address(0);
+        bool dedicatedReverter = config.validatorSenderOperatorReverter != address(0);
         validatorTimelock.addValidatorRoles(
             chainAddress,
             config.validatorSenderOperatorEth,
             IValidatorTimelock.ValidatorRotationParams({
                 rotatePrecommitterRole: true,
                 rotateCommitterRole: false,
-                rotateReverterRole: true,
+                rotateReverterRole: !dedicatedReverter,
                 rotateProverRole: !zkSyncOsValidatorSplit,
                 rotateExecutorRole: !zkSyncOsValidatorSplit,
                 rotateUpgraderRole: true
@@ -456,6 +462,21 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
                     rotateReverterRole: false,
                     rotateProverRole: false,
                     rotateExecutorRole: true,
+                    rotateUpgraderRole: false
+                })
+            );
+        }
+
+        if (dedicatedReverter) {
+            validatorTimelock.addValidatorRoles(
+                chainAddress,
+                config.validatorSenderOperatorReverter,
+                IValidatorTimelock.ValidatorRotationParams({
+                    rotatePrecommitterRole: false,
+                    rotateCommitterRole: false,
+                    rotateReverterRole: true,
+                    rotateProverRole: false,
+                    rotateExecutorRole: false,
                     rotateUpgraderRole: false
                 })
             );
