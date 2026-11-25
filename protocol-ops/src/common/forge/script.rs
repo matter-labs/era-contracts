@@ -54,9 +54,17 @@ impl ForgeScript {
     /// Also adds `--slow`: forge waits for each tx to be confirmed before
     /// sending the next, which is required for correctness against the anvil
     /// fork.
+    ///
+    /// And `--skip-simulation`: forge then takes each tx's gas limit from the
+    /// fork's `eth_estimateGas` instead of its own simulation. The simulation
+    /// prices gas by the project's `evm_version`, while anvil applies the
+    /// forked chain's hardfork: on a Sepolia fork (Glamsterdam, EIP-8037) a
+    /// contract creation costs several times the simulated figure and the
+    /// broadcast runs out of gas.
     pub fn with_broadcast(mut self) -> Self {
         self.args.add_arg(ForgeScriptArg::Broadcast);
         self.args.add_arg(ForgeScriptArg::Slow);
+        self.args.add_arg(ForgeScriptArg::SkipSimulation);
         self
     }
 
@@ -213,6 +221,7 @@ pub enum ForgeScriptArg {
         sig: String,
     },
     Slow,
+    SkipSimulation,
     #[strum(to_string = "verifier={verifier}")]
     Verifier {
         verifier: String,
