@@ -13,6 +13,7 @@ import {
 import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
 import {ICommitter, CommitBatchInfoZKsyncOS} from "../../chain-interfaces/ICommitter.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
+import {ZKsyncOSBatchCommitment} from "../../libraries/ZKsyncOSBatchCommitment.sol";
 import {StoredBatchHashing} from "../StoredBatchHashing.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../../../common/l2-helpers/L2ContractInterfaces.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
@@ -234,29 +235,11 @@ contract CommitterFacet is ZKChainBase, ICommitter, ISelfDescribingFacet {
             revert SettlementLayerChainIdMismatch();
         }
 
-        bytes32 batchOutputHash = _getBatchOutputHash(_newBatch, _expectedSystemContractUpgradeTxHash);
-
-        // We are using same stored batch info structure as was used for Era VM state transition.
-        // But we set some fields differently:
-        // `batchHash` commitments now contains full commitment to the state and `indexRepeatedStorageChanges` not used(always set to 0)
-        // `timestamp` is not used anymore(set to 0), for Era we used it to validate that committed batch timestamp is consistent with last stored,
-        // but in ZKsync OS we are validating it within the state transition program
-        storedBatchInfo = IExecutor.StoredBatchInfo({
-            batchNumber: _newBatch.batchNumber,
-            batchHash: _newBatch.newStateCommitment,
-            indexRepeatedStorageChanges: 0,
-            numberOfLayer1Txs: _newBatch.numberOfLayer1Txs,
-            priorityOperationsHash: _newBatch.priorityOperationsHash,
-            l2LogsTreeRoot: _newBatch.l2LogsTreeRoot,
-            dependencyRootsRollingHash: _newBatch.dependencyRootsRollingHash,
-            timestamp: 0,
-            commitment: _getBatchCommitment(
-                _previousBatch.batchHash,
-                _newBatch.newStateCommitment,
-                _newBatch.chainConfigHash,
-                batchOutputHash
-            )
-        });
+        storedBatchInfo = ZKsyncOSBatchCommitment.storedBatchInfo(
+            _previousBatch.batchHash,
+            _newBatch,
+            _expectedSystemContractUpgradeTxHash
+        );
 
         if (L1_CHAIN_ID != block.chainid) {
             // If we are settling on top of Gateway, we always relay the data needed to construct
@@ -280,51 +263,6 @@ contract CommitterFacet is ZKChainBase, ICommitter, ISelfDescribingFacet {
             _newBatch.firstBlockNumber,
             _newBatch.lastBlockNumber
         );
-    }
-
-    /// @notice Computes the hash of the batch data opened on L1. It is combined with the previous/new state
-    /// commitments and the chain config hash into the proof public input, so its layout must match the
-    /// ZKsync OS `BatchOutput::hash`.
-    /// @param _batch The committed batch.
-    /// @param _upgradeTxHash The system upgrade transaction expected in this batch, or zero.
-    /// @return The batch output hash.
-    function _getBatchOutputHash(
-        CommitBatchInfoZKsyncOS memory _batch,
-        bytes32 _upgradeTxHash
-    ) internal pure returns (bytes32) {
-        return
-            keccak256(
-                abi.encodePacked(
-                    _batch.firstBlockTimestamp,
-                    _batch.lastBlockTimestamp,
-                    uint256(_batch.daCommitmentScheme),
-                    _batch.daCommitment,
-                    _batch.numberOfLayer1Txs,
-                    _batch.numberOfLayer2Txs,
-                    _batch.priorityOperationsHash,
-                    _batch.l2LogsTreeRoot,
-                    _upgradeTxHash,
-                    _batch.dependencyRootsRollingHash,
-                    _batch.slChainId,
-                    _batch.interopFeeUnits
-                )
-            );
-    }
-
-    /// @notice Computes the full, untruncated batch proof public-input hash.
-    /// @param _previousState State commitment before the batch.
-    /// @param _newState State commitment after the batch.
-    /// @param _chainConfigHash Hash of the runtime configuration used to execute the batch.
-    /// @param _batchOutputHash Hash of the batch data opened on L1.
-    /// @return The commitment stored in `StoredBatchInfo` and passed to the verifier.
-    function _getBatchCommitment(
-        bytes32 _previousState,
-        bytes32 _newState,
-        bytes32 _chainConfigHash,
-        bytes32 _batchOutputHash
-    ) internal pure returns (bytes32) {
-        // `computeZKsyncOSHash` applies PUBLIC_INPUT_SHIFT once, after folding the full per-batch hashes.
-        return keccak256(abi.encodePacked(_previousState, _newState, _chainConfigHash, _batchOutputHash));
     }
 
     /// @inheritdoc ISelfDescribingFacet

@@ -26,7 +26,7 @@ the batch output, L1) only carries the difference, so changing the unit is an L2
    last word of the batch output hash. The slot is therefore **consensus-critical**: it must not move without a
    coordinated protocol change.
 3. **L1 commit.** `CommitBatchInfoZKsyncOS.interopFeeUnits` is hashed last into the batch output hash
-   (`CommitterFacet._getBatchOutputHash`, commit encoding version 6), which goes into the proof public input, and the
+   (`ZKsyncOSBatchCommitment.batchOutputHash`, commit encoding version 6), which goes into the proof public input, and the
    count is recorded for the batch number. A batch committed with a count other than the one its state transition
    produced can't pass verification of a real proof, so it never executes.
 4. **L1 execution.** Executing the proven batch charges the recorded count.

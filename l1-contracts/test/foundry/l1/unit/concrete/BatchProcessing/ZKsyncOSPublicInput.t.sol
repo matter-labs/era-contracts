@@ -14,6 +14,7 @@ import {
 } from "foundry-test/TestConstants.sol";
 
 import {TestCommitter} from "contracts/dev-contracts/test/TestCommitter.sol";
+import {ZKsyncOSBatchCommitment} from "contracts/state-transition/libraries/ZKsyncOSBatchCommitment.sol";
 import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
@@ -38,7 +39,7 @@ contract CommitterZKsyncOSPublicInputHarness is TestCommitter {
         CommitBatchInfoZKsyncOS memory _batch,
         bytes32 _upgradeTxHash
     ) external pure returns (bytes32) {
-        return _getBatchOutputHash(_batch, _upgradeTxHash);
+        return ZKsyncOSBatchCommitment.batchOutputHash(_batch, _upgradeTxHash);
     }
 
     function getBatchProofPublicInput(
@@ -48,7 +49,7 @@ contract CommitterZKsyncOSPublicInputHarness is TestCommitter {
     ) external view returns (uint256) {
         return
             uint256(
-                _getBatchCommitment(
+                ZKsyncOSBatchCommitment.batchCommitment(
                     _prevBatchStateCommitment,
                     _currentBatchStateCommitment,
                     _getZKsyncOSChainConfigHash(),
