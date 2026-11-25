@@ -61,11 +61,26 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
     mapping(uint256 chainId => bool everHadWriter) public isWriterSource;
 
     /// @inheritdoc IL2InteropRootStorage
+    /// @dev Appended after `isWriterSource`; the mapping is empty when the built-in is upgraded in place.
+    mapping(uint256 sourceChainId => uint256 generation) public interopRootWriterGeneration;
+
+    /// @dev The value of `interopRootWriterGeneration` when the writer wrote the root of each key. Appended after
+    /// `interopRootWriterGeneration`; a root written before the mapping existed has generation zero, the first one.
+    mapping(uint256 chainId => mapping(uint256 blockNumber => uint256 generation)) internal writtenRootGeneration;
+
+    /// @inheritdoc IL2InteropRootStorage
     function interopRoots(
         uint256 chainId,
         uint256 blockOrBatchNumber
     ) external view returns (StoredInteropRoot memory) {
         return storedInteropRoots[chainId][blockOrBatchNumber];
+    }
+
+    /// @inheritdoc IL2InteropRootStorage
+    function isCurrentWriterRoot(uint256 _chainId, uint256 _blockNumber) external view returns (bool) {
+        return
+            storedInteropRoots[_chainId][_blockNumber].root != bytes32(0) &&
+            writtenRootGeneration[_chainId][_blockNumber] == interopRootWriterGeneration[_chainId];
     }
 
     /// @notice Imports a single interop root as a full `(blockOrBatchNumber, root, timestamp)` tuple.
@@ -102,6 +117,7 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
             // Never cleared: the roots a writer added stay after it is removed.
             isWriterSource[_sourceChainId] = true;
         }
+        ++interopRootWriterGeneration[_sourceChainId];
         emit InteropRootWriterSet(_sourceChainId, _writer);
     }
 
@@ -119,6 +135,9 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
             _interopRoot.timestamp,
             _interopRoot.sides
         );
+        writtenRootGeneration[_interopRoot.chainId][_interopRoot.blockOrBatchNumber] = interopRootWriterGeneration[
+            _interopRoot.chainId
+        ];
         // Not `InteropRootAdded`: ZKsync OS folds every `InteropRootAdded` of this contract into the batch's
         // `dependencyRootsRollingHash`, which the settlement layer checks against its own message root.
         emit InteropRootAddedByWriter({

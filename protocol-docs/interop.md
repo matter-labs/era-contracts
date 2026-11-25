@@ -6,6 +6,11 @@ This document is the single source of truth for the protocol-level behaviour of 
 
 Interop is ZKsync's mechanism for sending messages and value between chains in the ecosystem. The `InteropCenter` (an L2 contract) is the primary entry point for communication between chains connected to interop, facilitating interactions between end users and bridges. As of v31 the `InteropCenter` is only deployed on L2s, not on L1. Interop was **not activated in v31**; the contracts here target v33+ and are expected to run on ZKsync OS chains only (the EraVM bootloader does not support the timestamp-carrying interop-root import entry points).
 
+From v37 an L1 sends bundles too, through its own contract, the `L1InteropCenter`. Those bundles, and the
+L2 -> L1 withdrawals, are **one-way bundles**: a single asset transfer proven by message inclusion, with no
+atomic flow. They are described in [One-way bundles](#one-way-bundles); the rest of this document is about
+the L2 `InteropCenter` unless it says otherwise.
+
 The lifecycle of an interop interaction is:
 
 1. **Prepare** — for L2 -> L2, preview every leg's bundle hash and construct the shared atomic-flow
@@ -106,15 +111,16 @@ Both entry points (`sendMessage` and `sendBundle`, both `nonReentrant`) funnel t
 
 1. **Validates destination** (see [Restrictions](#restrictions)) and, for atomic bundles, rejects L1 destinations before any burn.
 2. **Enforces salt uniqueness** and marks the (sender, salt) pair used.
-3. **Resolves `destinationBaseTokenAssetId`**: for an L2 destination, from the L2 `Bridgehub` registry (unregistered chains revert with `DestinationChainNotRegistered`, chains this chain's admin hasn't whitelisted with `DestinationChainNotAllowed`, see {protocol-docs/interop-gating.md#interop-peer-whitelist}); for an L1 destination, the L1-native ETH asset ID — the L1 chain is not registered as an interop destination in the L2 Bridgehub, and L1's base token is ETH (which is not necessarily this L2's base token; they only coincide on ETH-based chains).
-4. **Processes each call starter** (direct or indirect, applying the L1-destination restrictions) and accumulates two totals: `totalBurnedCallsValue` (sum of destination-side `interopCallValue`s) and `totalIndirectCallsValue` (sum of source-side `indirectCallMessageValue`s).
-5. **Collects fixed ZK fees**, if `useFixedFee` and the destination is not L1.
+3. **Resolves `destinationBaseTokenAssetId`**: for an L2 destination, from the L2 `Bridgehub` registry (unregistered chains revert with `DestinationChainNotRegistered`, chains this chain's admin hasn't whitelisted with `DestinationChainNotAllowed`, see {protocol-docs/interop-gating.md#interop-peer-whitelist}); for a one-way destination (L1, or a chain with [interop counterparts](#counterpart-addressing)), the destination's native ETH asset ID — such a chain is not registered as an interop destination in the L2 Bridgehub, and its base token is ETH (which is not necessarily this L2's base token; they only coincide on ETH-based chains).
+4. **Processes each call starter** (direct or indirect, applying the one-way restrictions) and accumulates two totals: `totalBurnedCallsValue` (sum of destination-side `interopCallValue`s) and `totalIndirectCallsValue` (sum of source-side `indirectCallMessageValue`s).
+5. **Collects fixed ZK fees**, if `useFixedFee` and the bundle is not one-way.
 6. **Collects and burns value** (`_ensureCorrectTotalValue`): `msg.value` must exactly match the expected total (`MsgValueMismatch`), where the expected total is:
    - same base token on both chains: `totalBurnedCallsValue + totalIndirectCallsValue + protocolFee`; the interop-call value is burned on the source chain via `L2_BASE_TOKEN_HOLDER.burnAndStartBridging` (notifying the L2AssetTracker);
    - different base tokens: `totalIndirectCallsValue + protocolFee`; the destination-chain value is instead deposited via `AssetRouter.bridgehubDepositBaseToken`.
-7. **Dispatches the bundle** (`_dispatchBundle`): an L2 -> L1 withdrawal is ABI-encoded, prefixed with
-   `BUNDLE_IDENTIFIER`, and sent through the `L2ToL1Messenger`; an atomic L2 -> L2 bundle is appended
-   to the interop IMT via `AtomicFlowManager` and is **not** published as an L2 -> L1 message.
+7. **Dispatches the bundle** (`_dispatchBundle`): a one-way bundle (canonically an L2 -> L1 withdrawal) is
+   ABI-encoded, prefixed with `BUNDLE_IDENTIFIER`, and sent through the `L2ToL1Messenger`; an atomic
+   L2 -> L2 bundle is appended to the interop IMT via `AtomicFlowManager` and is **not** published as an
+   L2 -> L1 message.
 8. **Emits events**: one ERC-7786 `MessageSent` per call, plus one `InteropBundleSent(l2l1MsgHash, bundleHash, bundle)`.
 
 There is intentionally **no settlement-mode requirement** on the send side. Route correctness is enforced
@@ -125,17 +131,17 @@ configuration.
 
 ## Restrictions
 
-- **No interop initiation on L1**: bundles can only be initiated on an L2 (`CannotInitiateInteropOnL1`). The `InteropCenter` never runs on L1.
+- **No interop initiation on L1 through the `InteropCenter`**: it never runs on L1 (`CannotInitiateInteropOnL1`). An L1 sends through the `L1InteropCenter`, with the restrictions of [one-way bundles from an L1](#one-way-bundles-from-an-l1).
 - **No interop to self** (`InteropToSelfNotSupported`): a chain can end up registered for interop on its own Bridgehub, and a self-destination bundle would burn value into an unsupported self-bridging accounting path.
 - **`sendMessage` is strictly L2→L2** (`NotL2ToL2`); the L2→L1 path goes through `sendBundle` as a single-call bundle.
-- **L1 destinations are restricted to single-call asset withdrawals** (for this release):
+- **One-way destinations are restricted to single-call asset withdrawals** (for this release). A one-way destination is L1 or a chain this chain has [interop counterparts](#counterpart-addressing) for; the error names say L1 for both:
   - exactly one call (`MultiCallToL1NotSupported`);
-  - the call must be **indirect** (`DirectCallToL1NotSupported`) and target the **L2 AssetRouter** (`InteropCallToL1NotToAssetRouter`) — `initiateIndirectCall` rewrites it into a call to the L1 AssetRouter's `finalizeDeposit`. This keeps the L1-side attack surface to the asset router only, rather than allowing arbitrary L2→L1 calls to any `IERC7786Recipient`;
+  - the call must be **indirect** (`DirectCallToL1NotSupported`) and target the **L2 AssetRouter** (`InteropCallToL1NotToAssetRouter`) — `initiateIndirectCall` rewrites it into a call to the destination AssetRouter's `finalizeDeposit` (the L1 AssetRouter, or the counterparts' asset router). This keeps the L1-side attack surface to the asset router only, rather than allowing arbitrary L2→L1 calls to any `IERC7786Recipient`;
   - the call must carry **zero `interopCallValue`** (`NonZeroValueToL1NotSupported`): the withdrawn amount rides in the transfer data / indirect-call message value, and a value-bearing call could end up in an unfinalizable bundle;
   - an L1-destined bundle must **not be atomic** (`AtomicBundleToL1NotSupported`).
 - **Indirect calls must target the L2 AssetRouter** (`IndirectCallOnlyToAssetRouter`) for this release: the atomic timeout-recovery hook (`recoverAtomicCall`) is dispatched to the asset router only, so pinning the starter guarantees every indirect burn is reachable by recovery. (For L1 destinations this is additionally enforced by the more specific `InteropCallToL1NotToAssetRouter` above.) Lifting the restriction requires first making `AtomicFlowManager._recoverBundle`'s dispatch generic (an indirect-call marker in the bundle encoding, or a registry of recoverable senders) — the manager silently skips any non-router `from`, so a second starter without a manager change would strand its burns.
 - **Indirect calls may not carry `interopCallValue`** (`IndirectCallCannotCarryValue`): recovery returns native value to the call's `InteropCall.from`, which for an indirect call is the asset router rather than the payer, so the value could never reach the original sender. Direct calls may carry value — on timeout it is refunded via `bridgehubRecoverBaseToken`. Everything else is allowed (an atomic bundle may mix recoverable fund calls, e.g. asset-router deposits, with fund-free calls); timeout recovery is best-effort and refund safety of fund-moving legs is the flow author's responsibility.
-- **`atomicBundle` is required on every L2→L2 send, `sendMessage` included.** `sendMessage` parses the attribute like any other send and wraps its single call into a one-leg atomic flow; `_sendBundle` then rejects a non-atomic L2→L2 send outright (`NonAtomicSendUnsupported`). So omitting the attribute on `sendMessage` reverts — it is not "a single-call send is never atomic". Conversely an L2→L1 send must **not** carry it (`AtomicBundleToL1NotSupported`), which makes the rule a biconditional: atomic ⟺ L2→L2, non-atomic ⟺ L2→L1.
+- **`atomicBundle` is required on every L2→L2 send, `sendMessage` included.** `sendMessage` parses the attribute like any other send and wraps its single call into a one-leg atomic flow; `_sendBundle` then rejects a non-atomic L2→L2 send outright (`NonAtomicSendUnsupported`). So omitting the attribute on `sendMessage` reverts — it is not "a single-call send is never atomic". Conversely an L2→L1 send must **not** carry it (`AtomicBundleToL1NotSupported`), which makes the rule a biconditional: atomic ⟺ L2→L2, non-atomic ⟺ one-way. A chain with interop counterparts is never an allowed peer, so an atomic bundle to it reverts with `DestinationChainNotRegistered`, and `sendMessage` refuses a non-atomic send before looking at the destination.
 
 ## Replay protection and bundle uniqueness
 
@@ -212,22 +218,30 @@ of the source chain that the chain's admin trusts. The writer can be any address
     `INTEROP_ROOT_WRITERS_FEATURE` for the chain (`InteropRootWritersNotEnabled`);
   - removing one is also open to the owner and the Bridgehub admin;
   - a source chain belongs to one chain, which the ecosystem picks: the owner or the Bridgehub admin assigns it
-    (`assignInteropRootSource(sourceChainId, chainId)`, recorded in `interopRootSourceChain`), and a writer can be
-    set only for a source assigned to the chain (`InteropRootSourceNotAssigned`). Asset ids are derived from the
-    origin chain's id ({protocol-docs/bridging.md#asset-ids-asset-handlers-deployment-trackers}), so a second chain
-    with its own writer for the same source id could mint, with a root of its own, the bridged tokens the first
-    chain backs with real deposits. A chain admin does not pick its own sources, since first-come claims would let a
-    chain take the id of another chain's source;
+    (`assignInteropRootSource(sourceChainId, chainId)`, recorded in `interopRootSourceChain`), and a writer (or
+    [interop counterparts](#counterpart-addressing)) can be set only for a source assigned to the chain
+    (`InteropRootSourceNotAssigned`). Asset ids are derived from the origin chain's id
+    ({protocol-docs/bridging.md#asset-ids-asset-handlers-deployment-trackers}), so a second chain with its own
+    writer for the same source id could mint, with a root of its own, the bridged tokens the first chain backs
+    with real deposits, and move them to the first chain by an atomic flow. A chain admin does not pick its own
+    sources, since first-come claims would let a chain take the id of another chain's source;
   - only a chain outside the ecosystem is assigned: not L1 and not a registered ZK chain
     (`InvalidInteropRootSource`), as their roots reach the chain through its settlement layer, and the bootloader
     and a writer never share a key space. The L2 rejects the chain itself as well. In turn the Bridgehub registers
     no chain under an assigned id (`ChainIdIsInteropRootSource`), so a source never becomes a ZK chain;
-  - the first writer the chain sets for a source makes the assignment permanent (`isInteropRootSourceUsed`):
-    whatever the chain minted from the source's roots stays on it, so the source can't move to another chain.
-    Before that, the owner or the Bridgehub admin can undo a mistaken assignment (`releaseInteropRootSource`,
-    `InteropRootSourceInUse` once used).
+  - the first writer or counterparts the chain sets for a source make the assignment permanent
+    (`isInteropRootSourceUsed`): whatever the chain minted from the source's roots stays on it, so the source can't
+    move to another chain. Before that, the owner or the Bridgehub admin can undo a mistaken assignment
+    (`releaseInteropRootSource`, `InteropRootSourceInUse` once used);
+- Each setting or removal of a writer starts a new generation of the source's roots
+  (`interopRootWriterGeneration`), and a written root records the generation it was written in.
+  `isCurrentWriterRoot(chainId, blockNumber)` tells whether a root was written since the writer last changed;
+  [one-way bundles](#executing-a-one-way-bundle-on-an-l2) count only such roots, so replacing a compromised writer
+  drops what it wrote. A root can't be written twice for the same block, so the new writer vouches for the
+  source's later roots; the source's message root is cumulative, and a later root proves the earlier messages too.
 - The writer mapping and `isWriterSource` are appended to `L2InteropRootStorage`'s storage (slots 2 and 3, after
-  `storedInteropRoots` and `latestInteropRootTimestamp`), so the built-in upgrades in place; both start empty.
+  `storedInteropRoots` and `latestInteropRootTimestamp`), so the built-in upgrades in place; both start empty. The
+  generations follow them in v37; a root written before has generation zero, the first one.
 
 ### Message verification (`L2MessageVerification`)
 
@@ -236,9 +250,9 @@ recursive proof logic (`MessageVerification` / `MessageHashing`); the terminal s
 to an imported L1 aggregate root in `L2InteropRootStorage`. Recursion depth is limited to one hop.
 A proof may name any settlement layer whose roots the chain holds; the roots of a writer's source chain
 serve only that chain's own messages ([interop root writers](#interop-root-writers)).
-The current `L2InteropHandler` does not use this path for public bundles: all supported L2 -> L2
-interop is atomic and authenticates each leg through `AtomicFlowManager` instead. L1 withdrawals use
-`L1InteropHandler` and the L1 `MessageRoot` directly.
+`L2InteropHandler` uses this path for [one-way bundles](#executing-a-one-way-bundle-on-an-l2) only: all
+supported L2 -> L2 interop is atomic and authenticates each leg through `AtomicFlowManager` instead. L1
+withdrawals use `L1InteropHandler` and the L1 `MessageRoot` directly.
 
 ## Destination-side processing (interop handlers)
 
@@ -255,6 +269,11 @@ path. The derived handlers authenticate a fresh bundle differently:
 | `_expectedDestinationBaseTokenAssetId` | NTV `BASE_TOKEN_ASSET_ID`                         | L1 ETH asset ID                                       |
 | execution pause                        | none                                              | owner-controlled pausable gate                        |
 | call target                            | bundle-selected ERC-7786 recipient                | canonical L1 asset router only                        |
+
+`L2InteropHandler` has one more entry point, `executeBundle`, for the one-way bundles of the chains it has
+interop counterparts for. It has its own rules, described in
+[Executing a one-way bundle on an L2](#executing-a-one-way-bundle-on-an-l2), and shares only the status
+machine and the call dispatch with the rows above.
 
 Before verification or execution, `_validateBundleDestinationContext` checks
 `destinationChainId == block.chainid` and the expected destination base-token asset ID. On L1 it also
@@ -311,10 +330,217 @@ An atomic bundle is a leg of an **atomic interop flow** (L2↔L2 only), marked w
 - **Settlement layer**: the IMT proofs are authenticated against the imported interop root, but atomic interop is **L1-only in this release**: `AtomicFlowManager` rejects any flow whose `settlementLayerChainId` is not the L1 chain id (`ManagerSettlementLayerNotL1`) on send, finality and refund alike (see {protocol-docs/atomicity/security.md#trust-assumptions}).
 - **Timeouts**: if a flow misses its deadline, recovery is best-effort via `AtomicFlowManager._recoverBundle` / `IAtomicRecoverable.recoverAtomicCall`. This is why _indirect_ calls may not carry `interopCallValue` (see [Restrictions](#restrictions)) — recovery returns value to `InteropCall.from`, the asset router for an indirect call, never the payer; direct calls may carry value and are refunded through `bridgehubRecoverBaseToken`. L1 destinations are banned because L1 has no atomic execution, so the only outcome would be a timeout refund, while L2→L1 withdrawal accounting must stay append-only and never revertable.
 
+## One-way bundles
+
+A one-way bundle is a non-atomic bundle with exactly one call: an asset transfer between the asset routers of
+two chains, proven on the destination by the inclusion of the bundle's message in a root of the source. The
+L2 -> L1 withdrawal has always been one. v37 adds two more routes with the same shape and the same code:
+
+| Route                           | Sent by                        | Proven against                                                   | Executed by                      |
+| ------------------------------- | ------------------------------ | ---------------------------------------------------------------- | -------------------------------- |
+| L2 -> its L1                    | `InteropCenter.sendBundle`     | the chain's batch root in the L1 `MessageRoot`                   | `L1InteropHandler.executeBundle` |
+| L1 -> an L2 that settles on it  | `L1InteropCenter.sendBundle`   | L1's root in `L2InteropRootStorage`, imported by the bootloader  | `L2InteropHandler.executeBundle` |
+| writer source -> an L2          | the source's `L1InteropCenter` | the source's root in `L2InteropRootStorage`, written by a writer | `L2InteropHandler.executeBundle` |
+| L2 -> a writer source of the L2 | `InteropCenter.sendBundle`     | the chain's batch root in the source's `MessageRoot`             | the source's `L1InteropHandler`  |
+
+A **writer source** is a chain outside the ecosystem that runs the L1 contracts of this repository and whose
+roots an L2 gets from an [interop root writer](#interop-root-writers). The L2 does not settle on it, so
+nothing carries its state into the L2 except that writer: the trusted write happens on the L2, and everything
+after it is proven. How the writer source learns the L2's batch roots, which the last route needs, is outside
+this document; whoever appends them to its `MessageRoot` is trusted for what leaves its vault, up to what the
+L2 deposited there ({protocol-docs/interop-gating.md#per-chain-balance-cap}).
+
+Every route is off until it is configured, see {protocol-docs/interop-gating.md#one-way-bundles-from-an-l1}.
+
+### One-way bundles from an L1
+
+`L1InteropCenter` is a contract of the L1 core, behind a proxy, owned by governance and pausable. It is not
+the L2 `InteropCenter` deployed on L1: that one is wired to L2 built-ins and has no room left in its code
+size. `sendBundle` takes the arguments of `IInteropCenter.sendBundle` and forms the same `InteropBundle`:
+
+1. **Destination.** It must be a chain of this Bridgehub other than L1 itself (`InteropToSelfNotSupported`,
+   `DestinationChainNotRegistered`), settle on this L1 and take deposits (`ChainNotSettlingOnThisChain`), and be
+   enabled by the owner with `setDestinationEnabled` (`DestinationChainNotAllowed`); the chain's admin can disable
+   it too. A bundle mints like a deposit, so it follows the chain's `depositsPaused()`: no bundle during a
+   migration or in the window before one, when the chain's balance may already be leaving this L1. That view is
+   the center's only call into the chain's contract.
+2. **The call.** Exactly one call starter (`OneWayBundleNotSingleCall`), indirect (`OneWayCallNotIndirect`),
+   to this L1's asset router (`OneWayCallNotToAssetRouter`), with neither `interopCallValue` nor
+   `indirectCallMessageValue` (`OneWayCallValueNotZero`). `sendBundle` is not payable.
+3. **Attributes.** Only `interopBundleSalt` (`OneWayBundleAttributeNotSupported`). A one-way bundle is
+   executed by anyone and never unbundled, so `executionAddress` and `unbundlerAddress` could only make it
+   unexecutable; sends from L1 pay no interop fee; an atomic flow has no L1 leg.
+4. **The asset.** `L1AssetRouter.initiateIndirectCall` takes the asset exactly as a deposit through the
+   Bridgehub does ({protocol-docs/bridging.md#one-way-bundles-and-the-deposit-accounting}) and returns the
+   call for the destination: `finalizeDeposit(l1ChainId, assetId, mintData)` to the destination's asset
+   router. The call's `from` is this L1's asset router.
+5. **The message.** The bundle, prefixed with `BUNDLE_IDENTIFIER`, is sent as a
+   [local message](#proof-of-a-local-message) of the L1 `MessageRoot`. The center emits `MessageSent`,
+   `InteropBundleSent` (with the message's hash) and `OneWayBundleSent` (with the local batch number, which
+   the proof needs).
+
+The bundle salt is `keccak256(l1InteropCenter, sender, salt)`, and a (sender, salt) pair is used once. The
+center's address is in the salt because the center can be [replaced](#replacing-the-counterparts): a new
+center starts with no used salts and must not repeat a bundle hash the destination already executed.
+
+A one-way bundle from an L1 has **no refund path**. It does not fail: it waits, and anyone executes it at any
+time. So what could never execute is refused when sent, as far as the L1 can tell: a zero receiver (the
+bridged token can't mint to it) and the attributes above. What the L1 can't tell is not covered: a receiver
+that a token native to the destination refuses, or counterparts that are not set on the destination yet. The
+second is a matter of order: enable a destination only after its counterparts are set.
+
+In v37 a bundle from an L1 carries assets of the native token vault only (ERC-20 tokens; a chain with interop
+enabled may also use other asset handlers, {protocol-docs/interop-gating.md#asset-handler-restriction}), never
+the destination's base token, and no ETH, since it carries no value. A chain that settles on another layer
+can't receive one: `L2MessageVerification` allows one hop.
+
+### Proof of a local message
+
+The message is in the root every chain that settles on the L1 already imports, so nothing new carries it:
+see {protocol-docs/message-root.md#local-messages} for where it sits. Its proof is an ordinary two-hop proof
+({protocol-docs/message-root.md#proof-paths}) whose chain and settlement layer are both the L1:
+
+```
+MessageInclusionProof {
+  chainId:        the L1's chain id
+  l1BatchNumber:  the local batch number k from OneWayBundleSent
+  l2MessageIndex: 0
+  message:        { txNumberInBatch: 0, sender: the L1InteropCenter, data: (replaced by the handler) }
+  proof: [
+    metadata (version 1, 3 log-leaf siblings, d batch-leaf siblings, not final),
+    0, keccak256(EMPTY_IMT_ROOT, EMPTY_IMT_ROOT), RESERVED_SUBTREE_NODE,
+    the batch's timestamp, the batch-leaf mask k - 1, d siblings of batch k in the L1's own chain tree,
+    (block << 128) | 0, the L1's chain id,
+    metadata (version 1, shared-tree depth, 0, final), the shared-tree siblings of slot 0
+  ]
+}
+```
+
+It ends at `interopRoots(l1ChainId, block)` for any block at or after the send in which the L1's shared tree
+changed: the chain tree only grows. The siblings must be those of the tree as that block's last root saw it.
+Nothing in a node builds this proof today; it is built from the L1's `AppendedChainBatchRoot` events and
+`getMerklePathForChain`.
+
+### Counterpart addressing
+
+A one-way bundle is authenticated by real addresses, with no alias:
+
+| Check                             | Where                                 | Value                                                           |
+| --------------------------------- | ------------------------------------- | --------------------------------------------------------------- |
+| message sender of an L1's bundle  | `L2InteropHandler.executeBundle`      | the source's interop center (the message root wrote the sender) |
+| call sender of its transfer       | `L2AssetRouter._isValidInteropSender` | the source's asset router                                       |
+| target of its transfer            | the bundle, built on the L1           | the L2's asset router, the same built-in address on every chain |
+| target of a transfer back         | `L2AssetRouter.initiateIndirectCall`  | the destination's asset router                                  |
+| message sender of a transfer back | `L1InteropHandler`                    | the L2's `InteropCenter`, a built-in address                    |
+| call sender of a transfer back    | `L1AssetRouter._isValidInteropSender` | the L2's asset router, a built-in address                       |
+
+The L2 learns the two addresses of the other side from one registry:
+`L2Bridgehub.interopCounterparts(chainId)` returns `InteropCounterparts {interopCenter, assetRouter}`, zero
+for a chain the L2 exchanges no one-way bundles with. One entry kind serves both the chain's own L1 and a
+writer source, so both run the same code, and clearing the entry stops both directions at once.
+
+- Only service transactions write the registry (`setInteropCounterparts`), sent by `ChainRegistrationSender`
+  on L1: `setL1InteropCounterparts(chainId, set)` sends this L1's own `L1InteropCenter` and asset router,
+  nothing the caller supplies; `setInteropCounterparts(chainId, sourceChainId, interopCenter, assetRouter)`
+  sends what the chain's admin names for a writer source. Who may call them is in
+  {protocol-docs/interop-gating.md#one-way-bundles-from-an-l1}.
+- An entry and `isPeerAllowed` exclude each other, and an entry never writes `baseTokenAssetId`
+  (`InteropCounterpartsConflict`): a chain is an atomic peer or a one-way counterpart, never both. The rest of
+  the protocol relies on it: an atomic flow has no leg on a counterpart, and a one-way bundle never comes from
+  a peer.
+- A counterpart other than L1 must be a writer source. `ChainRegistrationSender` requires a writer to be set
+  first (`InteropRootWriterNotSet`), and the L2 requires `isWriterSource`. The asset tracker applies the
+  [origin rule](#one-way-bundles-with-a-writer-source) to writer sources, so this is what makes every
+  counterpart other than L1 subject to it.
+
+### Executing a one-way bundle on an L2
+
+`L2InteropHandler.executeBundle(bytes bundle, MessageInclusionProof proof)` has the signature and the selector
+of `L1InteropHandler.executeBundle`. In order:
+
+1. The usual checks of an execution: the bundle's `executionAddress`, if any, and its status, which must be
+   `Unreceived` (`BundleAlreadyProcessed`).
+2. The destination context: `bundle.sourceChainId == proof.chainId` (`WrongSourceChainId`), the destination is
+   this chain and the base token is this chain's.
+3. **The gate.** The L2 must have counterparts for `proof.chainId` (`InteropCounterpartsNotSet`). On a chain
+   that never opted in the function stops here, before any proof. The chain feature behind the counterparts
+   must still be enabled (`ChainFeatureNotEnabled`): `L1_TO_L2_INTEROP_FEATURE` for the chain's L1,
+   `INTEROP_ROOT_WRITERS_FEATURE` for a writer source. For the chain's L1, the chain must currently settle on
+   L1 (`NotSettlingOnL1`), which keeps the deposit accounting right
+   ({protocol-docs/bridging.md#one-way-bundles-and-the-deposit-accounting}).
+4. The message's sender must be the counterparts' interop center (`UnauthorizedMessageSender`).
+5. **The shape.** One call (`OneWayBundleNotSingleCall`), to this chain's asset router
+   (`OneWayCallNotToAssetRouter`), without value (`OneWayCallValueNotZero`). The L2 handler does not pin call
+   targets on the atomic path and hands out base token for a call's value, so a one-way bundle is allowed
+   neither.
+6. **The proof.** `L2MessageVerification.proveL2MessageInclusionShared` over `BUNDLE_IDENTIFIER || bundle`
+   (`MessageNotIncluded`), and then the proof must be **self-rooted**: the settlement layer it names is
+   `proof.chainId` itself (`ProofNotSelfRooted`). A one-hop proof is refused: a stored root is a message root,
+   never a batch root.
+7. The bundle is marked `FullyExecuted` and its call runs. The asset router accepts it only from the
+   counterparts' asset router.
+
+There is no `verifyBundle` on this path, so `unbundleBundle`, which needs `Verified`, is unreachable for
+these bundles: a single transfer has nothing to unbundle, and a cancelled transfer could never be refunded.
+
+The self-rooted rule and `SettlementLayerIsWriterSource` close the same gap from its two sides. A writer's
+root never proves a message of another chain, the chain's L1 included; and a message of a writer source is
+never proven through the roots of L1, whatever chain L1 has under that chain id.
+
+### One-way bundles with a writer source
+
+With counterparts for a writer source `S`, an L2 does three things it does not do otherwise:
+
+- It **executes `S`'s bundles**, as above. `S` runs the same `L1InteropCenter`, so the send, the leaf and the
+  proof are those of an L1; only the root comes from the writer instead of the bootloader.
+- Its `InteropCenter` **sends one-way bundles to `S`**, with the restrictions of a withdrawal to L1
+  ([Restrictions](#restrictions)). `L2AssetRouter.initiateIndirectCall` targets `S`'s asset router from the
+  counterparts, the bundle's `destinationBaseTokenAssetId` is `S`'s ETH asset id, the bundle is published
+  with `sendToL1` and pays no interop fee. `S`'s unchanged `L1InteropHandler` executes it against the L2's
+  batch root in `S`'s `MessageRoot`, with the proof of a withdrawal that ends at the batch root.
+- Its asset tracker applies the **origin rule** to the link with `S`
+  ({protocol-docs/bridging.md#l2-asset-tracker}): only assets native to `S` cross it, in both directions, and
+  never the L2's base token (`OneWayAssetOriginNotAllowed`). An asset native to `S` does not go to L1 either,
+  which could not release it. The rule lives in the native token vault's hooks, so `L2AssetRouter` keeps assets
+  with any other handler off the link (`AssetHandlerNotAllowed`). A burn toward `S` is never recovered
+  (`RecoveryToOneWayDestinationNotSupported`).
+
+What the writer is trusted with follows from these rules. A root is exactly as trustworthy as its writer, and
+a forged root is bounded as follows:
+
+- it mints only bridged tokens of `S`'s own assets, through one pinned call: no base token, no other
+  contract, no asset of L1 or of another chain, nothing from the L2's vault;
+- the amount it mints is **not** bounded, and the minted tokens are the same tokens that real transfers from
+  `S` mint. They can be sent to `S`, whose vault releases real funds up to what the L2 deposited there, and
+  moved to other chains by atomic flows. So the writer has custody of everything `S` transferred to the L2;
+- another chain that received `S`'s asset by an atomic flow can't tell that `S` is a writer source: a
+  withdrawal of it to L1 from there burns it, and L1 releases nothing, since L1 holds no deposit of it.
+  Clients must not offer that withdrawal.
+
+Written roots can't be removed, but a one-way bundle executes only against a root written since the writer
+last changed ([interop root writers](#interop-root-writers)). Replacing or removing a compromised writer
+therefore stops every bundle not executed yet that is proven against its roots; clearing the counterparts or
+disabling the feature stops execution at once. What already executed stays. Other readers of the roots, such
+as `L2MessageVerification`, still accept the old roots.
+
+### Replacing the counterparts
+
+The counterparts can be replaced and removed at any time, by the chain's admin, and removed by the owner and
+the Bridgehub admin. On the L1, `L1AssetRouter.setL1InteropCenter` replaces the interop center.
+
+- Removing the counterparts stops the bundles already sent in both directions; setting the same counterparts
+  again resumes them.
+- Replacing the interop center of a source leaves behind every bundle the old center sent that was not
+  executed yet: the handler checks the stored center. Those transfers are locked on the source for good, so
+  in-flight bundles are executed first when the replacement is planned.
+- Replacing the asset router of a source strands the transfers back to it the same way: they carry the old
+  address as their target.
+
 ## Initialization and versioning notes
 
 - `InteropCenter.initL2` is a one-shot initializer called by the complex upgrader. Because the `InteropCenter` is introduced in v31, it runs for both new chains (genesis) and chains upgraded to v31; in both cases storage is fresh (the SystemProxy is freshly deployed). After v31 it must never be called again (`reentrancyGuardInitializer` + `_disableInitializers` guards). It sets `L1_CHAIN_ID`, the owner, `ZK_TOKEN_ASSET_ID` (must be non-zero; anyone updating it later must also update the cached `zkToken` address) and the default `ZK_INTEROP_FEE`.
-- `L2InteropHandler.initL2` only locks the reentrancy guard (the handler holds no configurable state); `L1InteropHandler` is initialized behind its proxy with an owner for pause control, and its implementation is locked in the constructor.
+- `L2InteropHandler.initL2` only locks the reentrancy guard (the handler holds no configurable state); `L1InteropHandler` is initialized behind its proxy with an owner for pause control, and its implementation is locked in the constructor. `L1InteropCenter` is initialized the same way; its owner also enables destinations.
+- The one-way routes of v37 add storage only by appending: `interopCounterparts` in `L2Bridgehub`, `isLocalMessageSender` in `L1MessageRoot`, `l1InteropCenter` in `L1AssetRouter`, the writer generations in `L2InteropRootStorage`, the counterparts in `ChainRegistrationSender`. All start empty, so the contracts upgrade in place.
 - `L1_CHAIN_ID` always refers to the base-most L1, on whichever layer the contract is deployed.
 - Deprecated storage slots retained for layout compatibility: `InteropCenter.__DEPRECATED_interopBundleNonce`, `InteropHandlerBase.__DEPRECATED_L1_CHAIN_ID` (the handler now operates on `block.chainid`).
 - `InteropCenter` is not pausable: it keeps the `PausableUpgradeable` inheritance (and its storage) for potential future use, but exposes no `pause`/`unpause` and gates no entry point on it. An L2 chain is stopped through the L1 freezing mechanism instead (see the L2 pausability rule in `AGENTS.md`).

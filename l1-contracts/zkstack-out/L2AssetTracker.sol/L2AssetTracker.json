@@ -501,8 +501,40 @@
   },
   {
     "type": "error",
+    "name": "OneWayAssetOriginNotAllowed",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "originChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "RecoverToL1NotSupported",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "RecoveryToOneWayDestinationNotSupported",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",

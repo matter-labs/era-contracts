@@ -17,6 +17,10 @@ import {IOwnable} from "../../common/interfaces/IOwnable.sol";
 import {ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE} from "../../common/Config.sol";
 import {NotMultiProofMode, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
+import {ChainBatchRootTree} from "../../common/libraries/ChainBatchRootTree.sol";
+import {UpgradeAuthorityLib} from "../../common/libraries/UpgradeAuthorityLib.sol";
+import {L2Log} from "../../common/Messaging.sol";
+import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1ChainAssetHandler} from "../chain-asset-handler/IL1ChainAssetHandler.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
@@ -47,6 +51,9 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
 
     /// @notice Whether governance enabled interop for the chain. See {protocol-docs/interop-gating.md}.
     mapping(uint256 chainId => bool enabled) internal interopEnabled;
+
+    /// @inheritdoc IL1MessageRoot
+    mapping(address sender => bool allowed) public isLocalMessageSender;
 
     /// @dev This contract is expected to be used as a proxy implementation on L1.
     /// @param _bridgehub Address of the Bridgehub.
@@ -93,6 +100,42 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
         return interopEnabled[_chainId];
     }
 
+    /// @inheritdoc IL1MessageRoot
+    function setLocalMessageSender(address _sender, bool _allowed) external {
+        UpgradeAuthorityLib.requireOwnerOrUpgrader(IOwnable(BRIDGE_HUB).owner());
+        isLocalMessageSender[_sender] = _allowed;
+        emit LocalMessageSenderSet(_sender, _allowed);
+    }
+
+    /// @inheritdoc IL1MessageRoot
+    function sendLocalMessage(bytes32 _messageHash) external returns (uint256 batchNumber) {
+        require(isLocalMessageSender[msg.sender], Unauthorized(msg.sender));
+
+        // The log the L2->L1 messenger of a chain emits for a message of `msg.sender`; this contract builds it, so
+        // a sender can only send as itself.
+        bytes32 leaf = MessageHashing.getLeafHashFromLog(
+            L2Log({
+                l2ShardId: 0,
+                isService: true,
+                txNumberInBatch: 0,
+                sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+                key: bytes32(uint256(uint160(msg.sender))),
+                value: _messageHash
+            })
+        );
+        bytes32 localBatchRoot = ChainBatchRootTree.compute(
+            leaf,
+            bytes32(0),
+            ChainBatchRootTree.EMPTY_IMT_ROOT,
+            ChainBatchRootTree.EMPTY_IMT_ROOT
+        );
+        batchNumber = currentChainBatchNumber[block.chainid] + 1;
+        _recordChainBatchRoot(block.chainid, batchNumber, localBatchRoot);
+        _pushChainBatchRoot(block.chainid, batchNumber, localBatchRoot);
+
+        emit LocalMessageSent(msg.sender, batchNumber, _messageHash);
+    }
+
     function _proveL2LeafInclusionOnSettlementLayer(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -100,6 +143,12 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
         bytes32[] calldata _proof,
         uint256 _depth
     ) internal view virtual override returns (bool) {
+        // No chain settles on this chain's own slot: its batch roots hold local messages, never another chain's
+        // tree. See {protocol-docs/message-root.md#local-messages}.
+        require(
+            _proofData.settlementLayerChainId != block.chainid,
+            InvalidSettlementLayerForBatch(_chainId, _batchNumber, _proofData.settlementLayerChainId)
+        );
         bool isValid = IL1ChainAssetHandler(CHAIN_ASSET_HANDLER).isValidSettlementLayer(
             _chainId,
             _batchNumber,

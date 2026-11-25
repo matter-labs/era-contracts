@@ -16,6 +16,8 @@ error ChainBalanceBackfillNotPending(uint256 chainId);
 error ChainBalanceBackfillPending(uint256 chainId);
 // 0x40fddfd0
 error ChainBalanceExceeded(uint256 chainId, bytes32 assetId, uint256 totalWithdrawn, uint256 limit);
+// 0x90de73ed
+error ChainNotSettlingOnThisChain(uint256 chainId);
 // 0x066f53b1
 error EmptyToken();
 // 0xabd51c42

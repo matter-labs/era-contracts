@@ -379,3 +379,13 @@ struct TokenBridgingData {
     /// The address of the base token on the origin chain.
     address originToken;
 }
+
+/// @dev The contracts of a chain that sends and receives one-way bundles, as the destination chain knows them.
+/// See {protocol-docs/interop.md#counterpart-addressing}.
+/// @param interopCenter The contract whose messages are the source chain's bundles.
+/// @param assetRouter The source chain's asset router: the sender of its asset transfers and the target of
+/// transfers to it.
+struct InteropCounterparts {
+    address interopCenter;
+    address assetRouter;
+}

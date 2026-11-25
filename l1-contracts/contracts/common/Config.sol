@@ -337,3 +337,7 @@ uint32 constant MAX_VALIDATOR_TIMELOCK_EXECUTION_DELAY = 30 days;
 /// ecosystem into `L2InteropRootStorage`, such as an operator key or a light client the chain's admin trusts.
 /// See {protocol-docs/interop.md#interop-root-writers}.
 bytes32 constant INTEROP_ROOT_WRITERS_FEATURE = keccak256("InteropRootWriters");
+
+/// @dev The chain feature that lets a chain's admin register the interop counterparts of the chain's own L1, so that
+/// the chain executes one-way bundles sent from L1. See {protocol-docs/interop.md#one-way-bundles-from-an-l1}.
+bytes32 constant L1_TO_L2_INTEROP_FEATURE = keccak256("L1ToL2Interop");

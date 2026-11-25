@@ -14,10 +14,12 @@ import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 import {IL1MessageRoot} from "../message-root/IL1MessageRoot.sol";
 
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_ROOT_STORAGE_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
-import {INTEROP_ROOT_WRITERS_FEATURE, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
+import {INTEROP_ROOT_WRITERS_FEATURE, L1_TO_L2_INTEROP_FEATURE, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
+import {InteropCounterparts} from "../../common/Messaging.sol";
+import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {SEMVER_MINOR_OFFSET} from "../../common/libraries/SemVer.sol";
 
-import {Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
+import {Unauthorized, UnsupportedEncodingVersion, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {
     ChainFeaturesNotSupported,
     ChainHasNoBatchesInMessageRoot,
@@ -31,11 +33,15 @@ import {
 import {IL2Bridgehub} from "../bridgehub/IL2Bridgehub.sol";
 import {IL2InteropRootStorage} from "../../interop/IL2InteropRootStorage.sol";
 import {
+    ChainFeatureNotEnabled,
+    InteropCounterpartsNotSupported,
     InteropRootSourceAlreadyAssigned,
     InteropRootSourceInUse,
     InteropRootSourceNotAssigned,
+    InteropRootWriterNotSet,
     InteropRootWritersNotEnabled,
     InteropRootWritersNotSupported,
+    InvalidInteropCounterparts,
     InvalidInteropRootSource
 } from "../../interop/InteropErrors.sol";
 
@@ -49,12 +55,16 @@ uint256 constant CHAIN_FEATURES_MIN_PROTOCOL_VERSION = 36 << SEMVER_MINOR_OFFSET
 /// @dev The first protocol version, v0.36.0, whose `L2InteropRootStorage` has the interop root writers.
 uint256 constant INTEROP_ROOT_WRITERS_MIN_PROTOCOL_VERSION = 36 << SEMVER_MINOR_OFFSET;
 
+/// @dev The first protocol version, v0.37.0, whose `L2Bridgehub` has the interop counterparts.
+uint256 constant INTEROP_COUNTERPARTS_MIN_PROTOCOL_VERSION = 37 << SEMVER_MINOR_OFFSET;
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Registers chains on other chains' L2 Bridgehubs to enable interop between them, for the pairs
-/// the chain admins whitelisted, pushes each chain's features to its own L2 Bridgehub and its interop root writers to
-/// its own `L2InteropRootStorage`. See {protocol-docs/interop-gating.md#interop-peer-whitelist},
-/// {protocol-docs/interop-gating.md#chain-features} and {protocol-docs/interop.md#interop-root-writers}.
+/// the chain admins whitelisted, pushes each chain's features and interop counterparts to its own L2 Bridgehub and its
+/// interop root writers to its own `L2InteropRootStorage`. See {protocol-docs/interop-gating.md#interop-peer-whitelist},
+/// {protocol-docs/interop-gating.md#chain-features}, {protocol-docs/interop.md#interop-root-writers} and
+/// {protocol-docs/interop.md#counterpart-addressing}.
 contract ChainRegistrationSender is
     IChainRegistrationSender,
     IL1CrossChainSender,
@@ -81,6 +91,9 @@ contract ChainRegistrationSender is
 
     /// @inheritdoc IChainRegistrationSender
     mapping(uint256 sourceChainId => bool used) public isInteropRootSourceUsed;
+
+    /// @dev The counterparts last sent to each chain, see {interopCounterparts}.
+    mapping(uint256 chainId => mapping(uint256 sourceChainId => InteropCounterparts)) internal counterparts;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
@@ -204,6 +217,126 @@ contract ChainRegistrationSender is
     }
 
     /// @inheritdoc IChainRegistrationSender
+    function interopCounterparts(
+        uint256 _chainId,
+        uint256 _sourceChainId
+    ) external view returns (InteropCounterparts memory) {
+        return counterparts[_chainId][_sourceChainId];
+    }
+
+    /// @inheritdoc IChainRegistrationSender
+    function setL1InteropCounterparts(uint256 _chainId, bool _set) external nonReentrant {
+        (address zkChain, address chainAdmin) = _getChainAndAdmin(_chainId);
+        InteropCounterparts memory newCounterparts;
+        if (_set) {
+            require(msg.sender == chainAdmin, Unauthorized(msg.sender));
+            require(
+                isChainFeatureEnabled[_chainId][L1_TO_L2_INTEROP_FEATURE],
+                ChainFeatureNotEnabled(L1_TO_L2_INTEROP_FEATURE)
+            );
+            newCounterparts.assetRouter = address(BRIDGE_HUB.assetRouter());
+            newCounterparts.interopCenter = IL1AssetRouter(newCounterparts.assetRouter).l1InteropCenter();
+            require(newCounterparts.interopCenter != address(0), ZeroAddress());
+        } else {
+            _requireChainAdminOrGovernance(chainAdmin);
+        }
+        _sendInteropCounterparts(zkChain, _chainId, block.chainid, newCounterparts);
+    }
+
+    /// @inheritdoc IChainRegistrationSender
+    function setInteropCounterparts(
+        uint256 _chainId,
+        uint256 _sourceChainId,
+        address _interopCenter,
+        address _assetRouter
+    ) external nonReentrant {
+        (address zkChain, address chainAdmin) = _getChainAndAdmin(_chainId);
+        require(
+            (_interopCenter == address(0)) == (_assetRouter == address(0)),
+            InvalidInteropCounterparts(_interopCenter, _assetRouter)
+        );
+        if (_interopCenter != address(0)) {
+            require(msg.sender == chainAdmin, Unauthorized(msg.sender));
+            // The chain needs the source's roots to execute its bundles, and only a writer brings them.
+            require(
+                interopRootWriter[_chainId][_sourceChainId] != address(0),
+                InteropRootWriterNotSet(_chainId, _sourceChainId)
+            );
+            _useInteropRootSource(_chainId, _sourceChainId);
+        } else {
+            _requireChainAdminOrGovernance(chainAdmin);
+        }
+        _sendInteropCounterparts(
+            zkChain,
+            _chainId,
+            _sourceChainId,
+            InteropCounterparts({interopCenter: _interopCenter, assetRouter: _assetRouter})
+        );
+    }
+
+    /// @dev Returns the chain's diamond and its admin; reverts for a chain the Bridgehub does not know.
+    function _getChainAndAdmin(uint256 _chainId) internal view returns (address zkChain, address chainAdmin) {
+        zkChain = BRIDGE_HUB.getZKChain(_chainId);
+        require(zkChain != address(0), ZKChainNotRegistered());
+        chainAdmin = IGetters(zkChain).getAdmin();
+    }
+
+    /// @dev Removals are also open to the owner and to the Bridgehub admin.
+    function _requireChainAdminOrGovernance(address _chainAdmin) internal view {
+        require(
+            msg.sender == _chainAdmin || msg.sender == owner() || msg.sender == BRIDGE_HUB.admin(),
+            Unauthorized(msg.sender)
+        );
+    }
+
+    /// @dev Only the owner and the Bridgehub admin decide what the ecosystem as a whole depends on.
+    function _requireGovernance() internal view {
+        require(msg.sender == owner() || msg.sender == BRIDGE_HUB.admin(), Unauthorized(msg.sender));
+    }
+
+    /// @dev Checks that `_chainId` may have a writer and counterparts for `_sourceChainId`, and makes the source's
+    /// assignment to it permanent. See {protocol-docs/interop.md#interop-root-writers}.
+    function _useInteropRootSource(uint256 _chainId, uint256 _sourceChainId) internal {
+        require(isChainFeatureEnabled[_chainId][INTEROP_ROOT_WRITERS_FEATURE], InteropRootWritersNotEnabled());
+        require(
+            interopRootSourceChain[_sourceChainId] == _chainId,
+            InteropRootSourceNotAssigned(_chainId, _sourceChainId)
+        );
+        if (!isInteropRootSourceUsed[_sourceChainId]) {
+            isInteropRootSourceUsed[_sourceChainId] = true;
+            emit InteropRootSourceUsed(_sourceChainId, _chainId);
+        }
+    }
+
+    /// @dev Records the counterparts of `_sourceChainId` for `_chainId` and sends them to the chain's L2 Bridgehub.
+    function _sendInteropCounterparts(
+        address _zkChain,
+        uint256 _chainId,
+        uint256 _sourceChainId,
+        InteropCounterparts memory _counterparts
+    ) internal {
+        // The chain's L2 runs its upgrade transaction before this service transaction, so a chain that reports the
+        // version already has the setter on L2.
+        uint256 protocolVersion = IGetters(_zkChain).getProtocolVersion();
+        require(
+            protocolVersion >= INTEROP_COUNTERPARTS_MIN_PROTOCOL_VERSION,
+            InteropCounterpartsNotSupported(_chainId, protocolVersion)
+        );
+
+        counterparts[_chainId][_sourceChainId] = _counterparts;
+        emit InteropCounterpartsSet(_chainId, _sourceChainId, _counterparts.interopCenter, _counterparts.assetRouter);
+
+        // slither-disable-next-line unused-return
+        IMailbox(_zkChain).requestL2ServiceTransaction(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeCall(
+                IL2Bridgehub.setInteropCounterparts,
+                (_sourceChainId, _counterparts.interopCenter, _counterparts.assetRouter)
+            )
+        );
+    }
+
+    /// @inheritdoc IChainRegistrationSender
     // The call to the ZK chain precedes the next pair's write; the function is `nonReentrant`.
     // slither-disable-next-line reentrancy-no-eth
     function deregisterInteropPairs(
@@ -289,33 +422,6 @@ contract ChainRegistrationSender is
             BRIDGE_HUB.settlementLayer(_peerChainId) == _chainId
         ) {
             revert InvalidInteropPeer(_chainId, _peerChainId);
-        }
-    }
-
-    /// @dev Only the owner and the Bridgehub admin decide what the ecosystem as a whole depends on.
-    function _requireGovernance() internal view {
-        require(msg.sender == owner() || msg.sender == BRIDGE_HUB.admin(), Unauthorized(msg.sender));
-    }
-
-    /// @dev Removals are also open to the owner and to the Bridgehub admin.
-    function _requireChainAdminOrGovernance(address _chainAdmin) internal view {
-        require(
-            msg.sender == _chainAdmin || msg.sender == owner() || msg.sender == BRIDGE_HUB.admin(),
-            Unauthorized(msg.sender)
-        );
-    }
-
-    /// @dev Checks that `_chainId` may have a writer for `_sourceChainId`, and makes the source's assignment to it
-    /// permanent. See {protocol-docs/interop.md#interop-root-writers}.
-    function _useInteropRootSource(uint256 _chainId, uint256 _sourceChainId) internal {
-        require(isChainFeatureEnabled[_chainId][INTEROP_ROOT_WRITERS_FEATURE], InteropRootWritersNotEnabled());
-        require(
-            interopRootSourceChain[_sourceChainId] == _chainId,
-            InteropRootSourceNotAssigned(_chainId, _sourceChainId)
-        );
-        if (!isInteropRootSourceUsed[_sourceChainId]) {
-            isInteropRootSourceUsed[_sourceChainId] = true;
-            emit InteropRootSourceUsed(_sourceChainId, _chainId);
         }
     }
 

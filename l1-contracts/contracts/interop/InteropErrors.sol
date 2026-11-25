@@ -17,6 +17,8 @@ error CallNotExecutable(bytes32 bundleHash, uint256 callIndex);
 error CannotInitiateInteropOnL1();
 // 0xf729f26d
 error CanNotUnbundle(bytes32 bundleHash);
+// 0x99be92a3
+error ChainFeatureNotEnabled(bytes32 feature);
 // 0x23b449be
 error DestinationChainNotAllowed(uint256 destinationChainId);
 // 0x2d159f39
@@ -39,6 +41,12 @@ error IndirectCallValueMismatch(uint256 expected, uint256 actual);
 error InteropBundleSaltAlreadyUsed(address user, bytes32 salt);
 // 0xd9b009c7
 error InteropCallToL1NotToAssetRouter(address target);
+// 0x9c86555d
+error InteropCounterpartsConflict(uint256 chainId);
+// 0xddfef0ad
+error InteropCounterpartsNotSet(uint256 chainId);
+// 0x0aabb78d
+error InteropCounterpartsNotSupported(uint256 chainId, uint256 protocolVersion);
 // 0xfe8b1b16
 error InteroperableAddressChainReferenceNotEmpty(bytes interoperableAddress);
 // 0x884f49ba
@@ -55,6 +63,8 @@ error InteropRootSourceInUse(uint256 sourceChainId, uint256 assignedToChainId);
 error InteropRootSourceNotAssigned(uint256 chainId, uint256 sourceChainId);
 // 0x8a011102
 error InteropRootTimestampIsZero();
+// 0x54936b89
+error InteropRootWriterNotSet(uint256 chainId, uint256 sourceChainId);
 // 0x3cebbbfd
 error InteropRootWritersNotEnabled();
 // 0x97c3045a
@@ -65,6 +75,8 @@ error InteropToSelfNotSupported();
 error InvalidInteropBundleVersion();
 // 0xd5f13973
 error InvalidInteropCallVersion();
+// 0x251310fd
+error InvalidInteropCounterparts(address interopCenter, address assetRouter);
 // 0xc8fed078
 error InvalidInteropRootSource(uint256 sourceChainId);
 // 0x32c2e156
@@ -75,6 +87,24 @@ error MultiCallToL1NotSupported(uint256 callCount);
 error NonAtomicSendUnsupported();
 // 0xd72e81d8
 error NonZeroValueToL1NotSupported(uint256 value);
+// 0x6f5d3620
+error NotSettlingOnL1(uint256 settlementLayerChainId);
+// 0x1c6cf858
+error OneWayAssetOriginNotAllowed(uint256 chainId, bytes32 assetId, uint256 originChainId);
+// 0x6f0fa85a
+error OneWayBundleAttributeNotSupported(bytes4 selector);
+// 0x7df64077
+error OneWayBundleNotSingleCall(uint256 callCount);
+// 0xd46f1fda
+error OneWayCallNotIndirect();
+// 0xd82724d8
+error OneWayCallNotToAssetRouter(address target);
+// 0x1074c1c0
+error OneWayCallValueNotZero(uint256 value);
+// 0x294a8348
+error ProofNotSelfRooted(uint256 chainId, uint256 settlementLayerChainId);
+// 0xb0321c67
+error RecoveryToOneWayDestinationNotSupported(uint256 chainId);
 // 0xce834c7b
 error SettlementLayerIsWriterSource(uint256 settlementLayerChainId, uint256 chainId);
 // 0x5af78ecd
@@ -85,6 +115,8 @@ error SidesLengthNotOne();
 error UnauthorizedMessageSender(address expected, address actual);
 // 0x0345c281
 error UnbundlingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes unbundlerAddress);
+// 0x1ef20f93
+error WriterRootNotCurrent(uint256 chainId, uint256 blockNumber);
 // 0x801534e9
 error WrongCallStatusLength(uint256 bundleCallsLength, uint256 providedCallStatusLength);
 // 0xb99d46dc

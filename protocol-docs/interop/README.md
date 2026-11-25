@@ -8,6 +8,9 @@ ZKsync interop sends calls and assets from an L2 source chain to another chain t
   flow is proven committed before its deadline.
 - L2 -> L1 bundles are non-atomic, single-call asset withdrawals. The bundle is published as an
   L2 -> L1 message and executed by `L1InteropHandler` after a message-inclusion proof.
+- From v37, an L1 sends the same kind of bundle to a chain that settles on it, and a chain exchanges
+  them with a chain whose roots an interop root writer brings. These one-way bundles are off until a
+  chain opts in: {protocol-docs/interop.md#one-way-bundles}.
 
 There is no public non-atomic L2 -> L2 path, no trigger object, no automatic-execution account, and no
 aliased account in this protocol version. Relayers or users submit execution proofs directly to the

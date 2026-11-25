@@ -5,6 +5,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
+import {L1InteropCenter} from "contracts/interop/L1InteropCenter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
@@ -38,6 +39,12 @@ contract DeployL1CoreUtils is DeployUtils {
     Config public config;
     // Note: This variable is populated during deployment by concrete implementations
     CoreDeployedAddresses internal coreAddresses; //slither-disable-line uninitialized-state
+
+    /// @notice The contracts that send one-way bundles from L1, see
+    /// {protocol-docs/interop.md#one-way-bundles-from-an-l1}.
+    address internal interopAttributeParser;
+    address internal l1InteropCenterImplementation;
+    address internal l1InteropCenterProxy;
 
     //slither-disable-next-line reentrancy-benign
     function initializeConfig(string memory configPath) public virtual {
@@ -91,6 +98,10 @@ contract DeployL1CoreUtils is DeployUtils {
             return abi.encode(coreAddresses.bridgehub.proxies.bridgehub, coreAddresses.bridgehub.proxies.messageRoot);
         } else if (compareStrings(contractName, "L1InteropHandler")) {
             return abi.encode(coreAddresses.bridgehub.proxies.messageRoot, coreAddresses.bridges.proxies.l1AssetRouter);
+        } else if (compareStrings(contractName, "InteropAttributeParser")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "L1InteropCenter")) {
+            return abi.encode(coreAddresses.bridgehub.proxies.bridgehub, interopAttributeParser);
         } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
             return abi.encode(config.ownerAddress, coreAddresses.bridgehub.proxies.bridgehub);
         } else if (compareStrings(contractName, "L1AssetRouter")) {
@@ -146,6 +157,8 @@ contract DeployL1CoreUtils is DeployUtils {
             return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress));
         } else if (compareStrings(contractName, "L1InteropHandler")) {
             return abi.encodeCall(L1InteropHandler.initialize, (config.deployerAddress));
+        } else if (compareStrings(contractName, "L1InteropCenter")) {
+            return abi.encodeCall(L1InteropCenter.initialize, (config.deployerAddress));
         } else if (compareStrings(contractName, "L1AssetRouter")) {
             return abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
         } else if (compareStrings(contractName, "L1NativeTokenVault")) {

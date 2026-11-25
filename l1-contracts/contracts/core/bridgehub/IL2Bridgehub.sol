@@ -3,11 +3,15 @@
 pragma solidity ^0.8.21;
 
 import {IBridgehubBase} from "./IBridgehubBase.sol";
+import {InteropCounterparts} from "../../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Interface for L2-specific Bridgehub functionality
 interface IL2Bridgehub is IBridgehubBase {
+    /// @notice The interop counterparts of `chainId` were set; zero addresses remove them.
+    event InteropCounterpartsSet(uint256 indexed chainId, address interopCenter, address assetRouter);
+
     /// @notice Set addresses
     // function setAddresses(
     //     address _assetRouter,
@@ -42,4 +46,20 @@ interface IL2Bridgehub is IBridgehubBase {
     /// @param _feature The feature id.
     /// @param _enabled Whether the feature is enabled.
     function setChainFeatureEnabled(bytes32 _feature, bool _enabled) external;
+
+    /// @notice The chain id of the L1 at the base of this chain's ecosystem.
+    // solhint-disable-next-line func-name-mixedcase
+    function L1_CHAIN_ID() external view returns (uint256);
+
+    /// @notice The interop counterparts of `_chainId`: zero unless this chain exchanges one-way bundles with it.
+    /// See {protocol-docs/interop.md#counterpart-addressing}.
+    /// @param _chainId The chain id of L1 or of a chain whose roots come from an interop root writer.
+    function interopCounterparts(uint256 _chainId) external view returns (InteropCounterparts memory);
+
+    /// @notice Sets or removes (zero addresses) the interop counterparts of `_chainId`. Called by the L1
+    /// `ChainRegistrationSender`. See {protocol-docs/interop.md#counterpart-addressing}.
+    /// @param _chainId The chain id of L1 or of a chain whose roots come from an interop root writer.
+    /// @param _interopCenter The chain's interop center, or zero.
+    /// @param _assetRouter The chain's asset router, or zero.
+    function setInteropCounterparts(uint256 _chainId, address _interopCenter, address _assetRouter) external;
 }

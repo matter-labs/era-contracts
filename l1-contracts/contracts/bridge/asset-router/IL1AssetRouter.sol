@@ -7,7 +7,7 @@ import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {IL1CrossChainSender} from "../interfaces/IL1CrossChainSender.sol";
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
-import {TxStatus} from "../../common/Messaging.sol";
+import {InteropCallStarter, TxStatus} from "../../common/Messaging.sol";
 
 /// @title L1 Asset Router interface
 /// @author Matter Labs
@@ -15,6 +15,9 @@ import {TxStatus} from "../../common/Messaging.sol";
 /// @notice The L1 side of asset routing. See {protocol-docs/bridging.md#asset-routing-burn--mint}.
 interface IL1AssetRouter is IAssetRouterBase, IL1CrossChainSender {
     event ClaimedFailedDepositAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
+
+    /// @notice The L1 interop center was set.
+    event L1InteropCenterSet(address indexed l1InteropCenter);
 
     function L1_NULLIFIER() external view returns (IL1Nullifier);
 
@@ -31,6 +34,27 @@ interface IL1AssetRouter is IAssetRouterBase, IL1CrossChainSender {
     function setNativeTokenVault(INativeTokenVaultBase _nativeTokenVault) external;
 
     function setL1InteropHandler(address _l1InteropHandler) external;
+
+    /// @notice The L1 interop center, the only caller of {initiateIndirectCall}.
+    function l1InteropCenter() external view returns (address);
+
+    /// @notice Sets the L1 interop center. Callable by the owner and by the upgrade authority. It can be replaced:
+    /// see {protocol-docs/interop.md#replacing-the-counterparts}.
+    /// @param _l1InteropCenter The address of the L1 interop center.
+    function setL1InteropCenter(address _l1InteropCenter) external;
+
+    /// @notice Burns or locks an asset for a chain that settles on this chain and returns the call that mints it
+    /// there, for a one-way bundle of the L1 interop center. Never the destination's base token, and no value.
+    /// See {protocol-docs/interop.md#one-way-bundles-from-an-l1}.
+    /// @param _chainId The destination chain.
+    /// @param _originalCaller The sender of the bundle, whose asset is taken.
+    /// @param _data The same data as the second-bridge data of an asset deposit through the Bridgehub.
+    /// @return interopCallStarter The call to the destination chain's asset router.
+    function initiateIndirectCall(
+        uint256 _chainId,
+        address _originalCaller,
+        bytes calldata _data
+    ) external returns (InteropCallStarter memory interopCallStarter);
 
     /// @notice Confirms the result of an initiated deposit, dispatching it to the asset handler
     /// (on failure the deposited funds are disbursed back to the depositor).

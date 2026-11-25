@@ -2,15 +2,48 @@
 
 pragma solidity ^0.8.24;
 
-import {L2_BASE_TOKEN_HOLDER, L2_NATIVE_TOKEN_VAULT} from "../../common/l2-helpers/L2ContractInterfaces.sol";
-import {L2_ATOMIC_FLOW_MANAGER_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_BASE_TOKEN_HOLDER,
+    L2_INTEROP_ROOT_STORAGE,
+    L2_MESSAGE_VERIFICATION,
+    L2_NATIVE_TOKEN_VAULT,
+    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
+} from "../../common/l2-helpers/L2ContractInterfaces.sol";
+import {
+    L2_ASSET_ROUTER_ADDR,
+    L2_ATOMIC_FLOW_MANAGER_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR
+} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {InteropHandlerBase} from "./InteropHandlerBase.sol";
 import {V31_INTEROP_HANDLER_L1_CHAIN_ID_SLOT} from "../InteropConstants.sol";
 import {IL2InteropHandler} from "./IL2InteropHandler.sol";
 import {IAtomicFlowManager} from "../../atomic-interop/IAtomicFlowManager.sol";
 import {AtomicFinalityProof} from "../../atomic-interop/IAtomicInterop.sol";
-import {BundleStatus, InteropBundle} from "../../common/Messaging.sol";
+import {
+    BUNDLE_IDENTIFIER,
+    BundleStatus,
+    InteropBundle,
+    InteropCall,
+    L2Message,
+    MessageInclusionProof
+} from "../../common/Messaging.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
+import {INTEROP_ROOT_WRITERS_FEATURE, L1_TO_L2_INTEROP_FEATURE} from "../../common/Config.sol";
+import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
+import {IL2Bridgehub} from "../../core/bridgehub/IL2Bridgehub.sol";
+import {
+    ChainFeatureNotEnabled,
+    InteropCounterpartsNotSet,
+    MessageNotIncluded,
+    NotSettlingOnL1,
+    OneWayBundleNotSingleCall,
+    OneWayCallNotToAssetRouter,
+    OneWayCallValueNotZero,
+    ProofNotSelfRooted,
+    UnauthorizedMessageSender,
+    WriterRootNotCurrent
+} from "../InteropErrors.sol";
 
 /// @title L2InteropHandler
 /// @author Matter Labs
@@ -18,7 +51,8 @@ import {Unauthorized} from "../../common/L1ContractErrors.sol";
 /// @dev L2 system contract that serves as the entry-point for executing, verifying and unbundling interop bundles.
 /// The generic bundle logic lives in `InteropHandlerBase`; this contract wires in the L2 system-contract
 /// behaviour and the **atomic** execution model: L2->L2 interop is proven via the AtomicFlowManager's IMT
-/// (`AtomicFinalityProof`), not via L1 message inclusion (public L2->L2 interop was removed).
+/// (`AtomicFinalityProof`), not via L1 message inclusion (public L2->L2 interop was removed). The one exception is
+/// {executeBundle}, for one-way bundles of the chains this chain has interop counterparts for.
 contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
     /// @dev Only allows calls from the complex upgrader contract on L2.
     modifier onlyUpgrader() {
@@ -89,6 +123,84 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
         IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).requireFlowFinalized(bundleHash, _finality);
 
         _markVerified(bundleHash);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        One-way bundle execution
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IL2InteropHandler
+    function executeBundle(bytes calldata _bundle, MessageInclusionProof calldata _proof) external override {
+        (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
+
+        _validateExecutable(bundleHash, interopBundle, status);
+        _validateVerifiable(bundleHash, interopBundle, _proof.chainId, status);
+        bool sourceIsL1 = _checkOneWaySource(_proof.chainId, _proof.message.sender);
+
+        require(interopBundle.calls.length == 1, OneWayBundleNotSingleCall(interopBundle.calls.length));
+        InteropCall memory interopCall = interopBundle.calls[0];
+        require(interopCall.to == L2_ASSET_ROUTER_ADDR, OneWayCallNotToAssetRouter(interopCall.to));
+        require(interopCall.value == 0, OneWayCallValueNotZero(interopCall.value));
+
+        require(
+            L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared({
+                _chainId: _proof.chainId,
+                _blockOrBatchNumber: _proof.l1BatchNumber,
+                _index: _proof.l2MessageIndex,
+                // The proven data is the bundle being executed, whatever data the proof carries.
+                _message: L2Message({
+                    txNumberInBatch: _proof.message.txNumberInBatch,
+                    sender: _proof.message.sender,
+                    data: bytes.concat(BUNDLE_IDENTIFIER, _bundle)
+                }),
+                _proof: _proof.proof
+            }),
+            MessageNotIncluded()
+        );
+        _checkProofRoot(_proof.chainId, _proof.proof, sourceIsL1);
+
+        _markFullyExecutedAndRun(bundleHash, interopBundle);
+    }
+
+    /// @dev Reverts unless the proof, already verified, ends at a root of `_sourceChainId` itself that still counts.
+    /// See {protocol-docs/interop.md#executing-a-one-way-bundle-on-an-l2}.
+    function _checkProofRoot(uint256 _sourceChainId, bytes32[] calldata _proof, bool _sourceIsL1) internal view {
+        MessageHashing.SettlementLayerReference memory root = MessageHashing.readSettlementLayerReference(_proof);
+        require(
+            root.settlementLayerChainId == _sourceChainId,
+            ProofNotSelfRooted(_sourceChainId, root.settlementLayerChainId)
+        );
+        if (!_sourceIsL1) {
+            require(
+                L2_INTEROP_ROOT_STORAGE.isCurrentWriterRoot(_sourceChainId, root.settlementLayerBatchNumber),
+                WriterRootNotCurrent(_sourceChainId, root.settlementLayerBatchNumber)
+            );
+        }
+    }
+
+    /// @dev Reverts unless this chain has interop counterparts for `_sourceChainId`, the feature behind them is still
+    /// enabled, and `_messageSender` is the source's interop center.
+    /// @return sourceIsL1 Whether the source is the chain's L1, rather than a writer's source chain.
+    function _checkOneWaySource(
+        uint256 _sourceChainId,
+        address _messageSender
+    ) internal view returns (bool sourceIsL1) {
+        IL2Bridgehub bridgehub = IL2Bridgehub(L2_BRIDGEHUB_ADDR);
+        address interopCenter = bridgehub.interopCounterparts(_sourceChainId).interopCenter;
+        require(interopCenter != address(0), InteropCounterpartsNotSet(_sourceChainId));
+
+        uint256 l1ChainId = bridgehub.L1_CHAIN_ID();
+        sourceIsL1 = _sourceChainId == l1ChainId;
+        bytes32 feature = sourceIsL1 ? L1_TO_L2_INTEROP_FEATURE : INTEROP_ROOT_WRITERS_FEATURE;
+        require(bridgehub.isChainFeatureEnabled(feature), ChainFeatureNotEnabled(feature));
+        if (sourceIsL1) {
+            // A bundle of L1 mints like a deposit, which the asset tracker counts only while the chain settles on
+            // L1. See {protocol-docs/bridging.md#one-way-bundles-and-the-deposit-accounting}.
+            uint256 settlementLayerChainId = L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId();
+            require(settlementLayerChainId == l1ChainId, NotSettlingOnL1(settlementLayerChainId));
+        }
+
+        require(_messageSender == interopCenter, UnauthorizedMessageSender(interopCenter, _messageSender));
     }
 
     /*//////////////////////////////////////////////////////////////

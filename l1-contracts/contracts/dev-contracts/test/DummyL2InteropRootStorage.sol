@@ -19,6 +19,13 @@ contract DummyL2InteropRootStorage {
     /// timestamp over all imported roots per chain.
     mapping(uint256 chainId => uint256 timestamp) public latestInteropRootTimestamp;
 
+    /// @notice Mirrors `L2InteropRootStorage.isWriterSource`; set directly through {setWriterSource}.
+    mapping(uint256 chainId => bool everHadWriter) public isWriterSource;
+
+    function setWriterSource(uint256 chainId, bool everHadWriter) external {
+        isWriterSource[chainId] = everHadWriter;
+    }
+
     function interopRoots(uint256 chainId, uint256 batchNumber) external view returns (StoredInteropRoot memory) {
         return storedInteropRoots[chainId][batchNumber];
     }

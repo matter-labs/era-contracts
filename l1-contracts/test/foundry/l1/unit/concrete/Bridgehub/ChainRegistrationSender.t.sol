@@ -9,6 +9,7 @@ import {
     CHAIN_FEATURES_MIN_PROTOCOL_VERSION,
     CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION,
     ChainRegistrationSender,
+    INTEROP_COUNTERPARTS_MIN_PROTOCOL_VERSION,
     INTEROP_ROOT_WRITERS_MIN_PROTOCOL_VERSION
 } from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {IChainRegistrationSender} from "contracts/core/chain-registration/IChainRegistrationSender.sol";
@@ -19,17 +20,27 @@ import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_ROOT_STORAGE_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {INTEROP_ROOT_WRITERS_FEATURE, TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
+import {
+    INTEROP_ROOT_WRITERS_FEATURE,
+    L1_TO_L2_INTEROP_FEATURE,
+    TWO_BRIDGES_MAGIC_VALUE
+} from "contracts/common/Config.sol";
+import {InteropCounterparts} from "contracts/common/Messaging.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL2InteropRootStorage} from "contracts/interop/IL2InteropRootStorage.sol";
 import {
+    ChainFeatureNotEnabled,
+    InteropCounterpartsNotSupported,
     InteropRootSourceAlreadyAssigned,
     InteropRootSourceInUse,
     InteropRootSourceNotAssigned,
+    InteropRootWriterNotSet,
     InteropRootWritersNotEnabled,
     InteropRootWritersNotSupported,
+    InvalidInteropCounterparts,
     InvalidInteropRootSource
 } from "contracts/interop/InteropErrors.sol";
-import {Unauthorized, UnsupportedEncodingVersion} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized, UnsupportedEncodingVersion, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {
     ChainFeaturesNotSupported,
     ChainHasNoBatchesInMessageRoot,
@@ -675,7 +686,7 @@ contract ChainRegistrationSenderUnitTest is Test {
         vm.mockCall(
             peer,
             abi.encodeCall(IGetters.getProtocolVersion, ()),
-            abi.encode(INTEROP_ROOT_WRITERS_MIN_PROTOCOL_VERSION)
+            abi.encode(INTEROP_COUNTERPARTS_MIN_PROTOCOL_VERSION)
         );
         vm.prank(owner);
         sender.setChainFeatureEnabled(PEER_CHAIN_ID, INTEROP_ROOT_WRITERS_FEATURE, true);
@@ -804,19 +815,26 @@ contract ChainRegistrationSenderUnitTest is Test {
         assertEq(sender.interopRootWriter(PEER_CHAIN_ID, SOURCE_CHAIN_ID), makeAddr("peerWriter"));
     }
 
-    /// @notice An assignment the chain used is never undone, even after the chain removed its writer: the tokens the
-    /// chain minted from the source's roots outlive it, and a second chain backing the same asset ids would have to
-    /// honour them.
+    /// @notice An assignment the chain used is never undone, in whatever order the chain removes its writer and its
+    /// counterparts afterwards: the tokens the chain minted from the source's roots outlive both, and a second
+    /// chain backing the same asset ids would have to honour them.
     function test_releaseInteropRootSource_revertWhen_used() public {
-        _enableInteropRootWriters();
+        _setWriterAndV37();
         address ecosystemAdmin = makeAddr("ecosystemAdmin");
         _mockBridgehubAdmin(ecosystemAdmin);
-        vm.prank(chainAdmin);
-        sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("writer"));
 
+        // With a writer only.
         _expectReleaseRefused(owner);
         vm.prank(chainAdmin);
+        sender.setInteropCounterparts(CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("center"), makeAddr("router"));
+        _expectReleaseRefused(owner);
+        // With counterparts only.
+        vm.prank(chainAdmin);
         sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, address(0));
+        _expectReleaseRefused(ecosystemAdmin);
+        // With neither any more.
+        vm.prank(chainAdmin);
+        sender.setInteropCounterparts(CHAIN_ID, SOURCE_CHAIN_ID, address(0), address(0));
         _expectReleaseRefused(owner);
         _expectReleaseRefused(ecosystemAdmin);
 
@@ -840,5 +858,245 @@ contract ChainRegistrationSenderUnitTest is Test {
         vm.prank(_caller);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, _caller));
         sender.releaseInteropRootSource(SOURCE_CHAIN_ID);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        Interop counterparts
+    //////////////////////////////////////////////////////////////*/
+
+    address internal l1AssetRouter = makeAddr("l1AssetRouter");
+    address internal l1InteropCenter = makeAddr("l1InteropCenter");
+
+    function _mockL1InteropCenter(address _l1InteropCenter) internal {
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.assetRouter, ()), abi.encode(l1AssetRouter));
+        vm.mockCall(l1AssetRouter, abi.encodeCall(IL1AssetRouter.l1InteropCenter, ()), abi.encode(_l1InteropCenter));
+    }
+
+    function _enableL1ToL2Interop() internal {
+        _mockL1InteropCenter(l1InteropCenter);
+        _mockProtocolVersion(INTEROP_COUNTERPARTS_MIN_PROTOCOL_VERSION);
+        vm.prank(owner);
+        sender.setChainFeatureEnabled(CHAIN_ID, L1_TO_L2_INTEROP_FEATURE, true);
+    }
+
+    function _expectCounterpartsPush(uint256 _sourceChainId, address _interopCenter, address _assetRouter) internal {
+        vm.expectEmit(true, true, false, true, address(sender));
+        emit IChainRegistrationSender.InteropCounterpartsSet(CHAIN_ID, _sourceChainId, _interopCenter, _assetRouter);
+        vm.expectCall(
+            chain,
+            abi.encodeCall(
+                IMailbox.requestL2ServiceTransaction,
+                (
+                    L2_BRIDGEHUB_ADDR,
+                    abi.encodeCall(IL2Bridgehub.setInteropCounterparts, (_sourceChainId, _interopCenter, _assetRouter))
+                )
+            )
+        );
+    }
+
+    function _assertCounterparts(uint256 _sourceChainId, address _interopCenter, address _assetRouter) internal view {
+        InteropCounterparts memory stored = sender.interopCounterparts(CHAIN_ID, _sourceChainId);
+        assertEq(stored.interopCenter, _interopCenter);
+        assertEq(stored.assetRouter, _assetRouter);
+    }
+
+    /// @notice The counterparts of L1 are this L1's own interop center and asset router: the caller supplies no
+    /// address.
+    function test_setL1InteropCounterparts_byChainAdmin() public {
+        _enableL1ToL2Interop();
+
+        _expectCounterpartsPush(block.chainid, l1InteropCenter, l1AssetRouter);
+        vm.prank(chainAdmin);
+        sender.setL1InteropCounterparts(CHAIN_ID, true);
+
+        _assertCounterparts(block.chainid, l1InteropCenter, l1AssetRouter);
+        InteropCounterparts memory peerSide = sender.interopCounterparts(PEER_CHAIN_ID, block.chainid);
+        assertEq(peerSide.interopCenter, address(0), "only the chain's own side");
+    }
+
+    /// @notice The ecosystem decides which chains execute bundles of L1: without the chain feature, the admin can't.
+    function test_setL1InteropCounterparts_revertWhen_featureNotEnabled() public {
+        _mockL1InteropCenter(l1InteropCenter);
+        _mockProtocolVersion(INTEROP_COUNTERPARTS_MIN_PROTOCOL_VERSION);
+        vm.prank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(ChainFeatureNotEnabled.selector, L1_TO_L2_INTEROP_FEATURE));
+        sender.setL1InteropCounterparts(CHAIN_ID, true);
+    }
+
+    /// @notice The chain's admin opts its chain in; the ecosystem can only remove the counterparts.
+    function test_setL1InteropCounterparts_revertWhen_ownerSets() public {
+        _enableL1ToL2Interop();
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, owner));
+        sender.setL1InteropCounterparts(CHAIN_ID, true);
+    }
+
+    function test_setL1InteropCounterparts_revertWhen_l1HasNoInteropCenter() public {
+        _enableL1ToL2Interop();
+        _mockL1InteropCenter(address(0));
+        vm.prank(chainAdmin);
+        vm.expectRevert(ZeroAddress.selector);
+        sender.setL1InteropCounterparts(CHAIN_ID, true);
+    }
+
+    /// @notice The counterparts ship in v0.37.0: on an older chain neither setting nor removing them reaches the L2.
+    function test_setL1InteropCounterparts_revertWhen_protocolVersionBelowV37() public {
+        assertEq(INTEROP_COUNTERPARTS_MIN_PROTOCOL_VERSION, 0x2500000000, "v0.37.0");
+        _enableL1ToL2Interop();
+        uint256 oldVersion = INTEROP_COUNTERPARTS_MIN_PROTOCOL_VERSION - 1;
+        _mockProtocolVersion(oldVersion);
+
+        bool[2] memory set = [true, false];
+        for (uint256 i = 0; i < set.length; ++i) {
+            vm.prank(chainAdmin);
+            vm.expectRevert(abi.encodeWithSelector(InteropCounterpartsNotSupported.selector, CHAIN_ID, oldVersion));
+            sender.setL1InteropCounterparts(CHAIN_ID, set[i]);
+        }
+        _assertCounterparts(block.chainid, address(0), address(0));
+    }
+
+    function test_setL1InteropCounterparts_removalByOwnerBridgehubAdminOrChainAdmin() public {
+        _enableL1ToL2Interop();
+        address ecosystemAdmin = makeAddr("ecosystemAdmin");
+        _mockBridgehubAdmin(ecosystemAdmin);
+        address[3] memory removers = [owner, ecosystemAdmin, chainAdmin];
+        for (uint256 i = 0; i < removers.length; ++i) {
+            vm.prank(chainAdmin);
+            sender.setL1InteropCounterparts(CHAIN_ID, true);
+
+            _expectCounterpartsPush(block.chainid, address(0), address(0));
+            vm.prank(removers[i]);
+            sender.setL1InteropCounterparts(CHAIN_ID, false);
+            _assertCounterparts(block.chainid, address(0), address(0));
+        }
+    }
+
+    function testFuzz_setL1InteropCounterparts_revertWhen_strangerRemoves(address _caller) public {
+        _mockBridgehubAdmin(makeAddr("ecosystemAdmin"));
+        vm.assume(_caller != owner && _caller != chainAdmin && _caller != makeAddr("ecosystemAdmin"));
+        vm.assume(_caller != makeAddr("proxyAdmin"));
+        vm.prank(_caller);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, _caller));
+        sender.setL1InteropCounterparts(CHAIN_ID, false);
+    }
+
+    function test_setL1InteropCounterparts_revertWhen_chainNotRegistered() public {
+        vm.expectRevert(ZKChainNotRegistered.selector);
+        sender.setL1InteropCounterparts(UNREGISTERED_CHAIN_ID, true);
+    }
+
+    function _setWriterAndV37() internal {
+        _enableInteropRootWriters();
+        _mockProtocolVersion(INTEROP_COUNTERPARTS_MIN_PROTOCOL_VERSION);
+        vm.prank(chainAdmin);
+        sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("writer"));
+    }
+
+    /// @notice A chain whose roots come from a writer gets the counterparts its chain admin names.
+    function test_setInteropCounterparts_byChainAdmin() public {
+        _setWriterAndV37();
+        address center = makeAddr("sourceCenter");
+        address router = makeAddr("sourceRouter");
+
+        _expectCounterpartsPush(SOURCE_CHAIN_ID, center, router);
+        vm.prank(chainAdmin);
+        sender.setInteropCounterparts(CHAIN_ID, SOURCE_CHAIN_ID, center, router);
+        _assertCounterparts(SOURCE_CHAIN_ID, center, router);
+
+        // The counterparts can be replaced: a new interop center on the source needs it.
+        address newCenter = makeAddr("newSourceCenter");
+        _expectCounterpartsPush(SOURCE_CHAIN_ID, newCenter, router);
+        vm.prank(chainAdmin);
+        sender.setInteropCounterparts(CHAIN_ID, SOURCE_CHAIN_ID, newCenter, router);
+        _assertCounterparts(SOURCE_CHAIN_ID, newCenter, router);
+    }
+
+    /// @notice Without a writer the chain could never execute the source's bundles, and its asset tracker would not
+    /// apply the origin rule to the source, so the counterparts come second.
+    function test_setInteropCounterparts_revertWhen_noWriter() public {
+        _enableInteropRootWriters();
+        _mockProtocolVersion(INTEROP_COUNTERPARTS_MIN_PROTOCOL_VERSION);
+        vm.prank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(InteropRootWriterNotSet.selector, CHAIN_ID, SOURCE_CHAIN_ID));
+        sender.setInteropCounterparts(CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("center"), makeAddr("router"));
+    }
+
+    function test_setInteropCounterparts_revertWhen_featureDisabled() public {
+        _setWriterAndV37();
+        vm.prank(owner);
+        sender.setChainFeatureEnabled(CHAIN_ID, INTEROP_ROOT_WRITERS_FEATURE, false);
+
+        vm.prank(chainAdmin);
+        vm.expectRevert(InteropRootWritersNotEnabled.selector);
+        sender.setInteropCounterparts(CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("center"), makeAddr("router"));
+    }
+
+    function test_setInteropCounterparts_revertWhen_onlyOneAddress() public {
+        _setWriterAndV37();
+        address center = makeAddr("center");
+        vm.prank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(InvalidInteropCounterparts.selector, center, address(0)));
+        sender.setInteropCounterparts(CHAIN_ID, SOURCE_CHAIN_ID, center, address(0));
+        vm.prank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(InvalidInteropCounterparts.selector, address(0), center));
+        sender.setInteropCounterparts(CHAIN_ID, SOURCE_CHAIN_ID, address(0), center);
+    }
+
+    function test_setInteropCounterparts_revertWhen_ownerSets() public {
+        _setWriterAndV37();
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, owner));
+        sender.setInteropCounterparts(CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("center"), makeAddr("router"));
+    }
+
+    /// @notice A source assigned to another chain gets neither a writer nor counterparts on this chain.
+    function test_setInteropCounterparts_revertWhen_sourceAssignedToAnotherChain() public {
+        _setWriterAndV37();
+        _enableInteropRootWritersForPeer();
+        vm.prank(makeAddr("peerAdmin"));
+        vm.expectRevert(abi.encodeWithSelector(InteropRootSourceNotAssigned.selector, PEER_CHAIN_ID, SOURCE_CHAIN_ID));
+        sender.setInteropRootWriter(PEER_CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("peerWriter"));
+        vm.prank(makeAddr("peerAdmin"));
+        vm.expectRevert(abi.encodeWithSelector(InteropRootWriterNotSet.selector, PEER_CHAIN_ID, SOURCE_CHAIN_ID));
+        sender.setInteropCounterparts(PEER_CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("center"), makeAddr("router"));
+    }
+
+    function test_setInteropCounterparts_removalByOwnerBridgehubAdminOrChainAdmin() public {
+        _setWriterAndV37();
+        address ecosystemAdmin = makeAddr("ecosystemAdmin");
+        _mockBridgehubAdmin(ecosystemAdmin);
+        address[3] memory removers = [owner, ecosystemAdmin, chainAdmin];
+        for (uint256 i = 0; i < removers.length; ++i) {
+            vm.prank(chainAdmin);
+            sender.setInteropCounterparts(CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("center"), makeAddr("router"));
+
+            _expectCounterpartsPush(SOURCE_CHAIN_ID, address(0), address(0));
+            vm.prank(removers[i]);
+            sender.setInteropCounterparts(CHAIN_ID, SOURCE_CHAIN_ID, address(0), address(0));
+            _assertCounterparts(SOURCE_CHAIN_ID, address(0), address(0));
+        }
+    }
+
+    function testFuzz_setInteropCounterparts_revertWhen_strangerRemoves(address _caller) public {
+        _mockBridgehubAdmin(makeAddr("ecosystemAdmin"));
+        vm.assume(_caller != owner && _caller != chainAdmin && _caller != makeAddr("ecosystemAdmin"));
+        vm.assume(_caller != makeAddr("proxyAdmin"));
+        vm.prank(_caller);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, _caller));
+        sender.setInteropCounterparts(CHAIN_ID, SOURCE_CHAIN_ID, address(0), address(0));
+    }
+
+    function test_setInteropCounterparts_revertWhen_protocolVersionBelowV37() public {
+        _setWriterAndV37();
+        uint256 oldVersion = INTEROP_COUNTERPARTS_MIN_PROTOCOL_VERSION - 1;
+        _mockProtocolVersion(oldVersion);
+        vm.prank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(InteropCounterpartsNotSupported.selector, CHAIN_ID, oldVersion));
+        sender.setInteropCounterparts(CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("center"), makeAddr("router"));
+    }
+
+    function test_setInteropCounterparts_revertWhen_chainNotRegistered() public {
+        vm.expectRevert(ZKChainNotRegistered.selector);
+        sender.setInteropCounterparts(UNREGISTERED_CHAIN_ID, SOURCE_CHAIN_ID, address(0), address(0));
     }
 }

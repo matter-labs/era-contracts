@@ -22,6 +22,7 @@ and dependency-root import separate source-chain commitment from destination exe
 | `L2InteropRootStorage`    | L2    | Stores imported settlement roots and timestamps, and writer-added roots.       |
 | `L2InteropHandler`        | L2    | Verifies atomic finality and executes or unbundles L2 -> L2 bundles.           |
 | `L1InteropHandler`        | L1    | Proves and finalizes restricted L2 -> L1 withdrawal bundles.                   |
+| `L1InteropCenter`         | L1    | Sends one-way bundles from L1 as local messages of the message root.           |
 | `MessageRoot`             | L1    | Aggregates per-chain batch roots and authenticates imported dependencies.      |
 | `BaseTokenHolder` / NTV   | L2    | Account for destination call value and cross-base-token movement.              |
 
@@ -237,7 +238,8 @@ soundness, liveness, and recovery limitations are documented in {protocol-docs/a
 Interop built-ins are force-deployed and initialized through the ZKsync OS genesis/upgrade process.
 They use fixed L2 addresses and do not use constructors or immutables. `L1InteropHandler` is the
 exception: it is an L1 proxy whose implementation has immutable references to `MessageRoot` and the
-canonical L1 asset router.
+canonical L1 asset router. So is `L1InteropCenter`, with immutable references to the Bridgehub and
+to the attribute parser deployed next to it on L1.
 
 The protocol requires ZKsync OS bootloader support for timestamped dependency-root import and batch
 commitments to atomic IMT roots. Atomic flows are L1-settlement-only, and every participating chain

@@ -3,6 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {AtomicFinalityProof} from "../../atomic-interop/IAtomicInterop.sol";
+import {MessageInclusionProof} from "../../common/Messaging.sol";
 import {IInteropHandlerBase} from "./IInteropHandlerBase.sol";
 
 /// @notice L2 interop handler surface: the proof-agnostic {IInteropHandlerBase} plus the atomic-proof-typed
@@ -25,4 +26,11 @@ interface IL2InteropHandler is IInteropHandlerBase {
     /// @param _bundle ABI-encoded InteropBundle to verify.
     /// @param _finality The flow definition + one IMT inclusion proof per leg.
     function verifyAtomicBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) external;
+
+    /// @notice Executes a one-way bundle of a chain this chain has interop counterparts for: its own L1, or a chain
+    /// whose roots come from an interop root writer. Same signature as `L1InteropHandler.executeBundle`.
+    /// See {protocol-docs/interop.md#executing-a-one-way-bundle-on-an-l2}.
+    /// @param _bundle ABI-encoded InteropBundle to execute.
+    /// @param _proof Inclusion proof of the bundle's message in a root of its source chain.
+    function executeBundle(bytes calldata _bundle, MessageInclusionProof calldata _proof) external;
 }

@@ -19,7 +19,11 @@ import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
-import {AssetHandlerNotAllowed, NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
+import {
+    AssetHandlerNotAllowed,
+    ChainNotSettlingOnThisChain,
+    NativeTokenVaultAlreadySet
+} from "../L1BridgeContractErrors.sol";
 import {
     AddressAlreadySet,
     AssetDeploymentTrackerNotSet,
@@ -34,7 +38,8 @@ import {IL1MessageRoot} from "../../core/message-root/IL1MessageRoot.sol";
 import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
 
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
-import {TxStatus} from "../../common/Messaging.sol";
+import {InteropCallStarter, TxStatus} from "../../common/Messaging.sol";
+import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -66,6 +71,9 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
     /// @dev Address of the L1 interop handler that finalizes L2 -> L1 withdrawals.
     address public l1InteropHandler;
+
+    /// @inheritdoc IL1AssetRouter
+    address public l1InteropCenter;
 
     /// @dev The owner, or the upgrade authority (the owner of this proxy's `ProxyAdmin`).
     modifier onlyOwnerOrUpgrader() {
@@ -134,6 +142,13 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         require(l1InteropHandler == address(0), AddressAlreadySet(l1InteropHandler));
         require(_l1InteropHandler != address(0), ZeroAddress());
         l1InteropHandler = _l1InteropHandler;
+    }
+
+    /// @inheritdoc IL1AssetRouter
+    function setL1InteropCenter(address _l1InteropCenter) external onlyOwnerOrUpgrader {
+        require(_l1InteropCenter != address(0), ZeroAddress());
+        l1InteropCenter = _l1InteropCenter;
+        emit L1InteropCenterSet(_l1InteropCenter);
     }
 
     /// @notice Used to set the asset deployment tracker address for given asset data.
@@ -245,6 +260,46 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                 _data: _data,
                 _nativeTokenVault: address(nativeTokenVault)
             });
+    }
+
+    /// @inheritdoc IL1AssetRouter
+    function initiateIndirectCall(
+        uint256 _chainId,
+        address _originalCaller,
+        bytes calldata _data
+    ) external whenNotPaused returns (InteropCallStarter memory interopCallStarter) {
+        require(msg.sender == l1InteropCenter, Unauthorized(msg.sender));
+        require(BRIDGE_HUB.settlementLayer(_chainId) == block.chainid, ChainNotSettlingOnThisChain(_chainId));
+
+        (bytes32 assetId, bytes memory transferData) = DataEncoding.decodeAssetRouterBridgehubDepositData(_data);
+        address assetHandler = assetHandlerAddress[assetId];
+        // A chain migration is a deposit through the Bridgehub only: it needs the priority transaction to the
+        // settlement layer and the record its recovery reads, and a bundle has neither.
+        require(
+            assetHandler != BRIDGE_HUB.chainAssetHandler(),
+            AssetHandlerNotAllowed(_chainId, assetId, assetHandler)
+        );
+        _checkAssetHandlerAllowed(_chainId, assetId);
+        if (assetHandler == address(0) || assetHandler == address(nativeTokenVault)) {
+            // A bundle has no refund path, and the vault's bridged token can't mint to the zero address.
+            // slither-disable-next-line unused-return
+            (, address receiver, ) = DataEncoding.decodeBridgeBurnData(transferData);
+            require(receiver != address(0), ZeroAddress());
+        }
+
+        L2TransactionRequestTwoBridgesInner memory request = _bridgehubDeposit({
+            _chainId: _chainId,
+            _originalCaller: _originalCaller,
+            _value: 0,
+            _data: _data,
+            _nativeTokenVault: address(nativeTokenVault)
+        });
+
+        interopCallStarter = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(request.l2Contract),
+            data: request.l2Calldata,
+            callAttributes: new bytes[](0)
+        });
     }
 
     /// @inheritdoc IL1CrossChainSender

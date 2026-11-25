@@ -524,6 +524,37 @@
   },
   {
     "type": "function",
+    "name": "interopCounterparts",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct InteropCounterparts",
+        "components": [
+          {
+            "name": "interopCenter",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "assetRouter",
+            "type": "address",
+            "internalType": "address"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "isChainFeatureEnabled",
     "inputs": [
       {
@@ -793,6 +824,29 @@
   },
   {
     "type": "function",
+    "name": "setInteropCounterparts",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_interopCenter",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_assetRouter",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setPendingAdmin",
     "inputs": [
       {
@@ -977,6 +1031,31 @@
         "type": "uint8",
         "indexed": false,
         "internalType": "uint8"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "InteropCounterpartsSet",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "interopCenter",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "assetRouter",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
       }
     ],
     "anonymous": false
@@ -1179,6 +1258,33 @@
     "type": "error",
     "name": "EmptyAssetId",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InteropCounterpartsConflict",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidInteropCounterparts",
+    "inputs": [
+      {
+        "name": "interopCenter",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "assetRouter",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
   },
   {
     "type": "error",
