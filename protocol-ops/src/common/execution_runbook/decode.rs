@@ -27,6 +27,8 @@ const KNOWN_FUNCTIONS: &[&str] = &[
     "upgradeChainFromVersion(uint256,((address,uint8,bool,bytes4[])[],address,bytes))",
     // ChainTypeManager
     "setNewVersionUpgrade(((address,uint8,bool,bytes4[])[],address,bytes),uint256,uint256,uint256,address)",
+    // (old, oldDeadline, new, verifier, upgradeContract); the CTM builds the cut itself
+    "createNewPatchUpgrade(uint256,uint256,uint256,address,address)",
     "setChainCreationParams((address,bytes32,uint64,bytes32,((address,uint8,bool,bytes4[])[],address,bytes),bytes))",
     // ChainAssetHandler
     "pauseMigration()",
@@ -157,6 +159,18 @@ pub(super) fn annotation(data: &[u8]) -> Option<String> {
         )),
         _ => None,
     }
+}
+
+/// The protocol version `data` makes a CTM's latest: `setNewVersionUpgrade` or
+/// `createNewPatchUpgrade`.
+pub(super) fn new_ctm_version(data: &[u8]) -> Option<U256> {
+    let (function, args) = decode(data)?;
+    let new_version_arg = match function.name.as_str() {
+        "setNewVersionUpgrade" => 3,
+        "createNewPatchUpgrade" => 2,
+        _ => return None,
+    };
+    args.get(new_version_arg).and_then(as_uint)
 }
 
 /// One call a wrapper runs.

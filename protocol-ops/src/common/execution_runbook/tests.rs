@@ -21,6 +21,7 @@ alloy::sol! {
     function execute(Operation _operation);
     function setUpgradeTimestamp(uint256 _protocolVersion, uint256 _upgradeTimestamp);
     function upgradeChainFromVersion(address _chain, uint256 _oldProtocolVersion, DiamondCutData _cut);
+    function createNewPatchUpgrade(uint256 _oldProtocolVersion, uint256 _oldProtocolVersionDeadline, uint256 _newProtocolVersion, address _verifier, address _upgradeContract);
 }
 
 /// The v0.33.0 stage upgrade: the committed emergency proposal and its runbook.
@@ -618,6 +619,10 @@ fn known_functions_have_the_selectors_the_contracts_use() {
         ("0x3b6d7534", "`upgradeChainFromVersion(...)`"),
         ("0xfc57565f", "`upgradeChainFromVersion(...)`"),
         ("0x8265f458", "`setNewVersionUpgrade(...)`"),
+        (
+            "0x81a8e48e",
+            "`createNewPatchUpgrade(uint256,uint256,uint256,address,address)`",
+        ),
         ("0x9b016b8b", "`setChainCreationParams(...)`"),
         ("0xac700e63", "`pauseMigration()`"),
         ("0xf7c7eb92", "`unpauseMigration()`"),
@@ -640,6 +645,103 @@ fn known_functions_have_the_selectors_the_contracts_use() {
         "`0x12345678` (unknown function)"
     );
     assert_eq!(decode::call_display(&[]), "none (plain transfer)");
+}
+
+// ─── the release tag step ─────────────────────────────────────────────────────────
+
+/// The fixture's tx 13 sets v0.33.0 on stage's Era CTM; with the stage env's names the page
+/// ends with the `era-v0.33.0` tag step.
+#[test]
+fn version_upgrades_end_with_the_release_tag_step() {
+    let Ok(env_cfg) = EnvConfig::load("stage") else {
+        return; // no checkout around the test binary
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let path = emergency_fixture(dir.path(), |_| {});
+    let options = LoadOptions {
+        env: Some("stage".to_string()),
+        chain_id: env_cfg.l1_chain_id(),
+        names: env_names(&env_cfg),
+        ..Default::default()
+    };
+    let markdown = render(&load(&path, &dir.path().join(RUNBOOK_FILE), &options).unwrap());
+    assert!(markdown.contains(
+        "## After the last tx: tag the release\n\nOnce tx 13 is mined, and with the go-ahead from \
+         the release owner, tag `era-v0.33.0` on the commit that last changed \
+         [`emergency-upgrade-board.json`](./emergency-upgrade-board.json)"
+    ));
+    assert!(markdown.contains(
+        "```bash\ngit fetch origin --tags\n\
+         git tag -a era-v0.33.0 -m era-v0.33.0 \"$(git log -1 --format=%H -- ./emergency-upgrade-board.json)\"\n\
+         git push origin refs/tags/era-v0.33.0\n```"
+    ));
+    // The step comes after the tables, before the long calldata.
+    assert!(markdown.find("tag the release").unwrap() < markdown.find("<details>").unwrap());
+}
+
+/// Without a flavour for the CTM there is no tag name, and so no step.
+#[test]
+fn unnamed_ctms_get_no_release_tag_step() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = emergency_fixture(dir.path(), |_| {});
+    let sepolia_without_names = LoadOptions {
+        chain_id: Some(11_155_111),
+        ..Default::default()
+    };
+    let runbook = load(
+        &path,
+        &dir.path().join(RUNBOOK_FILE),
+        &sepolia_without_names,
+    )
+    .unwrap();
+    assert!(!render(&runbook).contains("tag the release"));
+}
+
+/// Calls that do not set a CTM version (Safe approvals, ownership) get no step.
+#[test]
+fn other_calls_get_no_release_tag_step() {
+    let dir = tempfile::tempdir().unwrap();
+    let bundles = multi_sender_fixture(dir.path());
+    let out = default_runbook_path(&bundles).unwrap();
+    let runbook = load(&bundles, &out, &LoadOptions::default()).unwrap();
+    assert!(!render(&runbook).contains("tag the release"));
+}
+
+#[test]
+fn new_ctm_versions_decode_from_both_version_calls() {
+    let patch = createNewPatchUpgradeCall {
+        _oldProtocolVersion: U256::from(146_028_888_064u64),
+        _oldProtocolVersionDeadline: U256::MAX,
+        _newProtocolVersion: U256::from(146_028_888_065u64),
+        _verifier: OWNER_A,
+        _upgradeContract: OWNER_B,
+    }
+    .abi_encode();
+    assert_eq!(
+        decode::new_ctm_version(&patch)
+            .map(protocol_version)
+            .as_deref(),
+        Some("v0.34.1")
+    );
+    let fixture: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(repo_path(EMERGENCY_BOARD_FIXTURE)).unwrap())
+            .unwrap();
+    let execute = hex::decode(
+        fixture["transactions"][12]["data"]
+            .as_str()
+            .unwrap()
+            .trim_start_matches("0x"),
+    )
+    .unwrap();
+    let versions: Vec<String> = decode::wrapped(&execute)
+        .unwrap()
+        .calls
+        .iter()
+        .filter_map(|call| decode::new_ctm_version(&call.data))
+        .map(protocol_version)
+        .collect();
+    assert_eq!(versions, ["v0.33.0"]);
+    assert_eq!(decode::new_ctm_version(&[0x79, 0xba, 0x50, 0x97]), None);
 }
 
 #[test]
@@ -728,6 +830,19 @@ fn rendered_pages_are_prettier_stable() {
         &load(&bundles, &out, &LoadOptions::default()).unwrap(),
     )];
     pages.extend(v33_stage_runbook().map(|runbook| render(&runbook)));
+    if let Ok(env_cfg) = EnvConfig::load("stage") {
+        // The fixture with stage's names, so the page carries the release tag step.
+        let path = emergency_fixture(dir.path(), |_| {});
+        let options = LoadOptions {
+            env: Some("stage".to_string()),
+            chain_id: env_cfg.l1_chain_id(),
+            names: env_names(&env_cfg),
+            ..Default::default()
+        };
+        pages.push(render(
+            &load(&path, &dir.path().join(RUNBOOK_FILE), &options).unwrap(),
+        ));
+    }
     let mut files = Vec::new();
     for (i, page) in pages.iter().enumerate() {
         let path = dir.path().join(format!("page-{i}.md"));

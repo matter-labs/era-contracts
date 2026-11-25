@@ -212,6 +212,8 @@ The server uses contracts in two ways: **prebuilt** bootloaders per VM in `etc/m
   into a terminal. Before signing, check the network and that the runbook's sender still holds the authority on chain.
   Require a successful receipt before the next tx. Afterwards verify the ecosystem state (e.g. the CTM's
   `protocolVersion()`), each chain's protocol version after its upgrade, and that batches keep being produced and proven.
+- **Tag.** Once the governance transactions that set a new CTM version have executed on its first environment, push the
+  release tag ([`docs/release-tags.md`](docs/release-tags.md)). The runbook's last section has the commands.
 - **Owners** (reference values from 2026-09; check before use):
   - stage: `0xd669494442609879b209CcA8eba2BdC904D2E69D`, owner of the 12 member Safes behind the Emergency Upgrade Board
     (`approveHash` on each, then `executeEmergencyUpgrade`);

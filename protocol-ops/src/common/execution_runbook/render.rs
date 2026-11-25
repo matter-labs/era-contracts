@@ -7,7 +7,7 @@ use alloy::primitives::{keccak256, Address, U256};
 
 use super::decode::{self, InnerCall, WrapperKind, INLINE_CALLDATA_MAX_BYTES};
 use super::load::network_name;
-use super::{Runbook, RunbookTx, SourceKind};
+use super::{Runbook, RunbookTx, SourceKind, ERA_CTM_NAME, ZKSYNC_OS_CTM_NAME};
 
 /// Wrapped calls listed inline in a sentence; more become a numbered list.
 const MAX_INLINE_CALLS: usize = 4;
@@ -463,6 +463,71 @@ fn addresses_line(runbook: &Runbook) -> Option<String> {
     (!listed.is_empty()).then(|| format!("Addresses: {}.", listed.join(", ")))
 }
 
+/// The release tag of each CTM version the txs set, in order of appearance. A CTM the inputs do
+/// not name by flavour gets none; `docs/release-tags.md` names tags by flavour.
+fn release_tags(runbook: &Runbook) -> Vec<String> {
+    let mut tags = Vec::new();
+    for tx in &runbook.txs {
+        let inner = decode::wrapped(&tx.data)
+            .map(|wrapped| wrapped.calls)
+            .unwrap_or_default();
+        let calls = std::iter::once((tx.to, tx.data.as_ref()))
+            .chain(inner.iter().map(|call| (call.target, call.data.as_slice())));
+        for (target, data) in calls {
+            let Some(version) = decode::new_ctm_version(data) else {
+                continue;
+            };
+            let prefix = match runbook.names.get(&target).map(String::as_str) {
+                Some(ERA_CTM_NAME) => "era-",
+                Some(ZKSYNC_OS_CTM_NAME) => "",
+                _ => continue,
+            };
+            let version = decode::protocol_version(version);
+            // A packed version that does not unpack is shown as a bare number: no tag name.
+            if !version.starts_with('v') {
+                continue;
+            }
+            let tag = format!("{prefix}{version}");
+            if !tags.contains(&tag) {
+                tags.push(tag);
+            }
+        }
+    }
+    tags
+}
+
+/// The last step: tag the commit that produced the executed calldata (`docs/release-tags.md`).
+fn release_tag_block(runbook: &Runbook) -> Option<String> {
+    let tags = release_tags(runbook);
+    if tags.is_empty() {
+        return None;
+    }
+    let listed: Vec<String> = tags.iter().map(code).collect();
+    let mut commands = vec!["git fetch origin --tags".to_string()];
+    for tag in &tags {
+        commands.push(format!(
+            "git tag -a {tag} -m {tag} \"$(git log -1 --format=%H -- {})\"",
+            runbook.source_link
+        ));
+    }
+    for tag in &tags {
+        commands.push(format!("git push origin refs/tags/{tag}"));
+    }
+    Some(format!(
+        "## After the last tx: tag the release\n\n\
+         Once tx {} is mined, and with the go-ahead from the release owner, tag {} on the commit \
+         that last changed [{}]({}), as `docs/release-tags.md` requires. Run this from this \
+         directory, on the up-to-date branch this runbook was merged to. On a later environment \
+         the tag already exists, `git tag` stops with `already exists`, and there is nothing to \
+         do: a pushed tag is never moved.\n\n```bash\n{}\n```",
+        runbook.txs.len(),
+        listed.join(" and "),
+        code(runbook.source_link.trim_start_matches("./")),
+        runbook.source_link,
+        commands.join("\n")
+    ))
+}
+
 fn details_block(number: usize, tx: &RunbookTx) -> String {
     format!(
         "<details>\n<summary>Tx {number} calldata ({} bytes)</summary>\n\n```text\n{:#x}\n```\n\n</details>",
@@ -541,6 +606,7 @@ pub fn render(runbook: &Runbook) -> String {
     }
 
     blocks.extend(addresses_line(runbook));
+    blocks.extend(release_tag_block(runbook));
     for (i, tx) in runbook.txs.iter().enumerate() {
         if is_long(tx) {
             blocks.push(details_block(i + 1, tx));

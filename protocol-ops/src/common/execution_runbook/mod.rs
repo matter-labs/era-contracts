@@ -38,6 +38,10 @@ pub use render::render;
 /// File name of the runbook, written next to the upgrade's outputs.
 pub const RUNBOOK_FILE: &str = "EXECUTE.md";
 
+/// Names [`env_names`] gives CTMs; the release tag a runbook ends with depends on which one.
+pub const ERA_CTM_NAME: &str = "Era CTM";
+pub const ZKSYNC_OS_CTM_NAME: &str = "ZKsync OS CTM";
+
 /// A rendered-to-be runbook: the transactions plus everything the page says about them.
 #[derive(Debug, Clone)]
 pub struct Runbook {
@@ -112,8 +116,8 @@ pub fn env_names(env_cfg: &EnvConfig) -> BTreeMap<Address, String> {
     names.insert(env_cfg.bridgehub(), "Bridgehub".to_string());
     for ctm in env_cfg.ctms() {
         let name = match ctm.is_zk_sync_os {
-            Some(true) => "ZKsync OS CTM",
-            Some(false) => "Era CTM",
+            Some(true) => ZKSYNC_OS_CTM_NAME,
+            Some(false) => ERA_CTM_NAME,
             None => "CTM",
         };
         names.insert(ctm.proxy, name.to_string());
