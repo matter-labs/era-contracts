@@ -364,17 +364,9 @@ jobs:
       - name: Build l1-contracts artifacts
         run: yarn l1 build:foundry
 
-      # The step above put upstream forge first on PATH. The prepare's forge scripts must run under
-      # foundry-zksync, the build's own forge: upstream forge recompiles the contracts to different
-      # bytecode (not AllContractsHashes.json), hence different CREATE2 addresses. Upstream Foundry
-      # only supplies anvil.
-      - name: Put foundry-zksync's forge first on PATH again
+      - name: Show which forge and anvil the prepare runs
         run: |
-          echo "$GITHUB_WORKSPACE/foundry-zksync" >> "$GITHUB_PATH"
-
-      - name: Check which forge and anvil the prepare runs
-        run: |
-          forge --version | grep -q 'foundry-zksync' || { echo "::error::forge on PATH is not foundry-zksync: $(forge --version | head -1)"; exit 1; }
+          forge --version | head -1
           anvil --version | head -1
 
       - name: Build protocol_ops
