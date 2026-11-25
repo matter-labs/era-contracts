@@ -22,6 +22,10 @@ stage, or on its first environment if it skips stage, on the commit that produce
 the code is merged: an upgrade can stall before it executes. Later environments then run the tagged commit; a change
 after that needs a new version.
 
+The generated runbook (`EXECUTE.md`) of an upgrade that sets a new CTM version ends with this step: the tag name, and the
+commands that tag the commit that last changed the runbook's transaction list. Run them on the first environment; on a
+later one, `git tag` stops because the tag exists.
+
 Push the `zip-<n>` tag when governance proposal ZIP-`n` is submitted, on the commit that produced its calldata. Every tag
 is pushed by hand, after the go-ahead from the release owner.
 
