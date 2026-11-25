@@ -11,10 +11,10 @@ This repository contains both L1 and L2 ZKsync smart contracts.
 
 ## Documentation
 
-Documentation for these contracts lives in [`protocol-docs/`](protocol-docs/README.md): the
-[system architecture](protocol-docs/system/README.md), and the guides for
-[deploying](protocol-docs/ecosystem-deployment.md) and [upgrading](protocol-docs/ecosystem-upgrade.md)
-an ecosystem.
+Documentation for these contracts lives in [`docs/`](docs/README.md): the
+[system architecture](docs/system/README.md), the [atomic interop developer guide](docs/atomic-interop/README.md),
+and the guides for [deploying](docs/ecosystem-deployment.md) and [upgrading](docs/ecosystem-upgrade.md) an ecosystem.
+Contract comments that point to `protocol-docs/<path>.md`, the folder's old name, mean `docs/<path>.md`.
 
 ## Disclaimer
 

@@ -4,7 +4,7 @@ The Forge scripts in this directory prepare a protocol release for an existing e
 deploy the new implementations, build the diamond cut and the L2 upgrade transaction, and
 serialize the governance calls. The pipeline they are part of, the artifacts they produce and the
 phases that follow (deploy, verify, governance ceremony, per-chain upgrades) are described in
-[protocol-docs/ecosystem-upgrade.md](../../../protocol-docs/ecosystem-upgrade.md); this file only
+[docs/ecosystem-upgrade.md](../../../docs/ecosystem-upgrade.md); this file only
 covers the scripts themselves.
 
 The scripts are not run with `forge script` directly in a rollout. `protocol_ops` (see
