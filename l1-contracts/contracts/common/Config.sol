@@ -332,3 +332,8 @@ uint256 constant MAX_ALLOWED_NUMBER_OF_MIGRATIONS = 2;
 /// @dev Footgun prevention only, not a trust guarantee: governance can upgrade the timelock, and outside
 /// stage 1 a chain admin can revoke the validator roles and stall execution anyway.
 uint32 constant MAX_VALIDATOR_TIMELOCK_EXECUTION_DELAY = 30 days;
+
+/// @dev The chain feature that lets a chain's admin register writers of the interop roots of a source chain outside the
+/// ecosystem into `L2InteropRootStorage`, such as an operator key or a light client the chain's admin trusts.
+/// See {protocol-docs/interop.md#interop-root-writers}.
+bytes32 constant INTEROP_ROOT_WRITERS_FEATURE = keccak256("InteropRootWriters");

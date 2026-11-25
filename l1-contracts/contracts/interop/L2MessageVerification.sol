@@ -6,6 +6,7 @@ import {MessageVerification} from "../common/MessageVerification.sol";
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
 import {L2_INTEROP_ROOT_STORAGE} from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {DepthMoreThanOneForRecursiveMerkleProof} from "../core/bridgehub/L1BridgehubErrors.sol";
+import {SettlementLayerIsWriterSource} from "./InteropErrors.sol";
 
 /// @title L2MessageVerification
 /// @author Matter Labs
@@ -42,7 +43,15 @@ contract L2MessageVerification is MessageVerification {
         }
 
         // Assumes all settlement layers the chain has ever settled on are trustworthy (see
-        // {protocol-docs/interop.md#message-verification-l2messageverification}).
+        // {protocol-docs/interop.md#message-verification-l2messageverification}). The roots of a writer's source chain
+        // are only as trustworthy as the writer, and vouch only for the source chain's own messages: they never stand in
+        // for another chain's settlement layer (see {protocol-docs/interop.md#interop-root-writers}).
+        if (
+            proofData.settlementLayerChainId != _chainId &&
+            L2_INTEROP_ROOT_STORAGE.isWriterSource(proofData.settlementLayerChainId)
+        ) {
+            revert SettlementLayerIsWriterSource(proofData.settlementLayerChainId, _chainId);
+        }
         return
             this.proveL2LeafInclusionSharedRecursive({
                 _chainId: proofData.settlementLayerChainId,

@@ -167,7 +167,7 @@ the entire send revert, including its burns.
 
 ### Root import (`L2InteropRootStorage`)
 
-`L2InteropRootStorage` stores the message roots of other chains on the L2, keyed by `(chainId, blockOrBatchNumber)`. Roots are imported **only by the bootloader** via `addSingleInteropRoot` / `addInteropRootsInBatch`, as full `(blockOrBatchNumber, root, timestamp)` tuples (`InteropRoot` → `StoredInteropRoot`):
+`L2InteropRootStorage` stores the message roots of other chains on the L2, keyed by `(chainId, blockOrBatchNumber)`. The roots of the settlement layer are imported **only by the bootloader** via `addSingleInteropRoot` / `addInteropRootsInBatch`, as full `(blockOrBatchNumber, root, timestamp)` tuples (`InteropRoot` → `StoredInteropRoot`); the roots of chains outside the ecosystem can be written by [interop root writers](#interop-root-writers):
 
 - `blockOrBatchNumber` is the settlement layer's **block number**.
 - `sides` currently must contain exactly one element — the root itself (`SidesLengthNotOne`). The array
@@ -177,11 +177,65 @@ the entire send revert, including its burns.
 - Zero roots and zero timestamps are rejected on import, keeping the invariant structural: a zero stored timestamp only ever means "nothing imported at this key" (the atomic timeout path relies on this). A root for a given key can be set only once (`InteropRootAlreadyExists`).
 - This logic is **not compatible with EraVM** (its bootloader does not support the timestamp-carrying import entry points); it is deployed on ZKsync OS chains only. No roots recorded under previous protocol versions exist, because interop was not activated in v31; the v31→v33 widening of the stored value from `bytes32` to a struct is storage-safe (the mapping was empty, and the struct's first member occupies the old slot).
 
+### Interop root writers
+
+From protocol version v0.36.0, a chain can also hold the roots of a source chain outside the ecosystem, written by an
+address registered for that source chain: its **interop root writer**, for example an operator key or a light client
+of the source chain that the chain's admin trusts. The writer can be any address; the protocol checks only who calls.
+
+- `L2InteropRootStorage.addInteropRootFromWriter(InteropRoot)` adds a root of `interopRoot.chainId`. Only
+  `interopRootWriter(chainId)` may call it, and only while the chain feature `INTEROP_ROOT_WRITERS_FEATURE`
+  ({protocol-docs/interop-gating.md#chain-features}) is enabled in the chain's `L2Bridgehub`, so disabling the feature
+  stops every writer at once. The root is stored under the same invariants as a bootloader import: `sides` holds
+  exactly the root, the root and the timestamp are non-zero, a key is written once, and `latestInteropRootTimestamp`
+  never decreases. `interopRoots` and `latestInteropRootTimestamp` read both kinds of root the same way. Atomic
+  interop reads only the settlement layer's roots, under its chain id, for which no writer can be set.
+- Writes emit `InteropRootAddedByWriter`, not `InteropRootAdded`. ZKsync OS folds every `InteropRootAdded` of
+  `L2InteropRootStorage` (its interop-root event hook) into the batch's `dependencyRootsRollingHash`, and the
+  settlement layer re-derives that hash only from its own message root
+  ({protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}), so a written root would
+  make the batch unexecutable (`CommitBasedInteropNotSupported`). A written root is therefore **not** checked by the
+  settlement layer: it is exactly as trustworthy as the writer.
+- A written root vouches only for its source chain's own messages. `L2MessageVerification` lets a proof name its
+  chain's settlement layer, and trusts every settlement layer's roots for any chain settling there; it refuses a
+  writer's source chain as the settlement layer of another chain (`SettlementLayerIsWriterSource`). Otherwise the
+  writer, or whoever controls the source chain's roots, could prove messages of any ZK chain to this chain.
+  `isWriterSource(chainId)` records that a writer was ever set for `chainId`, and stays true after the writer is
+  removed, as its roots do.
+- `setInteropRootWriter(sourceChainId, writer)` sets or (zero) removes a writer. It accepts only a service
+  transaction, which `ChainRegistrationSender.setInteropRootWriter(chainId, sourceChainId, writer)` sends on L1, the
+  same route as the peer whitelist and the chain features ({protocol-docs/interop-gating.md}):
+  - the chain must run v0.36.0 or later (`INTEROP_ROOT_WRITERS_MIN_PROTOCOL_VERSION`, `InteropRootWritersNotSupported`
+    otherwise), the first version whose `L2InteropRootStorage` has the writers. The chain's L2 runs its upgrade
+    transaction before any later service transaction, so a chain that reports the version already has the setter;
+  - setting a writer is up to the chain's admin, as the trust it adds is the chain's own, once the ecosystem enabled
+    `INTEROP_ROOT_WRITERS_FEATURE` for the chain (`InteropRootWritersNotEnabled`);
+  - removing one is also open to the owner and the Bridgehub admin;
+  - a source chain belongs to one chain, which the ecosystem picks: the owner or the Bridgehub admin assigns it
+    (`assignInteropRootSource(sourceChainId, chainId)`, recorded in `interopRootSourceChain`), and a writer can be
+    set only for a source assigned to the chain (`InteropRootSourceNotAssigned`). Asset ids are derived from the
+    origin chain's id ({protocol-docs/bridging.md#asset-ids-asset-handlers-deployment-trackers}), so a second chain
+    with its own writer for the same source id could mint, with a root of its own, the bridged tokens the first
+    chain backs with real deposits. A chain admin does not pick its own sources, since first-come claims would let a
+    chain take the id of another chain's source;
+  - only a chain outside the ecosystem is assigned: not L1 and not a registered ZK chain
+    (`InvalidInteropRootSource`), as their roots reach the chain through its settlement layer, and the bootloader
+    and a writer never share a key space. The L2 rejects the chain itself as well. In turn the Bridgehub registers
+    no chain under an assigned id (`ChainIdIsInteropRootSource`), so a source never becomes a ZK chain;
+  - the first writer the chain sets for a source makes the assignment permanent (`isInteropRootSourceUsed`):
+    whatever the chain minted from the source's roots stays on it, so the source can't move to another chain.
+    Before that, the owner or the Bridgehub admin can undo a mistaken assignment (`releaseInteropRootSource`,
+    `InteropRootSourceInUse` once used).
+- The writer mapping and `isWriterSource` are appended to `L2InteropRootStorage`'s storage (slots 2 and 3, after
+  `storedInteropRoots` and `latestInteropRootTimestamp`), so the built-in upgrades in place; both start empty.
+
 ### Message verification (`L2MessageVerification`)
 
 `L2MessageVerification` proves generic L2 -> L1 message inclusion **on an L2**. It reuses the shared
 recursive proof logic (`MessageVerification` / `MessageHashing`); the terminal step anchors the proof
 to an imported L1 aggregate root in `L2InteropRootStorage`. Recursion depth is limited to one hop.
+A proof may name any settlement layer whose roots the chain holds; the roots of a writer's source chain
+serve only that chain's own messages ([interop root writers](#interop-root-writers)).
 The current `L2InteropHandler` does not use this path for public bundles: all supported L2 -> L2
 interop is atomic and authenticates each leg through `AtomicFlowManager` instead. L1 withdrawals use
 `L1InteropHandler` and the L1 `MessageRoot` directly.

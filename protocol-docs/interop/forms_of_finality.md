@@ -31,10 +31,14 @@ canonical L1 asset router and rejects non-zero call value.
 ## Imported-root safety
 
 An imported dependency is a `(chainId, blockOrBatchNumber, root, timestamp)` tuple. The bootloader is
-the only writer to `L2InteropRootStorage`; zero roots, zero timestamps, duplicate keys, and malformed
-`sides` are rejected. When the importing chain's batch executes, `ExecutorFacet` checks each imported
-tuple against `MessageRoot.historicalRoot` on the settlement layer. Protocols such as atomic timeout
-may therefore rely on both the root and its timestamp.
+the only writer of the settlement layer's roots to `L2InteropRootStorage`; zero roots, zero timestamps,
+duplicate keys, and malformed `sides` are rejected. When the importing chain's batch executes,
+`ExecutorFacet` checks each imported tuple against `MessageRoot.historicalRoot` on the settlement
+layer. Protocols such as atomic timeout may therefore rely on both the root and its timestamp. The
+roots of a chain outside the ecosystem are added by that chain's
+[interop root writer](../interop.md#interop-root-writers) under the same invariants, but the
+settlement layer does not check them: they, and the chain's `latestInteropRootTimestamp`, are only as
+trustworthy as the writer. Atomic interop reads only the settlement layer's roots.
 
 ## Unsupported historical modes
 

@@ -19,7 +19,13 @@ import {BridgehubL2TransactionRequest, TokenBridgingData, TxStatus} from "../../
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
-import {AlreadyCurrentSL, NotChainAssetHandler, SLNotWhitelisted} from "./L1BridgehubErrors.sol";
+import {IChainRegistrationSender} from "../chain-registration/IChainRegistrationSender.sol";
+import {
+    AlreadyCurrentSL,
+    ChainIdIsInteropRootSource,
+    NotChainAssetHandler,
+    SLNotWhitelisted
+} from "./L1BridgehubErrors.sol";
 import {
     AssetHandlerNotRegistered,
     AssetIdAlreadyRegistered,
@@ -511,6 +517,15 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
             _chainId == HARD_CODED_CHAIN_ID && (block.chainid == MAINNET_CHAIN_ID || block.chainid == SEPOLIA_CHAIN_ID)
         ) {
             revert ChainIdIsHardcoded();
+        }
+
+        // A source of written interop roots is a chain outside the ecosystem, and stays one.
+        // See {protocol-docs/interop.md#interop-root-writers}.
+        if (
+            chainRegistrationSender != address(0) &&
+            IChainRegistrationSender(chainRegistrationSender).interopRootSourceChain(_chainId) != 0
+        ) {
+            revert ChainIdIsInteropRootSource(_chainId);
         }
 
         if (_chainTypeManager == address(0)) {

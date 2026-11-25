@@ -47,14 +47,26 @@ error InteroperableAddressNotEmpty(bytes interoperableAddress);
 error InteropPreviewHash(bytes32 bundleHash);
 // 0x2d48e8cf
 error InteropRootAlreadyExists();
+// 0x466ffc88
+error InteropRootSourceAlreadyAssigned(uint256 sourceChainId, uint256 assignedToChainId);
+// 0xda97a9c2
+error InteropRootSourceInUse(uint256 sourceChainId, uint256 assignedToChainId);
+// 0x722f0f07
+error InteropRootSourceNotAssigned(uint256 chainId, uint256 sourceChainId);
 // 0x8a011102
 error InteropRootTimestampIsZero();
+// 0x3cebbbfd
+error InteropRootWritersNotEnabled();
+// 0x97c3045a
+error InteropRootWritersNotSupported(uint256 chainId, uint256 protocolVersion);
 // 0x9b021130
 error InteropToSelfNotSupported();
 // 0xeae192ef
 error InvalidInteropBundleVersion();
 // 0xd5f13973
 error InvalidInteropCallVersion();
+// 0xc8fed078
+error InvalidInteropRootSource(uint256 sourceChainId);
 // 0x32c2e156
 error MessageNotIncluded();
 // 0x6a430157
@@ -63,6 +75,8 @@ error MultiCallToL1NotSupported(uint256 callCount);
 error NonAtomicSendUnsupported();
 // 0xd72e81d8
 error NonZeroValueToL1NotSupported(uint256 value);
+// 0xce834c7b
+error SettlementLayerIsWriterSource(uint256 settlementLayerChainId, uint256 chainId);
 // 0x5af78ecd
 error ShadowAccountNotSupported();
 // 0x2f59bd0d
