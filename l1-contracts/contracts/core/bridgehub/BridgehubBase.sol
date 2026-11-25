@@ -27,11 +27,14 @@ import {
     BridgeHubAlreadyRegistered,
     CTMAlreadyRegistered,
     CTMNotRegistered,
+    ChainIdAlreadyExists,
     ChainIdCantBeCurrentChain,
     ChainIdIsHardcoded,
+    ChainIdMismatch,
     ChainIdNotRegistered,
     ChainIdTooBig,
     EmptyAssetId,
+    IncorrectBridgeHubAddress,
     NoCTMForAssetId,
     NotCurrentSettlementLayer,
     SettlementLayersMustSettleOnL1,
@@ -470,6 +473,49 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
     /*////////////////////////////////////////////////////////////
                             Chain registration
     //////////////////////////////////////////////////////////////*/
+
+    /// @notice Registers an already deployed chain with the Bridgehub, which then lets it append batch roots
+    /// to the `MessageRoot` and registers it there from its `getTotalBatchesExecuted()`.
+    /// @dev Available on L1 and L2 deployments alike: an EVM chain that runs the L2 contracts and follows a
+    /// chain with a `ZKsyncOSBatchMirror` registers the mirror here.
+    /// See {protocol-docs/batch-mirror.md#registration-in-the-host-chains-bridgehub}.
+    /// @param _chainId The chain Id of the chain
+    /// @param _zkChain Address of the zkChain
+    function registerAlreadyDeployedZKChain(uint256 _chainId, address _zkChain) external onlyOwner {
+        if (_zkChain == address(0)) {
+            revert ZeroAddress();
+        }
+        // slither-disable-next-line unused-return
+        (bool exists, ) = zkChainMap.tryGet(_chainId);
+        if (exists) {
+            revert ChainIdAlreadyExists();
+        }
+        if (IZKChain(_zkChain).getChainId() != _chainId) {
+            revert ChainIdMismatch();
+        }
+
+        address ctm = IZKChain(_zkChain).getChainTypeManager();
+        address chainAdmin = IZKChain(_zkChain).getAdmin();
+        bytes32 chainBaseTokenAssetId = IZKChain(_zkChain).getBaseTokenAssetId();
+        address bridgeHub = IZKChain(_zkChain).getBridgehub();
+        uint256 batchNumber = IZKChain(_zkChain).getTotalBatchesExecuted();
+
+        if (bridgeHub != address(this)) {
+            revert IncorrectBridgeHubAddress(bridgeHub);
+        }
+
+        _validateChainParams({_chainId: _chainId, _assetId: chainBaseTokenAssetId, _chainTypeManager: ctm});
+
+        chainTypeManager[_chainId] = ctm;
+
+        baseTokenAssetId[_chainId] = chainBaseTokenAssetId;
+        settlementLayer[_chainId] = block.chainid;
+
+        _registerNewZKChain(_chainId, _zkChain, true);
+        messageRoot.addNewChain(_chainId, batchNumber);
+
+        emit NewChain(_chainId, ctm, chainAdmin);
+    }
 
     /// @notice This function is used to register a new zkChain in the system.
     /// @param _chainId The chain ID of the ZK chain
