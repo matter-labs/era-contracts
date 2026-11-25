@@ -167,7 +167,7 @@ the entire send revert, including its burns.
 
 ### Root import (`L2InteropRootStorage`)
 
-`L2InteropRootStorage` stores the message roots of other chains on the L2, keyed by `(chainId, blockOrBatchNumber)`. Roots are imported **only by the bootloader** via `addSingleInteropRoot` / `addInteropRootsInBatch`, as full `(blockOrBatchNumber, root, timestamp)` tuples (`InteropRoot` → `StoredInteropRoot`):
+`L2InteropRootStorage` stores the message roots of other chains on the L2, keyed by `(chainId, blockOrBatchNumber)`. The roots of the settlement layer are imported **only by the bootloader** via `addSingleInteropRoot` / `addInteropRootsInBatch`, as full `(blockOrBatchNumber, root, timestamp)` tuples (`InteropRoot` → `StoredInteropRoot`); the roots of chains outside the ecosystem can be written by [interop root writers](#interop-root-writers):
 
 - `blockOrBatchNumber` is the settlement layer's **block number**.
 - `sides` currently must contain exactly one element — the root itself (`SidesLengthNotOne`). The array
@@ -176,6 +176,41 @@ the entire send revert, including its burns.
 - The imported tuple is double-checked on the settlement layer during batch execution (`ExecutorFacet._verifyDependencyInteropRoots`, against `MessageRoot.historicalRoot`), so time-sensitive proofs — e.g. the atomic-interop timeout protocol — can rely on the timestamp as much as on the root itself.
 - Zero roots and zero timestamps are rejected on import, keeping the invariant structural: a zero stored timestamp only ever means "nothing imported at this key" (the atomic timeout path relies on this). A root for a given key can be set only once (`InteropRootAlreadyExists`).
 - This logic is **not compatible with EraVM** (its bootloader does not support the timestamp-carrying import entry points); it is deployed on ZKsync OS chains only. No roots recorded under previous protocol versions exist, because interop was not activated in v31; the v31→v33 widening of the stored value from `bytes32` to a struct is storage-safe (the mapping was empty, and the struct's first member occupies the old slot).
+
+### Interop root writers
+
+From protocol version v0.36.0, a chain can also hold the roots of a source chain outside the ecosystem, written by an
+address registered for that source chain: its **interop root writer**, for example an operator key or a light client
+of the source chain that the chain's admin trusts. The writer can be any address; the protocol checks only who calls.
+
+- `L2InteropRootStorage.addInteropRootFromWriter(InteropRoot)` adds a root of `interopRoot.chainId`. Only
+  `interopRootWriter(chainId)` may call it, and only while the chain feature `INTEROP_ROOT_WRITERS_FEATURE`
+  ({protocol-docs/interop-gating.md#chain-features}) is enabled in the chain's `L2Bridgehub`, so disabling the feature
+  stops every writer at once. The root is stored under the same invariants as a bootloader import: `sides` holds
+  exactly the root, the root and the timestamp are non-zero, a key is written once, and `latestInteropRootTimestamp`
+  never decreases. `interopRoots` and `latestInteropRootTimestamp` read both kinds of root the same way. Atomic
+  interop reads only the settlement layer's roots, under its chain id, for which no writer can be set.
+- Writes emit `InteropRootAddedByWriter`, not `InteropRootAdded`. ZKsync OS folds every `InteropRootAdded` of
+  `L2InteropRootStorage` (its interop-root event hook) into the batch's `dependencyRootsRollingHash`, and the
+  settlement layer re-derives that hash only from its own message root
+  ({protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}), so a written root would
+  make the batch unexecutable (`CommitBasedInteropNotSupported`). A written root is therefore **not** checked by the
+  settlement layer: it is exactly as trustworthy as the writer.
+- `setInteropRootWriter(sourceChainId, writer)` sets or (zero) removes a writer. It accepts only a service
+  transaction, which `ChainRegistrationSender.setInteropRootWriter(chainId, sourceChainId, writer)` sends on L1, the
+  same route as the peer whitelist and the chain features ({protocol-docs/interop-gating.md}):
+  - the chain must run v0.36.0 or later (`INTEROP_ROOT_WRITERS_MIN_PROTOCOL_VERSION`, `InteropRootWritersNotSupported`
+    otherwise), the first version whose `L2InteropRootStorage` has the writers. The chain's L2 runs its upgrade
+    transaction before any later service transaction, so a chain that reports the version already has the setter;
+  - setting a writer is up to the chain's admin, as the trust it adds is the chain's own, once the ecosystem enabled
+    `INTEROP_ROOT_WRITERS_FEATURE` for the chain (`InteropRootWritersNotEnabled`);
+  - removing one is also open to the owner and the Bridgehub admin;
+  - a writer can't be set for L1, the chain itself or a registered ZK chain (`InvalidInteropRootSource`): their
+    roots reach the chain through its settlement layer, and the bootloader and a writer never share a key space. The
+    L2 rejects the chain itself as well. Removal is not refused on this ground, so a writer whose source chain id
+    was later registered as a ZK chain can still be removed.
+- The writer mapping is appended to `L2InteropRootStorage`'s storage (slot 2, after `storedInteropRoots` and
+  `latestInteropRootTimestamp`), so the built-in upgrades in place; it starts empty.
 
 ### Message verification (`L2MessageVerification`)
 

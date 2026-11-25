@@ -19,7 +19,7 @@ and dependency-root import separate source-chain commitment from destination exe
 | `L2AssetRouter`           | L2    | Produces indirect asset-transfer calls and implements timeout recovery.        |
 | `AtomicFlowManager`       | L2    | Commits, finalizes, and authorizes recovery for atomic L2 -> L2 legs.          |
 | `L2InteropCommitmentTree` | L2    | Stores the append-only indexed tree of flow-bound commit values.               |
-| `L2InteropRootStorage`    | L2    | Stores bootloader-imported settlement roots and timestamps.                    |
+| `L2InteropRootStorage`    | L2    | Stores imported settlement roots and timestamps, and writer-added roots.       |
 | `L2InteropHandler`        | L2    | Verifies atomic finality and executes or unbundles L2 -> L2 bundles.           |
 | `L1InteropHandler`        | L1    | Proves and finalizes restricted L2 -> L1 withdrawal bundles.                   |
 | `MessageRoot`             | L1    | Aggregates per-chain batch roots and authenticates imported dependencies.      |
@@ -109,10 +109,12 @@ root commits to its L2-to-L1 logs and its atomic IMT begin/end roots. Updating a
 shared aggregate root and records a timestamped `historicalRoot`.
 
 The destination server obtains the necessary Merkle paths and supplies dependency roots to its
-bootloader. The bootloader is the only writer to `L2InteropRootStorage`. Imported roots do not become
-trusted merely because the destination operator supplied them: when that destination batch executes,
-`ExecutorFacet` compares every imported root and timestamp against settlement-layer history and checks
-the committed rolling hash.
+bootloader. The bootloader is the only writer of settlement-layer roots to `L2InteropRootStorage`.
+Imported roots do not become trusted merely because the destination operator supplied them: when that
+destination batch executes, `ExecutorFacet` compares every imported root and timestamp against
+settlement-layer history and checks the committed rolling hash. The roots of chains outside the
+ecosystem come from [interop root writers](../interop.md#interop-root-writers) instead, skip this
+check, and are only as trustworthy as the writer.
 
 Proof service availability is a liveness concern, not a safety exception. Any party with the settled
 data may reconstruct proofs. Atomic IMT leaves are additionally recorded as mandatory L2-to-L1 logs so

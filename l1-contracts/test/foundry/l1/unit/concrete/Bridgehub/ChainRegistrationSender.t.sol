@@ -8,7 +8,8 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {
     CHAIN_FEATURES_MIN_PROTOCOL_VERSION,
     CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION,
-    ChainRegistrationSender
+    ChainRegistrationSender,
+    INTEROP_ROOT_WRITERS_MIN_PROTOCOL_VERSION
 } from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {IChainRegistrationSender} from "contracts/core/chain-registration/IChainRegistrationSender.sol";
 import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -17,8 +18,14 @@ import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
-import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
+import {L2_BRIDGEHUB_ADDR, L2_INTEROP_ROOT_STORAGE_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {INTEROP_ROOT_WRITERS_FEATURE, TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
+import {IL2InteropRootStorage} from "contracts/interop/IL2InteropRootStorage.sol";
+import {
+    InteropRootWritersNotEnabled,
+    InteropRootWritersNotSupported,
+    InvalidInteropRootSource
+} from "contracts/interop/InteropErrors.sol";
 import {Unauthorized, UnsupportedEncodingVersion} from "contracts/common/L1ContractErrors.sol";
 import {
     ChainFeaturesNotSupported,
@@ -42,7 +49,7 @@ contract ChainRegistrationSenderUnitTest is Test {
     uint256 internal constant UNREGISTERED_CHAIN_ID = 123456;
     bytes32 internal constant PEER_BASE_TOKEN_ASSET_ID = keccak256("peerBaseToken");
     bytes32 internal constant CHAIN_BASE_TOKEN_ASSET_ID = keccak256("chainBaseToken");
-    /// @dev No production feature exists yet; the gate takes any id.
+    /// @dev A feature nothing reads; the gate takes any id.
     bytes32 internal constant TEST_FEATURE = keccak256("testFeature");
 
     address internal bridgehub;
@@ -523,5 +530,156 @@ contract ChainRegistrationSenderUnitTest is Test {
         vm.expectRevert(ZKChainNotRegistered.selector);
         vm.prank(owner);
         sender.setChainFeatureEnabled(UNREGISTERED_CHAIN_ID, TEST_FEATURE, true);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            Interop root writers
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev The chain id of a source chain outside the ecosystem: not registered in the Bridgehub.
+    uint256 internal constant SOURCE_CHAIN_ID = UNREGISTERED_CHAIN_ID;
+
+    function _enableInteropRootWriters() internal {
+        _mockProtocolVersion(INTEROP_ROOT_WRITERS_MIN_PROTOCOL_VERSION);
+        vm.prank(owner);
+        sender.setChainFeatureEnabled(CHAIN_ID, INTEROP_ROOT_WRITERS_FEATURE, true);
+    }
+
+    function _expectWriterPush(address _writer) internal {
+        vm.expectCall(
+            chain,
+            abi.encodeCall(
+                IMailbox.requestL2ServiceTransaction,
+                (
+                    L2_INTEROP_ROOT_STORAGE_ADDR,
+                    abi.encodeCall(IL2InteropRootStorage.setInteropRootWriter, (SOURCE_CHAIN_ID, _writer))
+                )
+            )
+        );
+    }
+
+    function test_setInteropRootWriter_byChainAdmin() public {
+        _enableInteropRootWriters();
+        address writer = makeAddr("writer");
+
+        vm.expectEmit(true, true, true, true, address(sender));
+        emit IChainRegistrationSender.InteropRootWriterSet(CHAIN_ID, SOURCE_CHAIN_ID, writer);
+        _expectWriterPush(writer);
+        vm.prank(chainAdmin);
+        sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, writer);
+
+        assertEq(sender.interopRootWriter(CHAIN_ID, SOURCE_CHAIN_ID), writer);
+        assertEq(sender.interopRootWriter(PEER_CHAIN_ID, SOURCE_CHAIN_ID), address(0), "only the chain's own side");
+    }
+
+    /// @notice The ecosystem decides which chains may trust a writer: without the chain feature, the admin can't.
+    function test_setInteropRootWriter_revertWhen_featureNotEnabled() public {
+        vm.prank(chainAdmin);
+        vm.expectRevert(InteropRootWritersNotEnabled.selector);
+        sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("writer"));
+    }
+
+    /// @notice The writers ship in v0.36.0: on an older chain neither setting nor removing one reaches the L2, even
+    /// if the feature was recorded as enabled.
+    function test_setInteropRootWriter_revertWhen_protocolVersionBelowV36() public {
+        assertEq(INTEROP_ROOT_WRITERS_MIN_PROTOCOL_VERSION, 0x2400000000, "v0.36.0");
+        uint256 oldVersion = INTEROP_ROOT_WRITERS_MIN_PROTOCOL_VERSION - 1;
+        _mockProtocolVersion(CHAIN_FEATURES_MIN_PROTOCOL_VERSION);
+        vm.prank(owner);
+        sender.setChainFeatureEnabled(CHAIN_ID, INTEROP_ROOT_WRITERS_FEATURE, true);
+        _mockProtocolVersion(oldVersion);
+
+        address[2] memory writers = [makeAddr("writer"), address(0)];
+        for (uint256 i = 0; i < writers.length; ++i) {
+            vm.prank(chainAdmin);
+            vm.expectRevert(abi.encodeWithSelector(InteropRootWritersNotSupported.selector, CHAIN_ID, oldVersion));
+            sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, writers[i]);
+        }
+        assertEq(sender.interopRootWriter(CHAIN_ID, SOURCE_CHAIN_ID), address(0));
+    }
+
+    /// @notice Only the chain's admin chooses whom its chain trusts; the ecosystem can only remove a writer.
+    function test_setInteropRootWriter_revertWhen_ownerSetsWriter() public {
+        _enableInteropRootWriters();
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, owner));
+        sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("writer"));
+    }
+
+    function test_setInteropRootWriter_removalByOwnerBridgehubAdminOrChainAdmin() public {
+        _enableInteropRootWriters();
+        address ecosystemAdmin = makeAddr("ecosystemAdmin");
+        _mockBridgehubAdmin(ecosystemAdmin);
+        address[3] memory removers = [owner, ecosystemAdmin, chainAdmin];
+        for (uint256 i = 0; i < removers.length; ++i) {
+            vm.prank(chainAdmin);
+            sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("writer"));
+
+            vm.expectEmit(true, true, true, true, address(sender));
+            emit IChainRegistrationSender.InteropRootWriterSet(CHAIN_ID, SOURCE_CHAIN_ID, address(0));
+            _expectWriterPush(address(0));
+            vm.prank(removers[i]);
+            sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, address(0));
+            assertEq(sender.interopRootWriter(CHAIN_ID, SOURCE_CHAIN_ID), address(0));
+        }
+    }
+
+    function testFuzz_setInteropRootWriter_revertWhen_strangerRemoves(address _caller) public {
+        _mockBridgehubAdmin(makeAddr("ecosystemAdmin"));
+        vm.assume(_caller != owner && _caller != chainAdmin && _caller != makeAddr("ecosystemAdmin"));
+        // The proxy admin can't reach the implementation at all.
+        vm.assume(_caller != makeAddr("proxyAdmin"));
+        vm.prank(_caller);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, _caller));
+        sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, address(0));
+    }
+
+    /// @notice The roots of L1, of the chain itself and of every ZK chain reach the chain through its settlement
+    /// layer; a writer can't be named for them.
+    function test_setInteropRootWriter_revertWhen_sourceIsL1SelfOrZKChain() public {
+        _enableInteropRootWriters();
+        uint256[3] memory sources = [block.chainid, CHAIN_ID, PEER_CHAIN_ID];
+        for (uint256 i = 0; i < sources.length; ++i) {
+            vm.prank(chainAdmin);
+            vm.expectRevert(abi.encodeWithSelector(InvalidInteropRootSource.selector, sources[i]));
+            sender.setInteropRootWriter(CHAIN_ID, sources[i], makeAddr("writer"));
+        }
+    }
+
+    /// @notice A writer stays removable after its source chain id is registered as a ZK chain, the collision the
+    /// source check exists to prevent.
+    function test_setInteropRootWriter_removalAfterSourceBecameZKChain() public {
+        _enableInteropRootWriters();
+        address ecosystemAdmin = makeAddr("ecosystemAdmin");
+        _mockBridgehubAdmin(ecosystemAdmin);
+        address[3] memory removers = [owner, ecosystemAdmin, chainAdmin];
+        for (uint256 i = 0; i < removers.length; ++i) {
+            vm.mockCall(
+                bridgehub,
+                abi.encodeCall(IBridgehubBase.getZKChain, (SOURCE_CHAIN_ID)),
+                abi.encode(address(0))
+            );
+            vm.prank(chainAdmin);
+            sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("writer"));
+
+            vm.mockCall(
+                bridgehub,
+                abi.encodeCall(IBridgehubBase.getZKChain, (SOURCE_CHAIN_ID)),
+                abi.encode(makeAddr("sourceNowAZKChain"))
+            );
+            vm.prank(chainAdmin);
+            vm.expectRevert(abi.encodeWithSelector(InvalidInteropRootSource.selector, SOURCE_CHAIN_ID));
+            sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, makeAddr("writer"));
+
+            _expectWriterPush(address(0));
+            vm.prank(removers[i]);
+            sender.setInteropRootWriter(CHAIN_ID, SOURCE_CHAIN_ID, address(0));
+            assertEq(sender.interopRootWriter(CHAIN_ID, SOURCE_CHAIN_ID), address(0));
+        }
+    }
+
+    function test_setInteropRootWriter_revertWhen_chainNotRegistered() public {
+        vm.expectRevert(ZKChainNotRegistered.selector);
+        sender.setInteropRootWriter(UNREGISTERED_CHAIN_ID, SOURCE_CHAIN_ID, address(0));
     }
 }

@@ -14,6 +14,9 @@ interface IChainRegistrationSender {
     /// @notice `feature` was enabled or disabled for `chainId`.
     event ChainFeatureSet(uint256 indexed chainId, bytes32 indexed feature, bool enabled);
 
+    /// @notice `writer` may now add `sourceChainId`'s interop roots on `chainId`; zero removes the writer.
+    event InteropRootWriterSet(uint256 indexed chainId, uint256 indexed sourceChainId, address indexed writer);
+
     function initialize(address _owner) external;
 
     /// @notice Whether the admin of `_chainId` allowed interop with `_peerChainId`.
@@ -30,6 +33,22 @@ interface IChainRegistrationSender {
     /// @param _feature The feature id.
     /// @param _enabled Whether the feature is enabled.
     function setChainFeatureEnabled(uint256 _chainId, bytes32 _feature, bool _enabled) external;
+
+    /// @notice The address that may add `_sourceChainId`'s interop roots on `_chainId`, or zero.
+    /// See {protocol-docs/interop.md#interop-root-writers}.
+    function interopRootWriter(uint256 _chainId, uint256 _sourceChainId) external view returns (address);
+
+    /// @notice Sets the writer of `_sourceChainId`'s interop roots on `_chainId`, on L1 and on the chain's
+    /// `L2InteropRootStorage`, once the chain runs protocol version v0.36.0 or later. Setting a writer is callable by
+    /// the admin of `_chainId` once the chain feature `INTEROP_ROOT_WRITERS_FEATURE` is enabled for it; removing one
+    /// (zero `_writer`) also by the owner and by the Bridgehub admin. A writer can't be set for L1, `_chainId` or a
+    /// registered ZK chain; it can still be removed once its source has become a registered ZK chain.
+    /// See {protocol-docs/interop.md#interop-root-writers}.
+    /// @param _chainId The chain that stores the roots.
+    /// @param _sourceChainId The chain whose roots the writer adds.
+    /// @param _writer The writer, any address (an operator key or a contract such as a light client), or zero to
+    /// remove it.
+    function setInteropRootWriter(uint256 _chainId, uint256 _sourceChainId, address _writer) external;
 
     /// @notice Allows interop between `_chainId` and `_peerChainId` on `_chainId`'s side, on L1 and on
     /// `_chainId`'s L2 Bridgehub. `deregisterInteropPairs` revokes it.

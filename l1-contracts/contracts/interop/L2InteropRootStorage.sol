@@ -2,23 +2,40 @@
 
 pragma solidity 0.8.28;
 
-import {L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {INTEROP_ROOT_WRITERS_FEATURE, SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
 import {IL2InteropRootStorage} from "./IL2InteropRootStorage.sol";
-import {InteropRootAlreadyExists, InteropRootTimestampIsZero, SidesLengthNotOne} from "./InteropErrors.sol";
+import {
+    InteropRootAlreadyExists,
+    InteropRootTimestampIsZero,
+    InteropRootWritersNotEnabled,
+    InvalidInteropRootSource,
+    SidesLengthNotOne
+} from "./InteropErrors.sol";
 import {MessageRootIsZero} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {InteropRoot, StoredInteropRoot} from "contracts/common/Messaging.sol";
 
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice Stores the message roots of other chains on the L2, imported by the bootloader.
- * See {protocol-docs/interop.md#root-import-l2interoprootstorage}.
+ * @notice Stores the message roots of other chains on the L2, imported by the bootloader or written by
+ * the chain's interop root writers. See {protocol-docs/interop.md#root-import-l2interoprootstorage} and
+ * {protocol-docs/interop.md#interop-root-writers}.
  */
 contract L2InteropRootStorage is IL2InteropRootStorage {
     /// @dev Only allows calls from the bootloader.
     modifier onlyCallFromBootloader() {
         if (msg.sender != L2_BOOTLOADER_ADDRESS) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    /// @dev Only allows service transactions, which only the L1 `ChainRegistrationSender` sends to this contract.
+    modifier onlyServiceTransactionSender() {
+        if (msg.sender != SERVICE_TRANSACTION_SENDER) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -34,6 +51,10 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
     /// @inheritdoc IL2InteropRootStorage
     /// @dev Appended after `storedInteropRoots`, so the v31 layout note above is unaffected.
     mapping(uint256 chainId => uint256 timestamp) public latestInteropRootTimestamp;
+
+    /// @inheritdoc IL2InteropRootStorage
+    /// @dev Appended after `latestInteropRootTimestamp`; the mapping is empty when the built-in is upgraded in place.
+    mapping(uint256 sourceChainId => address writer) public interopRootWriter;
 
     /// @inheritdoc IL2InteropRootStorage
     function interopRoots(
@@ -67,7 +88,52 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
         }
     }
 
+    /// @inheritdoc IL2InteropRootStorage
+    function setInteropRootWriter(uint256 _sourceChainId, address _writer) external onlyServiceTransactionSender {
+        if (_sourceChainId == block.chainid) {
+            revert InvalidInteropRootSource(_sourceChainId);
+        }
+        interopRootWriter[_sourceChainId] = _writer;
+        emit InteropRootWriterSet(_sourceChainId, _writer);
+    }
+
+    /// @inheritdoc IL2InteropRootStorage
+    function addInteropRootFromWriter(InteropRoot calldata _interopRoot) external {
+        if (msg.sender != interopRootWriter[_interopRoot.chainId]) {
+            revert Unauthorized(msg.sender);
+        }
+        if (!IL2Bridgehub(L2_BRIDGEHUB_ADDR).isChainFeatureEnabled(INTEROP_ROOT_WRITERS_FEATURE)) {
+            revert InteropRootWritersNotEnabled();
+        }
+        _storeInteropRoot(
+            _interopRoot.chainId,
+            _interopRoot.blockOrBatchNumber,
+            _interopRoot.timestamp,
+            _interopRoot.sides
+        );
+        // Not `InteropRootAdded`: ZKsync OS folds every `InteropRootAdded` of this contract into the batch's
+        // `dependencyRootsRollingHash`, which the settlement layer checks against its own message root.
+        emit InteropRootAddedByWriter({
+            chainId: _interopRoot.chainId,
+            blockNumber: _interopRoot.blockOrBatchNumber,
+            timestamp: _interopRoot.timestamp,
+            sides: _interopRoot.sides,
+            writer: msg.sender
+        });
+    }
+
     function _addInteropRoot(
+        uint256 chainId,
+        uint256 blockOrBatchNumber,
+        uint256 timestamp,
+        bytes32[] calldata sides
+    ) private {
+        _storeInteropRoot(chainId, blockOrBatchNumber, timestamp, sides);
+        emit InteropRootAdded(chainId, blockOrBatchNumber, timestamp, sides);
+    }
+
+    /// @dev Enforces the import invariants of {IL2InteropRootStorage} for both the bootloader and the writers.
+    function _storeInteropRoot(
         uint256 chainId,
         uint256 blockOrBatchNumber,
         uint256 timestamp,
@@ -98,7 +164,5 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
         if (timestamp > latestInteropRootTimestamp[chainId]) {
             latestInteropRootTimestamp[chainId] = timestamp;
         }
-
-        emit InteropRootAdded(chainId, blockOrBatchNumber, timestamp, sides);
     }
 }

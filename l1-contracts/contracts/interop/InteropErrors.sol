@@ -49,12 +49,18 @@ error InteropPreviewHash(bytes32 bundleHash);
 error InteropRootAlreadyExists();
 // 0x8a011102
 error InteropRootTimestampIsZero();
+// 0x3cebbbfd
+error InteropRootWritersNotEnabled();
+// 0x97c3045a
+error InteropRootWritersNotSupported(uint256 chainId, uint256 protocolVersion);
 // 0x9b021130
 error InteropToSelfNotSupported();
 // 0xeae192ef
 error InvalidInteropBundleVersion();
 // 0xd5f13973
 error InvalidInteropCallVersion();
+// 0xc8fed078
+error InvalidInteropRootSource(uint256 sourceChainId);
 // 0x32c2e156
 error MessageNotIncluded();
 // 0x6a430157

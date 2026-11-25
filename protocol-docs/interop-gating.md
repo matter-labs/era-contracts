@@ -216,9 +216,13 @@ while the chain's diamond reports an older protocol version than `CHAIN_FEATURES
 reports that version, the chain's L2 runs the upgrade transaction before any later service transaction. Calling
 `setChainFeatureEnabled` again sends the value again.
 
-No feature is gated yet: no contract reads an id. A feature brings its id, by convention the `keccak256` of its name,
-and the check that reads it with the upgrade that ships it, without changing `ChainRegistrationSender` or
-`L2Bridgehub`. Neither checks the id, so setting one that nothing reads has no effect.
+A feature brings its id, by convention the `keccak256` of its name, and the check that reads it with the upgrade that
+ships it, without changing `ChainRegistrationSender` or `L2Bridgehub`. Neither checks the id, so setting one that
+nothing reads has no effect. The gated features:
+
+| Feature id                                                         | Gates                                                                              |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `INTEROP_ROOT_WRITERS_FEATURE` (`keccak256("InteropRootWriters")`) | the chain's interop root writers ({protocol-docs/interop.md#interop-root-writers}) |
 
 ## Governance procedure
 
