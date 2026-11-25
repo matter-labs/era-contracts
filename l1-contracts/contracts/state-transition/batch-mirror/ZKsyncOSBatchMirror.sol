@@ -31,13 +31,21 @@ import {
     Unauthorized,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
-import {BatchMirrorLengthMismatch, SettlementLayerChainIdMismatch} from "../L1StateTransitionErrors.sol";
+import {
+    BatchMirrorLengthMismatch,
+    SettlementLayerChainIdMismatch,
+    UnexpectedUpgradeTxHash
+} from "../L1StateTransitionErrors.sol";
 
 /// @title A verify-only copy of a ZKsync OS chain's executed batches, kept on a chain it does not settle on.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice See {protocol-docs/batch-mirror.md}.
 /// @dev Deployed behind a proxy: the Bridgehub registers the followed chain under this address for good.
+/// The owner and the proxy admin are trusted for soundness: either can make the mirror accept any batch root,
+/// and with it any message of the followed chain. So are the validators, which can mirror any batch that
+/// has a valid proof, including one the settlement layer would refuse to execute.
+/// See {protocol-docs/batch-mirror.md#what-the-mirror-trusts}.
 contract ZKsyncOSBatchMirror is IZKsyncOSBatchMirror, Ownable2StepUpgradeable {
     /// @dev The followed chain.
     uint256 internal chainId;
@@ -74,6 +82,10 @@ contract ZKsyncOSBatchMirror is IZKsyncOSBatchMirror, Ownable2StepUpgradeable {
 
     /// @dev The chain batch root of each mirrored batch.
     mapping(uint256 batchNumber => bytes32 root) internal l2LogsRootHashes;
+
+    /// @dev The system upgrade transaction the owner expects in a coming batch, as the settlement layer's
+    /// `l2SystemContractsUpgradeTxHash`; zero when none is expected.
+    bytes32 internal l2SystemContractsUpgradeTxHash;
 
     modifier onlyValidator() {
         if (!validators[msg.sender]) {
@@ -129,6 +141,7 @@ contract ZKsyncOSBatchMirror is IZKsyncOSBatchMirror, Ownable2StepUpgradeable {
         if (_upgradeTxHashes.length != batchesCount) {
             revert BatchMirrorLengthMismatch(batchesCount, _upgradeTxHashes.length);
         }
+        _consumeUpgradeTxHash(_upgradeTxHashes);
         uint256 lastMirrored = totalBatchesExecuted;
         (
             IExecutor.StoredBatchInfo memory previousBatch,
@@ -148,6 +161,25 @@ contract ZKsyncOSBatchMirror is IZKsyncOSBatchMirror, Ownable2StepUpgradeable {
 
         _executeBatches(provedBatches);
         emit BatchesMirrored(lastMirrored + 1, lastMirrored + batchesCount);
+    }
+
+    /// @dev Requires every non-zero upgrade transaction hash to be the one the owner expects and clears it,
+    /// as the settlement layer's `CommitterFacet` uses `l2SystemContractsUpgradeTxHash` for one batch only.
+    function _consumeUpgradeTxHash(bytes32[] calldata _upgradeTxHashes) internal {
+        bytes32 expected = l2SystemContractsUpgradeTxHash;
+        uint256 batchesCount = _upgradeTxHashes.length;
+        for (uint256 i = 0; i < batchesCount; ++i) {
+            bytes32 upgradeTxHash = _upgradeTxHashes[i];
+            if (upgradeTxHash == bytes32(0)) {
+                continue;
+            }
+            if (upgradeTxHash != expected) {
+                revert UnexpectedUpgradeTxHash(expected, upgradeTxHash);
+            }
+            // A second batch with the same upgrade transaction fails the check above.
+            expected = bytes32(0);
+            delete l2SystemContractsUpgradeTxHash;
+        }
     }
 
     /// @dev Recomputes the batches of the commits, checks that they are the proved ones and returns the
@@ -250,6 +282,18 @@ contract ZKsyncOSBatchMirror is IZKsyncOSBatchMirror, Ownable2StepUpgradeable {
     }
 
     /// @inheritdoc IZKsyncOSBatchMirror
+    function setSettlementLayerChainId(uint256 _settlementLayerChainId) external onlyOwner {
+        emit NewSettlementLayerChainId(settlementLayerChainId, _settlementLayerChainId);
+        settlementLayerChainId = _settlementLayerChainId;
+    }
+
+    /// @inheritdoc IZKsyncOSBatchMirror
+    function setL2SystemContractsUpgradeTxHash(bytes32 _upgradeTxHash) external onlyOwner {
+        emit NewL2SystemContractsUpgradeTxHash(l2SystemContractsUpgradeTxHash, _upgradeTxHash);
+        l2SystemContractsUpgradeTxHash = _upgradeTxHash;
+    }
+
+    /// @inheritdoc IZKsyncOSBatchMirror
     function setProofSystemStatus(ProofSystem _proofSystem, bool _enabled) external onlyOwner {
         // The same switch as `AdminFacet.setProofSystemStatus`: only ZiSK can be turned off on ZKsync OS.
         if (_proofSystem != ProofSystem.Zisk) {
@@ -317,6 +361,11 @@ contract ZKsyncOSBatchMirror is IZKsyncOSBatchMirror, Ownable2StepUpgradeable {
     /// @inheritdoc IZKsyncOSBatchMirror
     function getTotalBatchesExecuted() external view returns (uint256) {
         return totalBatchesExecuted;
+    }
+
+    /// @inheritdoc IZKsyncOSBatchMirror
+    function getL2SystemContractsUpgradeTxHash() external view returns (bytes32) {
+        return l2SystemContractsUpgradeTxHash;
     }
 
     /// @inheritdoc IZKsyncOSBatchMirror

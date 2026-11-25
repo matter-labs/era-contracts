@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {ZKsyncOSBatchMirrorSharedTest, RejectingVerifier} from "./_ZKsyncOSBatchMirror_Shared.t.sol";
+import {L2HostStack, ZKsyncOSBatchMirrorSharedTest, RejectingVerifier} from "./_ZKsyncOSBatchMirror_Shared.t.sol";
 
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 
@@ -28,6 +28,7 @@ import {
     BatchHashMismatch,
     CanOnlyProcessOneBatch,
     ChainConfigHashMismatch,
+    ChainIdAlreadyExists,
     EmptyData,
     IncorrectBatchBounds,
     IncorrectBatchChainId,
@@ -42,7 +43,8 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {
     BatchMirrorLengthMismatch,
-    SettlementLayerChainIdMismatch
+    SettlementLayerChainIdMismatch,
+    UnexpectedUpgradeTxHash
 } from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {OnlyChain} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
@@ -63,6 +65,7 @@ contract ZKsyncOSBatchMirrorTest is ZKsyncOSBatchMirrorSharedTest {
         assertEq(mirror.storedBatchHash(ANCHOR_BATCH_NUMBER), keccak256(abi.encode(anchor)));
         assertEq(mirror.l2LogsRootHash(ANCHOR_BATCH_NUMBER), anchor.l2LogsTreeRoot);
         assertEq(abi.encode(mirror.getZKsyncOSChainConfig()), abi.encode(chainConfig));
+        assertEq(mirror.getL2SystemContractsUpgradeTxHash(), bytes32(0));
         assertEq(
             mirror.getZKsyncOSChainConfigHash(),
             ZKsyncOSBatchCommitment.chainConfigHash(
@@ -84,6 +87,25 @@ contract ZKsyncOSBatchMirrorTest is ZKsyncOSBatchMirrorSharedTest {
         assertTrue(messageRoot.chainRegistered(FOLLOWED_CHAIN_ID));
         // The MessageRoot continues the chain's batch numbering from the anchor.
         assertEq(messageRoot.currentChainBatchNumber(FOLLOWED_CHAIN_ID), ANCHOR_BATCH_NUMBER);
+    }
+
+    /// @notice Only the Bridgehub owner registers a mirror, and a chain ID only once.
+    function test_registration_onlyByTheBridgehubOwnerAndOnce() public {
+        ZKsyncOSBatchMirrorInitParams memory params = _initParams();
+        params.chainId = FOLLOWED_CHAIN_ID + 1;
+        ZKsyncOSBatchMirror other = _deployMirror(params);
+
+        vm.prank(makeAddr("stranger"));
+        vm.expectRevert("Ownable: caller is not the owner");
+        bridgehub.registerAlreadyDeployedZKChain(FOLLOWED_CHAIN_ID + 1, address(other));
+
+        vm.prank(bridgehubOwner);
+        vm.expectRevert(ChainIdAlreadyExists.selector);
+        bridgehub.registerAlreadyDeployedZKChain(FOLLOWED_CHAIN_ID, address(other));
+
+        vm.prank(bridgehubOwner);
+        bridgehub.registerAlreadyDeployedZKChain(FOLLOWED_CHAIN_ID + 1, address(other));
+        assertEq(bridgehub.getZKChain(FOLLOWED_CHAIN_ID + 1), address(other));
     }
 
     function test_initialize_rejectsZeroAddresses() public {
@@ -166,22 +188,121 @@ contract ZKsyncOSBatchMirrorTest is ZKsyncOSBatchMirrorSharedTest {
     }
 
     /// @notice The upgrade transaction hash enters the commitment, so a batch mirrors only with the hash the
-    /// settlement layer committed it with.
+    /// settlement layer committed it with, and only once the owner has set that hash, as governance does on
+    /// the settlement layer. The mirror uses it for one batch.
     function test_mirrorBatches_withUpgradeTransaction() public {
-        bytes32[] memory roots = new bytes32[](2);
-        roots[0] = _chainBatchRoot(keccak256("upgrade batch logs"));
-        roots[1] = _chainBatchRoot(keccak256("next batch logs"));
-        bytes32[] memory upgradeTxHashes = new bytes32[](2);
-        upgradeTxHashes[0] = keccak256("upgrade tx");
-        Range memory range = _sealWithRoots(roots, upgradeTxHashes);
+        Range memory range = _sealWithUpgrade(keccak256("upgrade tx"));
 
         (bytes[] memory commitData, bytes memory proofData) = _encode(range);
         vm.prank(validator);
         vm.expectRevert(_hashMismatch(range, 0, bytes32(0)));
         mirror.mirrorBatches(commitData, new bytes32[](2), proofData);
 
+        vm.expectEmit(true, true, true, true, address(mirror));
+        emit IZKsyncOSBatchMirror.NewL2SystemContractsUpgradeTxHash(bytes32(0), keccak256("upgrade tx"));
+        vm.prank(owner);
+        mirror.setL2SystemContractsUpgradeTxHash(keccak256("upgrade tx"));
+        assertEq(mirror.getL2SystemContractsUpgradeTxHash(), keccak256("upgrade tx"));
+
         _mirror(range);
         _assertMirrored(range);
+        assertEq(mirror.getL2SystemContractsUpgradeTxHash(), bytes32(0), "used up");
+    }
+
+    /// @notice A relayer cannot pick the upgrade transaction: a proved batch with an upgrade transaction the
+    /// owner did not set is rejected, even with a valid proof.
+    function test_mirrorBatches_rejectsAnUpgradeTransactionTheOwnerDidNotSet() public {
+        Range memory range = _sealWithUpgrade(keccak256("made-up upgrade tx"));
+
+        _expectMirrorRevert(
+            range,
+            abi.encodeWithSelector(UnexpectedUpgradeTxHash.selector, bytes32(0), keccak256("made-up upgrade tx"))
+        );
+
+        vm.prank(owner);
+        mirror.setL2SystemContractsUpgradeTxHash(keccak256("governance-approved upgrade tx"));
+        _expectMirrorRevert(
+            range,
+            abi.encodeWithSelector(
+                UnexpectedUpgradeTxHash.selector,
+                keccak256("governance-approved upgrade tx"),
+                keccak256("made-up upgrade tx")
+            )
+        );
+    }
+
+    /// @notice The owner's upgrade transaction serves one batch, as on the settlement layer: neither a second
+    /// batch of the same range nor a batch of a later range can carry it again.
+    function test_mirrorBatches_usesTheUpgradeTransactionOnce() public {
+        bytes32 upgradeTxHash = keccak256("upgrade tx");
+        vm.prank(owner);
+        mirror.setL2SystemContractsUpgradeTxHash(upgradeTxHash);
+
+        bytes32[] memory roots = new bytes32[](2);
+        roots[0] = _chainBatchRoot(keccak256("upgrade batch logs"));
+        roots[1] = _chainBatchRoot(keccak256("next batch logs"));
+        bytes32[] memory upgradeTxHashes = new bytes32[](2);
+        upgradeTxHashes[0] = upgradeTxHash;
+        upgradeTxHashes[1] = upgradeTxHash;
+        Range memory twice = _sealWithRoots(roots, upgradeTxHashes);
+        _expectMirrorRevert(twice, abi.encodeWithSelector(UnexpectedUpgradeTxHash.selector, bytes32(0), upgradeTxHash));
+        assertEq(mirror.getL2SystemContractsUpgradeTxHash(), upgradeTxHash, "a rejected range uses nothing up");
+
+        settlementLayerTip = twice.previous;
+        _mirror(_sealWithUpgrade(upgradeTxHash));
+        _expectMirrorRevert(
+            _sealWithUpgrade(upgradeTxHash),
+            abi.encodeWithSelector(UnexpectedUpgradeTxHash.selector, bytes32(0), upgradeTxHash)
+        );
+    }
+
+    /// @notice The owner follows the followed chain to a new settlement layer: batches committed there carry
+    /// the new chain ID, and from then on only they mirror.
+    function test_mirrorBatches_followsASettlementLayerMigration() public {
+        uint256 newSettlementLayerChainId = SETTLEMENT_LAYER_CHAIN_ID + 1;
+        _mirror(_seal(1));
+        Range memory migrated = _seal(1);
+        migrated.commits[0].slChainId = newSettlementLayerChainId;
+        migrated.batches[0] = _storedBatchInfo(migrated.previous, migrated.commits[0], bytes32(0));
+        migrated.proof = _mockProof(migrated.batches);
+        settlementLayerTip = migrated.batches[0];
+        _expectMirrorRevert(migrated, abi.encodeWithSelector(SettlementLayerChainIdMismatch.selector));
+
+        vm.expectEmit(true, true, true, true, address(mirror));
+        emit IZKsyncOSBatchMirror.NewSettlementLayerChainId(SETTLEMENT_LAYER_CHAIN_ID, newSettlementLayerChainId);
+        vm.prank(owner);
+        mirror.setSettlementLayerChainId(newSettlementLayerChainId);
+        assertEq(mirror.getSettlementLayerChainId(), newSettlementLayerChainId);
+
+        _mirror(migrated);
+        _assertMirrored(migrated);
+    }
+
+    /// @notice The mirror does not run the settlement layer's execution checks: a proved batch whose priority
+    /// operations or imported interop roots the settlement layer never had still mirrors. The validators are
+    /// trusted to mirror only executed batches (see `protocol-docs/batch-mirror.md`, "What the mirror trusts").
+    function test_mirrorBatches_trustsTheValidatorForExecutionChecks() public {
+        bytes32[] memory roots = new bytes32[](1);
+        roots[0] = _chainBatchRoot(keccak256("logs of a batch the settlement layer never executed"));
+        Range memory range = _sealWithRoots(roots, new bytes32[](1));
+        range.commits[0].numberOfLayer1Txs = 1;
+        range.commits[0].priorityOperationsHash = keccak256("made-up deposit");
+        range.commits[0].dependencyRootsRollingHash = keccak256("made-up interop root");
+        range.batches[0] = _storedBatchInfo(range.previous, range.commits[0], bytes32(0));
+        range.proof = _mockProof(range.batches);
+
+        _mirror(range);
+        _assertMirrored(range);
+    }
+
+    /// @dev Commits and proves an upgrade batch carrying `_upgradeTxHash` and the batch after it.
+    function _sealWithUpgrade(bytes32 _upgradeTxHash) internal returns (Range memory) {
+        bytes32[] memory roots = new bytes32[](2);
+        roots[0] = _chainBatchRoot(keccak256(abi.encode("upgrade batch logs", settlementLayerTip.batchNumber)));
+        roots[1] = _chainBatchRoot(keccak256(abi.encode("next batch logs", settlementLayerTip.batchNumber)));
+        bytes32[] memory upgradeTxHashes = new bytes32[](2);
+        upgradeTxHashes[0] = _upgradeTxHash;
+        return _sealWithRoots(roots, upgradeTxHashes);
     }
 
     /// @notice A batch's own `chainConfigHash` is what its commitment binds; the owner follows a change of
@@ -607,6 +728,10 @@ contract ZKsyncOSBatchMirrorTest is ZKsyncOSBatchMirrorSharedTest {
         mirror.setZKsyncOSChainConfig(chainConfig);
         vm.expectRevert("Ownable: caller is not the owner");
         mirror.setProofSystemStatus(ProofSystem.Zisk, false);
+        vm.expectRevert("Ownable: caller is not the owner");
+        mirror.setSettlementLayerChainId(SETTLEMENT_LAYER_CHAIN_ID + 1);
+        vm.expectRevert("Ownable: caller is not the owner");
+        mirror.setL2SystemContractsUpgradeTxHash(keccak256("upgrade tx"));
         vm.stopPrank();
     }
 
@@ -619,5 +744,13 @@ contract ZKsyncOSBatchMirrorTest is ZKsyncOSBatchMirrorSharedTest {
         vm.prank(newOwner);
         mirror.acceptOwnership();
         assertEq(mirror.getAdmin(), newOwner);
+    }
+}
+
+/// @notice Every mirror test, with the mirror registered in the L2 Bridgehub and appending to the L2
+/// `MessageRoot`.
+contract ZKsyncOSBatchMirrorL2HostTest is ZKsyncOSBatchMirrorTest, L2HostStack {
+    function _deployHostStack() internal override(ZKsyncOSBatchMirrorSharedTest, L2HostStack) returns (address) {
+        return L2HostStack._deployHostStack();
     }
 }

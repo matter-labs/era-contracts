@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {ZKsyncOSBatchMirrorSharedTest} from "./_ZKsyncOSBatchMirror_Shared.t.sol";
+import {L2HostStack, ZKsyncOSBatchMirrorSharedTest} from "./_ZKsyncOSBatchMirror_Shared.t.sol";
 
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
@@ -21,7 +21,7 @@ contract ZKsyncOSBatchMirrorMessageProofTest is ZKsyncOSBatchMirrorSharedTest {
     bytes32[] internal logsTreeLeaves;
     uint256 internal messageBatchNumber;
 
-    function setUp() public override {
+    function setUp() public virtual override {
         super.setUp();
         message = L2Message({txNumberInBatch: 2, sender: makeAddr("l2Sender"), data: "hello from the followed chain"});
         logsTreeLeaves = new bytes32[](1 << LOGS_TREE_DEPTH);
@@ -162,5 +162,17 @@ contract ZKsyncOSBatchMirrorMessageProofTest is ZKsyncOSBatchMirrorSharedTest {
             bytes.concat(ChainBatchRootTree.EMPTY_IMT_ROOT, ChainBatchRootTree.EMPTY_IMT_ROOT)
         );
         proof[3 + LOGS_TREE_DEPTH] = ChainBatchRootTree.RESERVED_SUBTREE_NODE;
+    }
+}
+
+/// @notice The end-to-end message proofs, with the mirror registered in the L2 Bridgehub and the message
+/// proven through the L2 `MessageRoot`, the stack the interop contracts on the host chain read.
+contract ZKsyncOSBatchMirrorL2HostMessageProofTest is ZKsyncOSBatchMirrorMessageProofTest, L2HostStack {
+    function setUp() public override(ZKsyncOSBatchMirrorMessageProofTest, ZKsyncOSBatchMirrorSharedTest) {
+        ZKsyncOSBatchMirrorMessageProofTest.setUp();
+    }
+
+    function _deployHostStack() internal override(ZKsyncOSBatchMirrorSharedTest, L2HostStack) returns (address) {
+        return L2HostStack._deployHostStack();
     }
 }

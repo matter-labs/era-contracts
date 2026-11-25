@@ -98,6 +98,8 @@ error SettlementLayerCTMMismatch();
 error TotalPriorityTxsIsZero();
 // 0x0c946faf
 error TransitionDeadlineMismatch(uint256 expected, uint256 actual);
+// 0x52d65797
+error UnexpectedUpgradeTxHash(bytes32 expected, bytes32 actual);
 // 0x79274f04
 error UnsupportedProofMetadataVersion(uint256 metadataVersion);
 // 0x16bb1290

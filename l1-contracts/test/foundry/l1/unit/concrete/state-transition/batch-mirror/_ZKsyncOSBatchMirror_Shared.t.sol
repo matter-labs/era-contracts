@@ -18,10 +18,20 @@ import {MultiProofTestnetVerifier} from "contracts/state-transition/verifiers/Mu
 import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
 import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {AcceptingVerifier} from "contracts/dev-contracts/test/AcceptingVerifier.sol";
+import {BridgehubBase} from "contracts/core/bridgehub/BridgehubBase.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
+import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
+import {MessageRootBase} from "contracts/core/message-root/MessageRootBase.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
+import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
+import {
+    L2_BRIDGEHUB_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_MESSAGE_ROOT_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {L2DACommitmentScheme, PubdataContent, PUBLIC_INPUT_SHIFT} from "contracts/common/Config.sol";
 
@@ -36,8 +46,8 @@ contract RejectingVerifier is IVerifier {
     }
 }
 
-/// @notice A `ZKsyncOSBatchMirror` on its host chain: a real `L1Bridgehub` and `L1MessageRoot` the mirror is
-/// registered in, and a simulated settlement layer of the followed chain that produces the commit and prove
+/// @notice A `ZKsyncOSBatchMirror` on its host chain: a real Bridgehub and `MessageRoot` the mirror is
+/// registered in (the L1 contracts here, the L2 contracts in `L2HostStack`), and a simulated settlement layer of the followed chain that produces the commit and prove
 /// calldata a relayer replays. The verifier is the testnet multi-proof verifier: its mock proofs check the
 /// public input the mirror computes, but not a cryptographic proof, which the verifier suites cover.
 contract ZKsyncOSBatchMirrorSharedTest is Test {
@@ -64,8 +74,8 @@ contract ZKsyncOSBatchMirrorSharedTest is Test {
     address internal chainTypeManager = makeAddr("chainTypeManager");
     bytes32 internal baseTokenAssetId = keccak256("followed chain base token");
 
-    L1Bridgehub internal bridgehub;
-    L1MessageRoot internal messageRoot;
+    BridgehubBase internal bridgehub;
+    MessageRootBase internal messageRoot;
     MultiProofTestnetVerifier internal verifier;
     ZKsyncOSBatchMirror internal mirror;
     ZKsyncOSChainConfig internal chainConfig;
@@ -75,17 +85,7 @@ contract ZKsyncOSBatchMirrorSharedTest is Test {
     IExecutor.StoredBatchInfo internal settlementLayerTip;
 
     function setUp() public virtual {
-        bridgehub = new L1Bridgehub(bridgehubOwner, 100);
-        address chainAssetHandler = makeAddr("chainAssetHandler");
-        messageRoot = L1MessageRoot(
-            address(
-                new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(address(bridgehub), chainAssetHandler)),
-                    makeAddr("messageRootProxyAdmin"),
-                    abi.encodeCall(L1MessageRoot.initialize, ())
-                )
-            )
-        );
+        address chainAssetHandler = _deployHostStack();
         vm.startPrank(bridgehubOwner);
         bridgehub.setAddresses(
             makeAddr("assetRouter"),
@@ -127,6 +127,21 @@ contract ZKsyncOSBatchMirrorSharedTest is Test {
         mirror.setValidator(validator, true);
         vm.prank(bridgehubOwner);
         bridgehub.registerAlreadyDeployedZKChain(FOLLOWED_CHAIN_ID, address(mirror));
+    }
+
+    /// @dev Deploys the host chain's Bridgehub and `MessageRoot` and returns its chain asset handler.
+    function _deployHostStack() internal virtual returns (address chainAssetHandler) {
+        bridgehub = new L1Bridgehub(bridgehubOwner, 100);
+        chainAssetHandler = makeAddr("chainAssetHandler");
+        messageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(address(bridgehub), chainAssetHandler)),
+                    makeAddr("messageRootProxyAdmin"),
+                    abi.encodeCall(L1MessageRoot.initialize, ())
+                )
+            )
+        );
     }
 
     function _initParams() internal view returns (ZKsyncOSBatchMirrorInitParams memory) {
@@ -311,4 +326,23 @@ contract ZKsyncOSBatchMirrorSharedTest is Test {
 
     // add this to be excluded from coverage report
     function test() internal virtual {}
+}
+
+/// @notice The host chain runs the L2 Bridgehub and `MessageRoot` at their built-in addresses, as an EVM chain
+/// does that also runs the interop contracts, which read the L2 Bridgehub (`isPeerAllowed`).
+abstract contract L2HostStack is ZKsyncOSBatchMirrorSharedTest {
+    /// @dev The host chain's L1, as its L2 contracts are initialized with; not the host chain itself.
+    uint256 internal constant HOST_L1_CHAIN_ID = 1;
+
+    function _deployHostStack() internal virtual override returns (address chainAssetHandler) {
+        vm.etch(L2_BRIDGEHUB_ADDR, address(new L2Bridgehub()).code);
+        vm.etch(L2_MESSAGE_ROOT_ADDR, address(new L2MessageRoot()).code);
+        vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).initL2(HOST_L1_CHAIN_ID, bridgehubOwner, 100);
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(HOST_L1_CHAIN_ID);
+        vm.stopPrank();
+        bridgehub = BridgehubBase(L2_BRIDGEHUB_ADDR);
+        messageRoot = MessageRootBase(L2_MESSAGE_ROOT_ADDR);
+        chainAssetHandler = L2_CHAIN_ASSET_HANDLER_ADDR;
+    }
 }

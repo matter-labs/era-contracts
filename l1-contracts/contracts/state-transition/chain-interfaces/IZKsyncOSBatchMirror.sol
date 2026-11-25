@@ -57,12 +57,22 @@ interface IZKsyncOSBatchMirror {
     /// @notice The followed chain's runtime configuration changed.
     event NewZKsyncOSChainConfig(bytes32 indexed oldChainConfigHash, bytes32 indexed newChainConfigHash);
 
+    /// @notice The chain the followed chain settles on changed.
+    event NewSettlementLayerChainId(
+        uint256 indexed oldSettlementLayerChainId,
+        uint256 indexed newSettlementLayerChainId
+    );
+
+    /// @notice The system upgrade transaction the mirror expects changed.
+    event NewL2SystemContractsUpgradeTxHash(bytes32 indexed oldUpgradeTxHash, bytes32 indexed newUpgradeTxHash);
+
     /// @notice Mirrors the batches of one `proveBatchesSharedBridge` call of the settlement layer.
     /// @dev Callable by validators only. See {protocol-docs/batch-mirror.md#mirroring-a-range}.
     /// @param _commitData The `_commitData` of each `commitBatchesSharedBridge` call that committed the
     /// proved batches, in order, one batch each.
     /// @param _upgradeTxHashes The system upgrade transaction hash each batch was committed with (the
-    /// settlement layer's `ReportCommittedBatchProtocolVersion` event), zero for most batches.
+    /// settlement layer's `ReportCommittedBatchProtocolVersion` event), zero for most batches. A non-zero
+    /// one must be the hash the owner set with `setL2SystemContractsUpgradeTxHash`, and is used up by it.
     /// @param _proofData The `_proofData` of the `proveBatchesSharedBridge` call.
     function mirrorBatches(
         bytes[] calldata _commitData,
@@ -82,6 +92,16 @@ interface IZKsyncOSBatchMirror {
     /// @notice Replaces the followed chain's runtime configuration, following a change on its settlement layer.
     /// @param _chainConfig The new configuration.
     function setZKsyncOSChainConfig(ZKsyncOSChainConfig calldata _chainConfig) external;
+
+    /// @notice Replaces the chain the followed chain settles on, following its migration to another
+    /// settlement layer. Every batch committed on the new settlement layer carries its chain ID.
+    /// @param _settlementLayerChainId The new settlement layer.
+    function setSettlementLayerChainId(uint256 _settlementLayerChainId) external;
+
+    /// @notice Sets the system upgrade transaction the followed chain's next upgrade batch carries, following
+    /// a protocol upgrade on its settlement layer, as `l2SystemContractsUpgradeTxHash` there. Zero clears it.
+    /// @param _upgradeTxHash The upgrade transaction's hash.
+    function setL2SystemContractsUpgradeTxHash(bytes32 _upgradeTxHash) external;
 
     /// @notice Enables or disables one proof system, following the followed chain's switch.
     /// @param _proofSystem The proof system; only `ProofSystem.Zisk` is supported.
@@ -111,6 +131,9 @@ interface IZKsyncOSBatchMirror {
 
     /// @notice The newest mirrored batch; the anchor's number before the first one is mirrored.
     function getTotalBatchesExecuted() external view returns (uint256);
+
+    /// @notice The system upgrade transaction the mirror expects in a coming batch; zero when none is expected.
+    function getL2SystemContractsUpgradeTxHash() external view returns (bytes32);
 
     /// @notice The hash of a mirrored batch's `StoredBatchInfo`, equal to the settlement layer's.
     /// @param _batchNumber The batch.
