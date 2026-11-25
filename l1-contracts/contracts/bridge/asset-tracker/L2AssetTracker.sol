@@ -10,6 +10,7 @@ import {
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT,
     L2_COMPLEX_UPGRADER_ADDR,
+    L2_INTEROP_ROOT_STORAGE,
     L2_NATIVE_TOKEN_VAULT,
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
@@ -26,6 +27,7 @@ import {
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IL2AssetTracker, SavedTotalSupply} from "./IL2AssetTracker.sol";
 import {MAX_TOKEN_BALANCE} from "../../common/Config.sol";
+import {OneWayAssetOriginNotAllowed, RecoveryToOneWayDestinationNotSupported} from "../../interop/InteropErrors.sol";
 
 /// @notice Chain-local, write-mostly token bookkeeping; correctness of transfers is guaranteed by ZK
 /// proofs, not by these balances. See {protocol-docs/bridging.md#l2-asset-tracker}.
@@ -152,6 +154,21 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
         address tokenAddress = _tryGetTokenAddress(_assetId);
         _registerLegacyTokenIfNeeded(_assetId, tokenAddress);
 
+        // The origin rule of one-way links, see {protocol-docs/interop.md#one-way-bundles-with-a-writer-source}.
+        if (_toChainId == L1_CHAIN_ID) {
+            if (_tokenOriginChainId != L1_CHAIN_ID && _tokenOriginChainId != block.chainid) {
+                require(
+                    !L2_INTEROP_ROOT_STORAGE.isWriterSource(_tokenOriginChainId),
+                    OneWayAssetOriginNotAllowed(_toChainId, _assetId, _tokenOriginChainId)
+                );
+            }
+        } else if (L2_INTEROP_ROOT_STORAGE.isWriterSource(_toChainId)) {
+            require(
+                _tokenOriginChainId == _toChainId && _assetId != BASE_TOKEN_ASSET_ID,
+                OneWayAssetOriginNotAllowed(_toChainId, _assetId, _tokenOriginChainId)
+            );
+        }
+
         if (_tokenOriginChainId == block.chainid) {
             // chainBalance is only tracked for native tokens.
             _decreaseChainBalance(block.chainid, _assetId, _amount);
@@ -177,6 +194,10 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
         // L2->L1 withdrawals are never revertable: `totalWithdrawalsToL1` must stay append-only.
         // See {protocol-docs/bridging.md#l2-asset-tracker}.
         require(_toChainId != L1_CHAIN_ID, RecoverToL1NotSupported());
+        require(
+            !L2_INTEROP_ROOT_STORAGE.isWriterSource(_toChainId),
+            RecoveryToOneWayDestinationNotSupported(_toChainId)
+        );
         // The base token never originates from this chain, so there is no chainBalance to re-credit;
         // for every other asset the re-credit happens through `handleFinalizeBridgingOnL2`.
         if (_assetId == BASE_TOKEN_ASSET_ID) {
@@ -197,6 +218,13 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
         uint256 _tokenOriginChainId,
         address _tokenAddress
     ) external onlyL2NativeTokenVault {
+        // The origin rule of one-way links, see {protocol-docs/interop.md#one-way-bundles-with-a-writer-source}.
+        if (_fromChainId != L1_CHAIN_ID && L2_INTEROP_ROOT_STORAGE.isWriterSource(_fromChainId)) {
+            require(
+                _tokenOriginChainId == _fromChainId,
+                OneWayAssetOriginNotAllowed(_fromChainId, _assetId, _tokenOriginChainId)
+            );
+        }
         _handleFinalizeBridgingOnL2Inner({
             _fromChainId: _fromChainId,
             _assetId: _assetId,

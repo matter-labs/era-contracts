@@ -7,6 +7,10 @@ import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/Enumerable
 
 import {ETH_TOKEN_ADDRESS, SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 import {EmptyAssetId, Unauthorized} from "../../common/L1ContractErrors.sol";
+import {InteropCounterparts} from "../../common/Messaging.sol";
+import {L2_INTEROP_ROOT_STORAGE_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {IL2InteropRootStorage} from "../../interop/IL2InteropRootStorage.sol";
+import {InteropCounterpartsConflict, InvalidInteropCounterparts} from "../../interop/InteropErrors.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
 import {IL2Bridgehub} from "./IL2Bridgehub.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
@@ -44,6 +48,9 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
 
     /// @inheritdoc IL2Bridgehub
     mapping(bytes32 feature => bool enabled) public isChainFeatureEnabled;
+
+    /// @dev The counterparts by chain id, see {interopCounterparts}. An entry and `isPeerAllowed` exclude each other.
+    mapping(uint256 chainId => InteropCounterparts) internal counterparts;
 
     modifier onlyChainRegistrationSender() {
         if (
@@ -97,6 +104,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     /// @inheritdoc IL2Bridgehub
     function allowInteropPeer(uint256 _chainId, bytes32 _baseTokenAssetId) external onlyChainRegistrationSender {
         require(_baseTokenAssetId != bytes32(0), EmptyAssetId());
+        require(counterparts[_chainId].interopCenter == address(0), InteropCounterpartsConflict(_chainId));
         baseTokenAssetId[_chainId] = _baseTokenAssetId;
         isPeerAllowed[_chainId] = true;
     }
@@ -110,6 +118,37 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     /// @inheritdoc IL2Bridgehub
     function setChainFeatureEnabled(bytes32 _feature, bool _enabled) external onlyChainRegistrationSender {
         isChainFeatureEnabled[_feature] = _enabled;
+    }
+
+    /// @inheritdoc IL2Bridgehub
+    function interopCounterparts(uint256 _chainId) external view returns (InteropCounterparts memory) {
+        return counterparts[_chainId];
+    }
+
+    /// @inheritdoc IL2Bridgehub
+    function setInteropCounterparts(
+        uint256 _chainId,
+        address _interopCenter,
+        address _assetRouter
+    ) external onlyChainRegistrationSender {
+        require(
+            (_interopCenter == address(0)) == (_assetRouter == address(0)),
+            InvalidInteropCounterparts(_interopCenter, _assetRouter)
+        );
+        if (_interopCenter != address(0)) {
+            // A chain is either a one-way counterpart or an atomic peer, and, unless it is L1, its roots must come
+            // from a writer: the asset tracker applies the one-way origin rule to exactly those chains.
+            require(
+                _chainId != block.chainid &&
+                    !isPeerAllowed[_chainId] &&
+                    baseTokenAssetId[_chainId] == bytes32(0) &&
+                    (_chainId == L1_CHAIN_ID ||
+                        IL2InteropRootStorage(L2_INTEROP_ROOT_STORAGE_ADDR).isWriterSource(_chainId)),
+                InteropCounterpartsConflict(_chainId)
+            );
+        }
+        counterparts[_chainId] = InteropCounterparts({interopCenter: _interopCenter, assetRouter: _assetRouter});
+        emit InteropCounterpartsSet(_chainId, _interopCenter, _assetRouter);
     }
 
     /*//////////////////////////////////////////////////////////////

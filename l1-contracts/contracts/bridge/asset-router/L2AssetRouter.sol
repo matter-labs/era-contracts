@@ -33,6 +33,7 @@ import {
     Unauthorized
 } from "../../common/L1ContractErrors.sol";
 import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
+import {AssetHandlerNotAllowed} from "../L1BridgeContractErrors.sol";
 import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 
 /// @author Matter Labs
@@ -226,7 +227,33 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
         uint256 _senderChainId,
         address _senderAddress
     ) internal view override returns (bool) {
+        address counterpartAssetRouter = _counterpartAssetRouter(_senderChainId);
+        if (counterpartAssetRouter != address(0)) {
+            return _senderAddress == counterpartAssetRouter;
+        }
         return _senderChainId != L1_CHAIN_ID && _senderAddress == address(this);
+    }
+
+    /// @notice The asset router of a chain this chain exchanges one-way bundles with, zero for any other chain.
+    /// See {protocol-docs/interop.md#counterpart-addressing}.
+    function _counterpartAssetRouter(uint256 _chainId) internal view returns (address) {
+        return IL2Bridgehub(L2_BRIDGEHUB_ADDR).interopCounterparts(_chainId).assetRouter;
+    }
+
+    /// @notice Reverts if an asset with a custom handler crosses a one-way link with a chain other than L1: only the
+    /// native token vault applies the origin rule of that link.
+    /// See {protocol-docs/interop.md#one-way-bundles-with-a-writer-source}.
+    /// @param _chainId The chain on the other side of the transfer, never L1.
+    /// @param _assetId The transferred asset.
+    function _checkOneWayAssetHandler(uint256 _chainId, bytes32 _assetId) internal view {
+        address assetHandler = assetHandlerAddress[_assetId];
+        if (assetHandler == address(0) || assetHandler == _getNativeTokenVaultAddr()) {
+            return;
+        }
+        require(
+            _counterpartAssetRouter(_chainId) == address(0),
+            AssetHandlerNotAllowed(_chainId, _assetId, assetHandler)
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -256,6 +283,9 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
         bytes calldata _transferData
     ) public payable override onlyAssetRouterCounterpartOrSelf(_sourceChainId) nonReentrant {
         require(_assetId != BASE_TOKEN_ASSET_ID, AssetIdNotSupported(BASE_TOKEN_ASSET_ID));
+        if (_sourceChainId != L1_CHAIN_ID) {
+            _checkOneWayAssetHandler(_sourceChainId, _assetId);
+        }
         _finalizeDeposit(_sourceChainId, _assetId, _transferData, _getNativeTokenVaultAddr());
 
         emit DepositFinalizedAssetRouter(_sourceChainId, _assetId, _transferData);
@@ -351,8 +381,20 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
         attributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, _value);
 
         // For an L2->L1 withdrawal the asset router on L1 lives at a different address than the common
-        // L2 one, so target the known L1 asset router; the finalizeDeposit calldata is identical.
-        address destinationAssetRouter = _chainId == L1_CHAIN_ID ? address(L1_ASSET_ROUTER) : request.l2Contract;
+        // L2 one, so target the known L1 asset router; the finalizeDeposit calldata is identical. The same holds
+        // for a chain this chain has interop counterparts for.
+        address destinationAssetRouter = request.l2Contract;
+        if (_chainId == L1_CHAIN_ID) {
+            destinationAssetRouter = address(L1_ASSET_ROUTER);
+        } else {
+            address counterpartAssetRouter = _counterpartAssetRouter(_chainId);
+            if (counterpartAssetRouter != address(0)) {
+                destinationAssetRouter = counterpartAssetRouter;
+                // slither-disable-next-line unused-return
+                (bytes32 assetId, ) = DataEncoding.decodeAssetRouterBridgehubDepositData(_data);
+                _checkOneWayAssetHandler(_chainId, assetId);
+            }
+        }
         interopCallStarter = InteropCallStarter({
             to: InteroperableAddress.formatEvmV1(destinationAssetRouter),
             data: request.l2Calldata,

@@ -238,6 +238,8 @@ contract InteropCenter is
         // Every send is atomic now (public interop was removed). A single-call send is a valid
         // single-leg atomic flow: it must carry the `atomicBundle` attribute like any other send.
         AtomicSend memory atomicSend = _parser().parseAtomicSend(attributes);
+        // One-way bundles go through `sendBundle` only.
+        require(atomicSend.isAtomic, NonAtomicSendUnsupported());
 
         bytes32 bundleHash = _sendBundle({
             _destinationChainId: recipientChainId,
@@ -262,13 +264,10 @@ contract InteropCenter is
         // slither-disable-next-line unused-return
         (uint256 destinationChainId, ) = InteroperableAddress.parseEvmV1Calldata(_destinationChainId);
 
-        // Ensure the destination is valid: bundles are initiated only on an L2, never target this chain
-        // itself, and an L2->L1 bundle (canonically a withdrawal) must be a single call.
+        // Ensure the destination is valid: bundles are initiated only on an L2 and never target this chain
+        // itself.
         require(L1_CHAIN_ID != block.chainid, CannotInitiateInteropOnL1());
         require(destinationChainId != block.chainid, InteropToSelfNotSupported());
-        if (destinationChainId == L1_CHAIN_ID) {
-            require(_callStarters.length == 1, MultiCallToL1NotSupported(_callStarters.length));
-        }
 
         (
             InteropCallStarterInternal[] memory callStartersInternal,
@@ -356,7 +355,12 @@ contract InteropCenter is
         BundleAttributes memory _bundleAttributes
     ) private {
         // slither-disable-next-line unused-return
-        (InteropBundle memory bundle, , ) = _buildInteropBundle(_destinationChainId, _callStarters, _bundleAttributes);
+        (InteropBundle memory bundle, , ) = _buildInteropBundle({
+            _destinationChainId: _destinationChainId,
+            _callStarters: _callStarters,
+            _bundleAttributes: _bundleAttributes,
+            _oneWay: false
+        });
         revert InteropPreviewHash(_hashBundle(bundle));
     }
 
@@ -412,29 +416,28 @@ contract InteropCenter is
     }
 
     /// @notice Ensures `msg.value` matches the expected total for the bundle and burns/deposits the
-    /// call value; charges the base-token protocol fee unless useFixedFee is set or the destination is
-    /// L1 (L2->L1 bundles are free). See {protocol-docs/interop.md#fee-model} and
+    /// call value; charges the base-token protocol fee unless useFixedFee is set or the bundle is
+    /// one-way (one-way bundles are free). See {protocol-docs/interop.md#fee-model} and
     /// {protocol-docs/interop.md#send-flow}.
     /// @param _destinationChainId Destination chain ID.
     /// @param _destinationBaseTokenAssetId The destination chain's base-token asset id (drives the
     /// same-vs-cross-base-token branch).
     /// @param _totalBurnedCallsValue Sum of requested interop call values.
     /// @param _totalIndirectCallsValue Sum of requested indirect call values.
-    /// @param _useFixedFee Whether fixed ZK fees were used (true) or base token fees required (false).
+    /// @param _noProtocolFee Whether the bundle pays no base-token protocol fee: it pays the fixed ZK fee or is
+    /// one-way.
     /// @param _callCount Number of calls in the bundle for per-call fee calculation.
     function _ensureCorrectTotalValue(
         uint256 _destinationChainId,
         bytes32 _destinationBaseTokenAssetId,
         uint256 _totalBurnedCallsValue,
         uint256 _totalIndirectCallsValue,
-        bool _useFixedFee,
+        bool _noProtocolFee,
         uint256 _callCount
     ) internal {
         bytes32 thisChainBaseTokenAssetId = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT).BASE_TOKEN_ASSET_ID();
 
-        uint256 protocolFee = (_useFixedFee || _destinationChainId == L1_CHAIN_ID)
-            ? 0
-            : interopProtocolFee * _callCount;
+        uint256 protocolFee = _noProtocolFee ? 0 : interopProtocolFee * _callCount;
 
         if (_destinationBaseTokenAssetId == thisChainBaseTokenAssetId) {
             uint256 expectedValue = _totalBurnedCallsValue + _totalIndirectCallsValue + protocolFee;
@@ -551,15 +554,18 @@ contract InteropCenter is
         //    L2->L1 message (its commit value goes to the IMT instead) and L1 has no atomic execution, so
         //    its only possible outcome would be a timeout refund — but L2->L1 withdrawals must never be
         //    revertable (their `totalWithdrawalsToL1` accounting must stay append-only for a future
-        //    settlement-layer migration, see {L2AssetTracker}).
-        //  - Non-atomic => L1 (an L2->L1 withdrawal). Public (L1-published) L2->L2 interop was removed, so a
-        //    non-atomic L2->L2 send has no delivery path.
+        //    settlement-layer migration, see {L2AssetTracker}). A chain with interop counterparts is never an
+        //    allowed peer, so an atomic bundle to it fails in the assembly below.
+        //  - Non-atomic => a one-way destination (canonically an L2->L1 withdrawal), with a single call. Public
+        //    (L1-published) L2->L2 interop was removed, so a non-atomic L2->L2 send has no delivery path.
         // The empty call-starter address (`ZeroAddress`) is already rejected earlier in `_parseBundleInputs`;
         // `DestinationChainNotRegistered` for a bad L2 destination still surfaces from the assembly below.
-        if (_atomicSend.isAtomic) {
-            require(_destinationChainId != L1_CHAIN_ID, AtomicBundleToL1NotSupported());
+        bool oneWay = !_atomicSend.isAtomic;
+        if (oneWay) {
+            require(_isOneWayDestination(_destinationChainId), NonAtomicSendUnsupported());
+            require(_callStarters.length == 1, MultiCallToL1NotSupported(_callStarters.length));
         } else {
-            require(_destinationChainId == L1_CHAIN_ID, NonAtomicSendUnsupported());
+            require(_destinationChainId != L1_CHAIN_ID, AtomicBundleToL1NotSupported());
         }
 
         // Deliberately no gateway-mode requirement on the send side; correctness is enforced by the
@@ -573,17 +579,22 @@ contract InteropCenter is
         isInteropBundleSaltUsed[msg.sender][_bundleAttributes.salt] = true;
 
         // Form an InteropBundle (this also runs each call starter, burning value for indirect calls, and
-        // enforcing the L2->L1 withdrawal restrictions for an L1 destination).
+        // enforcing the withdrawal restrictions for a one-way destination).
         (
             InteropBundle memory bundle,
             uint256 totalBurnedCallsValue,
             uint256 totalIndirectCallsValue
-        ) = _buildInteropBundle(_destinationChainId, _callStarters, _bundleAttributes);
+        ) = _buildInteropBundle({
+                _destinationChainId: _destinationChainId,
+                _callStarters: _callStarters,
+                _bundleAttributes: _bundleAttributes,
+                _oneWay: oneWay
+            });
 
         uint256 callStartersLength = _callStarters.length;
-        // Fixed ZK fees are accumulated per coinbase (not pushed) like the protocol fee above; L2->L1
+        // Fixed ZK fees are accumulated per coinbase (not pushed) like the protocol fee above; one-way
         // bundles are free.
-        if (_bundleAttributes.useFixedFee && _destinationChainId != L1_CHAIN_ID) {
+        if (_bundleAttributes.useFixedFee && !oneWay) {
             uint256 totalZKFee = ZK_INTEROP_FEE * callStartersLength;
             _getZKToken().safeTransferFrom(msg.sender, address(this), totalZKFee);
             accumulatedZKFees[block.coinbase] += totalZKFee;
@@ -596,7 +607,7 @@ contract InteropCenter is
             _destinationBaseTokenAssetId: bundle.destinationBaseTokenAssetId,
             _totalBurnedCallsValue: totalBurnedCallsValue,
             _totalIndirectCallsValue: totalIndirectCallsValue,
-            _useFixedFee: _bundleAttributes.useFixedFee,
+            _noProtocolFee: _bundleAttributes.useFixedFee || oneWay,
             _callCount: callStartersLength
         });
 
@@ -628,13 +639,15 @@ contract InteropCenter is
     function _buildInteropBundle(
         uint256 _destinationChainId,
         InteropCallStarterInternal[] memory _callStarters,
-        BundleAttributes memory _bundleAttributes
+        BundleAttributes memory _bundleAttributes,
+        bool _oneWay
     ) internal returns (InteropBundle memory bundle, uint256 totalBurnedCallsValue, uint256 totalIndirectCallsValue) {
-        // For an L2->L1 bundle the L1 chain is not registered as an interop destination in the L2 Bridgehub,
-        // so its base-token asset id is the L1-native ETH asset id (which is NOT necessarily this L2's base
-        // token — they only coincide on ETH-based chains). Otherwise resolve it from the Bridgehub registry.
-        bytes32 destinationBaseTokenAssetId = _destinationChainId == L1_CHAIN_ID
-            ? DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS)
+        // A one-way destination (L1, or a chain with interop counterparts) is not registered as an interop
+        // destination in the L2 Bridgehub; the base-token asset id its interop handler expects is its own native
+        // ETH asset id (which is NOT necessarily this L2's base token — they only coincide on ETH-based chains).
+        // Otherwise resolve it from the Bridgehub registry.
+        bytes32 destinationBaseTokenAssetId = _oneWay
+            ? DataEncoding.encodeNTVAssetId(_destinationChainId, ETH_TOKEN_ADDRESS)
             : _getDestinationBaseTokenAssetId(_destinationChainId);
         bundle = InteropBundle({
             version: INTEROP_BUNDLE_VERSION,
@@ -650,8 +663,8 @@ contract InteropCenter is
         // Fill the formed InteropBundle with calls, aggregating the value each one consumes.
         uint256 callStartersLength = _callStarters.length;
         for (uint256 i = 0; i < callStartersLength; ++i) {
-            if (_destinationChainId == L1_CHAIN_ID) {
-                // Interop to L1 is restricted to a single indirect, zero-value asset-router call (a
+            if (_oneWay) {
+                // A one-way bundle is restricted to a single indirect, zero-value asset-router call (a
                 // withdrawal) for this release. See {protocol-docs/interop.md#restrictions}.
                 require(_callStarters[i].callAttributes.indirectCall, DirectCallToL1NotSupported());
                 require(
@@ -710,6 +723,14 @@ contract InteropCenter is
         return assetId;
     }
 
+    /// @notice Whether non-atomic single-call bundles can be sent to the chain: L1, or a chain this chain has interop
+    /// counterparts for. See {protocol-docs/interop.md#one-way-bundles-with-a-writer-source}.
+    function _isOneWayDestination(uint256 _destinationChainId) internal view returns (bool) {
+        return
+            _destinationChainId == L1_CHAIN_ID ||
+            IL2Bridgehub(address(L2_BRIDGEHUB)).interopCounterparts(_destinationChainId).assetRouter != address(0);
+    }
+
     /// @notice Handles base-token value collection for the bundle.
     /// @notice Hashes the bundle and dispatches it along one of two paths, keyed on the destination:
     /// - **L2->L2 interop (atomic):** the bundle's commit value is appended to the interop IMT via the
@@ -737,8 +758,9 @@ contract InteropCenter is
     ) internal returns (bytes32 bundleHash, bytes32 msgHash) {
         bundleHash = _hashBundle(_bundle);
 
-        if (_bundle.destinationChainId == L1_CHAIN_ID) {
-            // L2->L1 withdrawal: publish the bundle to L1 for finalization by the L1InteropHandler.
+        if (!_atomicSend.isAtomic) {
+            // One-way bundle (`_sendBundle` guaranteed its destination), canonically an L2->L1 withdrawal: publish
+            // the bundle as an L2->L1 message for finalization by the destination's L1InteropHandler.
             msgHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(BUNDLE_IDENTIFIER, abi.encode(_bundle)));
             return (bundleHash, msgHash);
         }
