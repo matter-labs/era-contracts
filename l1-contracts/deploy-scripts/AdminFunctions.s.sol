@@ -107,6 +107,7 @@ contract AdminFunctions is Script, IAdminFunctions {
         address l1Nullifier = address(assetRouterContract.L1_NULLIFIER());
         address l1NativeTokenVault = address(assetRouterContract.nativeTokenVault());
         address l1InteropHandler = IL1Nullifier(l1Nullifier).l1InteropHandler();
+        address l1InteropCenter = assetRouterContract.l1InteropCenter();
 
         if (Ownable2Step(_bridgehub).pendingOwner() == _governor) {
             governanceAcceptOwner(_governor, _bridgehub);
@@ -122,6 +123,9 @@ contract AdminFunctions is Script, IAdminFunctions {
         }
         if (Ownable2Step(l1InteropHandler).pendingOwner() == _governor) {
             governanceAcceptOwner(_governor, l1InteropHandler);
+        }
+        if (Ownable2Step(l1InteropCenter).pendingOwner() == _governor) {
+            governanceAcceptOwner(_governor, l1InteropCenter);
         }
         if (Ownable2Step(ctmDeploymentTracker).pendingOwner() == _governor) {
             governanceAcceptOwner(_governor, ctmDeploymentTracker);

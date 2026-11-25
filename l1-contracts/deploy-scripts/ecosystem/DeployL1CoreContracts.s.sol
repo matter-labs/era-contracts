@@ -12,6 +12,7 @@ import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
+import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
@@ -126,6 +127,8 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridges.implementations.l1InteropHandler,
             coreAddresses.bridges.proxies.l1InteropHandler
         ) = deployTuppWithContract("L1InteropHandler");
+        interopAttributeParser = deploySimpleContract("InteropAttributeParser");
+        (l1InteropCenterImplementation, l1InteropCenterProxy) = deployTuppWithContract("L1InteropCenter");
         setL1NativeTokenVaultParams();
 
         updateSharedBridge();
@@ -212,6 +215,10 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         l1Nullifier.setL1InteropHandler(coreAddresses.bridges.proxies.l1InteropHandler);
         vm.broadcast(getDeployerAddress());
         sharedBridge.setL1InteropHandler(coreAddresses.bridges.proxies.l1InteropHandler);
+        vm.broadcast(getDeployerAddress());
+        sharedBridge.setL1InteropCenter(l1InteropCenterProxy);
+        vm.broadcast(getDeployerAddress());
+        IL1MessageRoot(coreAddresses.bridgehub.proxies.messageRoot).setLocalMessageSender(l1InteropCenterProxy, true);
     }
 
     function updateOwners() internal {
@@ -234,6 +241,9 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
 
         // The L1 interop handler's owner can pause/unpause withdrawal finalization.
         IOwnable(coreAddresses.bridges.proxies.l1InteropHandler).transferOwnership(coreAddresses.shared.governance);
+
+        // The L1 interop center's owner enables destinations and can pause sending.
+        IOwnable(l1InteropCenterProxy).transferOwnership(coreAddresses.shared.governance);
 
         ICTMDeploymentTracker ctmDeploymentTracker = ICTMDeploymentTracker(
             coreAddresses.bridgehub.proxies.ctmDeploymentTracker
@@ -306,6 +316,9 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridges.implementations.l1InteropHandler
         );
         vm.serializeAddress("bridges", "l1_interop_handler_proxy_addr", coreAddresses.bridges.proxies.l1InteropHandler);
+        vm.serializeAddress("bridges", "l1_interop_center_implementation_addr", l1InteropCenterImplementation);
+        vm.serializeAddress("bridges", "l1_interop_center_proxy_addr", l1InteropCenterProxy);
+        vm.serializeAddress("bridges", "interop_attribute_parser_addr", interopAttributeParser);
         vm.serializeAddress(
             "bridges",
             "shared_bridge_implementation_addr",
