@@ -196,6 +196,12 @@ of the source chain that the chain's admin trusts. The writer can be any address
   ({protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}), so a written root would
   make the batch unexecutable (`CommitBasedInteropNotSupported`). A written root is therefore **not** checked by the
   settlement layer: it is exactly as trustworthy as the writer.
+- A written root vouches only for its source chain's own messages. `L2MessageVerification` lets a proof name its
+  chain's settlement layer, and trusts every settlement layer's roots for any chain settling there; it refuses a
+  writer's source chain as the settlement layer of another chain (`SettlementLayerIsWriterSource`). Otherwise the
+  writer, or whoever controls the source chain's roots, could prove messages of any ZK chain to this chain.
+  `isWriterSource(chainId)` records that a writer was ever set for `chainId`, and stays true after the writer is
+  removed, as its roots do.
 - `setInteropRootWriter(sourceChainId, writer)` sets or (zero) removes a writer. It accepts only a service
   transaction, which `ChainRegistrationSender.setInteropRootWriter(chainId, sourceChainId, writer)` sends on L1, the
   same route as the peer whitelist and the chain features ({protocol-docs/interop-gating.md}):
@@ -209,14 +215,16 @@ of the source chain that the chain's admin trusts. The writer can be any address
     roots reach the chain through its settlement layer, and the bootloader and a writer never share a key space. The
     L2 rejects the chain itself as well. Removal is not refused on this ground, so a writer whose source chain id
     was later registered as a ZK chain can still be removed.
-- The writer mapping is appended to `L2InteropRootStorage`'s storage (slot 2, after `storedInteropRoots` and
-  `latestInteropRootTimestamp`), so the built-in upgrades in place; it starts empty.
+- The writer mapping and `isWriterSource` are appended to `L2InteropRootStorage`'s storage (slots 2 and 3, after
+  `storedInteropRoots` and `latestInteropRootTimestamp`), so the built-in upgrades in place; both start empty.
 
 ### Message verification (`L2MessageVerification`)
 
 `L2MessageVerification` proves generic L2 -> L1 message inclusion **on an L2**. It reuses the shared
 recursive proof logic (`MessageVerification` / `MessageHashing`); the terminal step anchors the proof
 to an imported L1 aggregate root in `L2InteropRootStorage`. Recursion depth is limited to one hop.
+A proof may name any settlement layer whose roots the chain holds; the roots of a writer's source chain
+serve only that chain's own messages ([interop root writers](#interop-root-writers)).
 The current `L2InteropHandler` does not use this path for public bundles: all supported L2 -> L2
 interop is atomic and authenticates each leg through `AtomicFlowManager` instead. L1 withdrawals use
 `L1InteropHandler` and the L1 `MessageRoot` directly.

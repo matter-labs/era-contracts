@@ -57,6 +57,10 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
     mapping(uint256 sourceChainId => address writer) public interopRootWriter;
 
     /// @inheritdoc IL2InteropRootStorage
+    /// @dev Appended after `interopRootWriter`; the mapping is empty when the built-in is upgraded in place.
+    mapping(uint256 chainId => bool everHadWriter) public isWriterSource;
+
+    /// @inheritdoc IL2InteropRootStorage
     function interopRoots(
         uint256 chainId,
         uint256 blockOrBatchNumber
@@ -94,6 +98,10 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
             revert InvalidInteropRootSource(_sourceChainId);
         }
         interopRootWriter[_sourceChainId] = _writer;
+        if (_writer != address(0)) {
+            // Never cleared: the roots a writer added stay after it is removed.
+            isWriterSource[_sourceChainId] = true;
+        }
         emit InteropRootWriterSet(_sourceChainId, _writer);
     }
 

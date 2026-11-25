@@ -6,18 +6,24 @@ import {Test, Vm} from "forge-std/Test.sol";
 import {L2InteropRootStorage} from "contracts/interop/L2InteropRootStorage.sol";
 import {IL2InteropRootStorage} from "contracts/interop/IL2InteropRootStorage.sol";
 import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
-import {InteropRoot, StoredInteropRoot} from "contracts/common/Messaging.sol";
+import {InteropRoot, L2Log, StoredInteropRoot} from "contracts/common/Messaging.sol";
+import {L2MessageVerification} from "contracts/interop/L2MessageVerification.sol";
 import {
     InteropRootAlreadyExists,
     InteropRootTimestampIsZero,
     InteropRootWritersNotEnabled,
     InvalidInteropRootSource,
+    SettlementLayerIsWriterSource,
     SidesLengthNotOne
 } from "contracts/interop/InteropErrors.sol";
 import {MessageRootIsZero} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {INTEROP_ROOT_WRITERS_FEATURE, SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_BOOTLOADER_ADDRESS,
+    L2_BRIDGEHUB_ADDR,
+    L2_INTEROP_ROOT_STORAGE_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @notice Covers the interop root writers of `L2InteropRootStorage`: who sets them, who may write, that writes keep
 /// the import invariants, and that they leave the bootloader import untouched.
@@ -78,6 +84,19 @@ contract L2InteropRootStorageWritersTest is Test {
 
         _setWriter(SOURCE_CHAIN_ID, address(0));
         assertEq(rootStorage.interopRootWriter(SOURCE_CHAIN_ID), address(0));
+    }
+
+    /// @notice A chain stays a writer source once a writer was set for it: the roots the writer added outlive it.
+    function test_isWriterSource_setWithTheWriterAndKeptAfterRemoval() public {
+        assertFalse(rootStorage.isWriterSource(SOURCE_CHAIN_ID));
+        _setWriter(SOURCE_CHAIN_ID, address(0));
+        assertFalse(rootStorage.isWriterSource(SOURCE_CHAIN_ID), "removing a writer that was never set");
+
+        _setWriter(SOURCE_CHAIN_ID, writer);
+        assertTrue(rootStorage.isWriterSource(SOURCE_CHAIN_ID));
+        _setWriter(SOURCE_CHAIN_ID, address(0));
+        assertTrue(rootStorage.isWriterSource(SOURCE_CHAIN_ID), "kept after removal");
+        assertFalse(rootStorage.isWriterSource(SETTLEMENT_LAYER_CHAIN_ID));
     }
 
     function testFuzz_setInteropRootWriter_revertWhen_notServiceTransaction(address _caller) public {
@@ -240,6 +259,11 @@ contract L2InteropRootStorageWritersTest is Test {
             writer,
             "interopRootWriter at slot 2"
         );
+        assertEq(
+            uint256(vm.load(address(rootStorage), keccak256(abi.encode(SOURCE_CHAIN_ID, uint256(3))))),
+            1,
+            "isWriterSource at slot 3"
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -284,5 +308,98 @@ contract L2InteropRootStorageWritersTest is Test {
         vm.prank(L2_BOOTLOADER_ADDRESS);
         vm.expectRevert(InteropRootAlreadyExists.selector);
         rootStorage.addSingleInteropRoot(_root(SOURCE_CHAIN_ID, BLOCK_NUMBER, TIMESTAMP, keccak256("other")));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+            L2MessageVerification and the roots of writers
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev The chain, batch and settlement layer of `_doubleProof`, a real proof of a log of chain 271 through the
+    /// root of its settlement layer, chain 506, at block 243 (also used in `L2MessageVerificationDepthRegression`).
+    uint256 internal constant PROVEN_CHAIN_ID = 271;
+    uint256 internal constant PROVEN_BATCH_NUMBER = 66;
+    uint256 internal constant PROOF_SETTLEMENT_LAYER_CHAIN_ID = 506;
+    uint256 internal constant PROOF_SETTLEMENT_LAYER_BLOCK = 243;
+    bytes32 internal constant PROOF_SETTLEMENT_LAYER_ROOT =
+        0xf2ed765ea90479defa99f4853559bec02617067e736f70475cc64a8e571f509a;
+
+    /// @notice A writer's roots vouch for its source chain only, never as the settlement layer of another chain: the
+    /// same proof that holds against a bootloader-imported root is refused against a written one.
+    function test_l2MessageVerification_refusesWriterSourceAsSettlementLayer() public {
+        vm.etch(L2_INTEROP_ROOT_STORAGE_ADDR, address(rootStorage).code);
+        L2InteropRootStorage builtIn = L2InteropRootStorage(L2_INTEROP_ROOT_STORAGE_ADDR);
+        L2MessageVerification verification = new L2MessageVerification();
+        (L2Log memory log, bytes32[] memory proof) = _doubleProof();
+        InteropRoot memory slRoot = _root(
+            PROOF_SETTLEMENT_LAYER_CHAIN_ID,
+            PROOF_SETTLEMENT_LAYER_BLOCK,
+            TIMESTAMP,
+            PROOF_SETTLEMENT_LAYER_ROOT
+        );
+
+        uint256 snapshot = vm.snapshotState();
+        InteropRoot[] memory roots = new InteropRoot[](1);
+        roots[0] = slRoot;
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        builtIn.addInteropRootsInBatch(roots);
+        assertTrue(
+            verification.proveL2LogInclusionShared(PROVEN_CHAIN_ID, PROVEN_BATCH_NUMBER, 1, log, proof),
+            "the settlement layer's own root"
+        );
+        vm.revertToState(snapshot);
+
+        _enableFeature(true);
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        builtIn.setInteropRootWriter(PROOF_SETTLEMENT_LAYER_CHAIN_ID, writer);
+        vm.prank(writer);
+        builtIn.addInteropRootFromWriter(slRoot);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SettlementLayerIsWriterSource.selector,
+                PROOF_SETTLEMENT_LAYER_CHAIN_ID,
+                PROVEN_CHAIN_ID
+            )
+        );
+        verification.proveL2LogInclusionShared(PROVEN_CHAIN_ID, PROVEN_BATCH_NUMBER, 1, log, proof);
+    }
+
+    function _doubleProof() internal pure returns (L2Log memory log, bytes32[] memory proof) {
+        log = L2Log({
+            l2ShardId: 0,
+            isService: true,
+            txNumberInBatch: 0,
+            sender: 0x0000000000000000000000000000000000008008,
+            key: 0x0000000000000000000000000000000000000000000000000000000000010008,
+            value: 0x182bf04331468886c27903ea0bdc761fde4a166e29814a178da2d3f56d205982
+        });
+        proof = new bytes32[](28);
+        proof[0] = bytes32(0x010f060000000000000000000000000000000000000000000000000000000000);
+        proof[1] = bytes32(0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba);
+        proof[2] = bytes32(0xc3d03eebfd83049991ea3d3e358b6712e7aa2e2e63dc2d4b438987cec28ac8d0);
+        proof[3] = bytes32(0xe3697c7f33c31a9b0f0aeb8542287d0d21e8c4cf82163d0c44c7a98aa11aa111);
+        proof[4] = bytes32(0x199cc5812543ddceeddd0fc82807646a4899444240db2c0d2f20c3cceb5f51fa);
+        proof[5] = bytes32(0xe4733f281f18ba3ea8775dd62d2fcd84011c8c938f16ea5790fd29a03bf8db89);
+        proof[6] = bytes32(0x1798a1fd9c8fbb818c98cff190daa7cc10b6e5ac9716b4a2649f7c2ebcef2272);
+        proof[7] = bytes32(0x66d7c5983afe44cf15ea8cf565b34c6c31ff0cb4dd744524f7842b942d08770d);
+        proof[8] = bytes32(0xb04e5ee349086985f74b73971ce9dfe76bbed95c84906c5dffd96504e1e5396c);
+        proof[9] = bytes32(0xac506ecb5465659b3a927143f6d724f91d8d9c4bdb2463aee111d9aa869874db);
+        proof[10] = bytes32(0x124b05ec272cecd7538fdafe53b6628d31188ffb6f345139aac3c3c1fd2e470f);
+        proof[11] = bytes32(0xc3be9cbd19304d84cca3d045e06b8db3acd68c304fc9cd4cbffe6d18036cb13f);
+        proof[12] = bytes32(0xfef7bd9f889811e59e4076a0174087135f080177302763019adaf531257e3a87);
+        proof[13] = bytes32(0xa707d1c62d8be699d34cb74804fdd7b4c568b6c1a821066f126c680d4b83e00b);
+        proof[14] = bytes32(0xf6e093070e0389d2e529d60fadb855fdded54976ec50ac709e3a36ceaa64c291);
+        proof[15] = bytes32(0xe4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf75944);
+        proof[16] = bytes32(uint256(0));
+        proof[17] = bytes32(0x0000000000000000000000000000000000000000000000000000000000000034);
+        proof[18] = bytes32(0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21);
+        proof[19] = bytes32(0xcc4c41edb0c2031348b292b768e9bac1ee8c92c09ef8a3277c2ece409c12d86a);
+        proof[20] = bytes32(0x665220c0a39a5c4886626c93dfe3f253324bd0fd48bf037156b977d2da1c2a80);
+        proof[21] = bytes32(0x4cd95f8962e2e3b5f525a0f4fdfbbf0667990c7159528a008057f3592bcb2c06);
+        proof[22] = bytes32(0x73374357c2721f1e18426e45490035daf9a01b4fd064b9fc6bf85acf888bbc42);
+        proof[23] = bytes32(0x9b63d72e0483741f19d143751f22f965461f0a98897b8ffffedd086935f6bc26);
+        proof[24] = bytes32(0x000000000000000000000000000000f300000000000000000000000000000001);
+        proof[25] = bytes32(0x00000000000000000000000000000000000000000000000000000000000001fa);
+        proof[26] = bytes32(0x0101000100000000000000000000000000000000000000000000000000000000);
+        proof[27] = bytes32(0xf84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f828);
     }
 }

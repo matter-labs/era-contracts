@@ -29,18 +29,26 @@ interface IL2InteropRootStorage {
     /// `(blockOrBatchNumber, root, timestamp)` tuple) for a chain ID and block or batch number.
     /// @dev A zero timestamp only ever means "nothing imported at this key"; see
     /// {protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check} for
-    /// the import invariants.
+    /// the import invariants. The settlement layer checks the roots the bootloader imported; the roots of a writer's
+    /// source chain (`isWriterSource`) are only as trustworthy as the writer, see
+    /// {protocol-docs/interop.md#interop-root-writers}.
     function interopRoots(uint256 chainId, uint256 blockOrBatchNumber) external view returns (StoredInteropRoot memory);
 
     /// @notice Returns the maximum creation timestamp over all roots imported for `chainId` (zero if
     /// none was imported yet). Monotonically non-decreasing: once a root created at time `T` is
-    /// imported, the returned value is `>= T` forever, so it is an authenticated lower bound on the
-    /// referenced chain's clock as observed by this chain.
+    /// imported, the returned value is `>= T` forever. For a chain whose roots the bootloader imports, it is
+    /// an authenticated lower bound on the referenced chain's clock as observed by this chain; for a writer's
+    /// source chain (`isWriterSource`), it is a lower bound only as far as the writer is trusted.
     function latestInteropRootTimestamp(uint256 chainId) external view returns (uint256);
 
     /// @notice Returns the address that may add the interop roots of `sourceChainId`, or zero if there is none.
     /// See {protocol-docs/interop.md#interop-root-writers}.
     function interopRootWriter(uint256 sourceChainId) external view returns (address);
+
+    /// @notice Whether a writer was ever set for `chainId`, so that roots stored under it may come from a writer
+    /// rather than from the settlement layer. Stays true after the writer is removed. `L2MessageVerification` does not
+    /// accept such a chain as the settlement layer of another chain. See {protocol-docs/interop.md#interop-root-writers}.
+    function isWriterSource(uint256 chainId) external view returns (bool);
 
     /// @notice Sets or, with zero, removes the writer of `_sourceChainId`'s interop roots. Called by a service
     /// transaction from the L1 `ChainRegistrationSender`. See {protocol-docs/interop.md#interop-root-writers}.

@@ -17,6 +17,12 @@ contract L2MessageVerificationDepthRegressionTest is Test {
 
     function setUp() public {
         l2MessageVerification = new L2MessageVerification();
+        // The recursion asks whether the settlement layer's roots come from a writer; here they never do.
+        vm.mockCall(
+            address(L2_INTEROP_ROOT_STORAGE),
+            abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.isWriterSource.selector),
+            abi.encode(false)
+        );
     }
 
     /// @notice Test that a proof requiring single recursion (double proof) still works
