@@ -48,6 +48,7 @@
     "coverage:merge": "ts-node scripts/merge-coverage.ts",
     "verify-contracts": "ts-node scripts/verify-contracts.ts",
     "errors-lint": "ts-node scripts/errors-lint.ts",
+    "check-release-tags": "ts-node scripts/check-release-tags.ts",
     "selectors": "ts-node ../scripts/selectors.ts",
     "solc-warnings": "ts-node ../scripts/solc-warnings.ts",
     "write-factory-deps-zksync-os": "ts-node scripts/write-factory-deps-zksync-os.ts",

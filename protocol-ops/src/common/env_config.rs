@@ -157,6 +157,10 @@ pub struct CtmEntry {
 pub struct PermanentContracts {
     #[serde(default)]
     pub create2_factory_addr: Option<Address>,
+    /// The env's `TxOriginAsserter`, when its chain batches end with `assertTxOrigin()`
+    /// (`common::tx_origin`).
+    #[serde(default)]
+    pub tx_origin_asserter_addr: Option<Address>,
     // NOTE: `create2_factory_salt` deliberately does NOT live here. The salt
     // rotates every regen (the CREATE2 deployer would collide with previously
     // deployed addresses if reused), so it belongs in the v31 input TOML
@@ -264,6 +268,13 @@ impl EnvConfig {
             .and_then(|p| p.create2_factory_addr)
     }
 
+    pub fn tx_origin_asserter(&self) -> Option<Address> {
+        self.permanent
+            .permanent_contracts
+            .as_ref()
+            .and_then(|p| p.tx_origin_asserter_addr)
+    }
+
     /// Per-upgrade-version CREATE2 salt from
     /// `<current upgrade-env dir>/<env>.toml [contracts]
     /// create2_factory_salt`. Distinct from `create2_factory_salt()` (which
@@ -334,11 +345,11 @@ impl EnvConfig {
             .with_context(|| format!("read {}", self.upgrade_input_path.display()))
     }
 
-    /// Whether this is the mainnet ecosystem. Drives testnet-vs-real contract
-    /// selection (e.g. the per-CTM verifier and the PUH redeploy: every
-    /// non-mainnet env gets the zeroed-delay `TestnetProtocolUpgradeHandler`).
+    /// Whether this is one of our mainnet ecosystems (Era or ZKsync OS). Drives testnet-vs-real
+    /// contract selection (e.g. the per-CTM verifier and the PUH redeploy: every non-mainnet env
+    /// gets the zeroed-delay `TestnetProtocolUpgradeHandler`).
     pub fn is_mainnet(&self) -> bool {
-        self.env == "mainnet"
+        matches!(self.env.as_str(), "mainnet" | "zksync-os-mainnet")
     }
 
     pub fn l1_chain_id(&self) -> Option<u64> {

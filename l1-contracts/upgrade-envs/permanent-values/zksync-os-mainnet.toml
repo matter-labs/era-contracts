@@ -13,6 +13,10 @@ zk_token_asset_id = "0x3a38577a86db1c11f5d17ced1d0c3757370aed1b14a1829de6fef58c6
 
 [permanent_contracts]
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+# Every chain batch ends with `assertTxOrigin()` on this TxOriginAsserter, so only an executor its
+# authority (the 1-of-2 Safe 0x5AFEca1146DEFb617269EF0a7dCDcAF0958eE041) lists can send it. Read from
+# mainnet on 2026-11-25. `--skip-tx-origin-assertion` leaves the call out for one chain.
+tx_origin_asserter_addr = "0x123450011cb3166a63D4523B2496eCc1fea665BB"
 
 [core_contracts]
 bridgehub_proxy_addr = "0xEe293Fd09348e22Cde4CFc7c1ddE82953fc33027"

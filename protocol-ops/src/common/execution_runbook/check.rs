@@ -13,9 +13,11 @@ use anyhow::Context;
 use super::{CheckFacts, Runbook};
 use crate::common::anvil::{evm_increase_time_and_mine, evm_revert, evm_snapshot, set_balance};
 use crate::common::ethereum::get_provider;
+use crate::common::tx_origin;
 
 /// Replay every tx of `runbook` on the anvil fork at `rpc_url` (with `--auto-impersonate`),
-/// in order, each from its sender, and fail on the first revert. A tx's `time_increase`
+/// in order, each from its sender, and fail on the first revert. An `assertTxOrigin()` call is
+/// sent from `tx_origin::authorized_origin` instead. A tx's `time_increase`
 /// advances the fork's clock before it is sent, as the page tells the simulator to (a stage
 /// timer's `checkDeadline()` reverts otherwise). The fork's state is restored afterwards.
 /// `fork_block` is the L1 block the fork was taken at; `replayed_after` says what the caller
@@ -83,8 +85,15 @@ async fn replay(rpc_url: &str, runbook: &Runbook) -> anyhow::Result<()> {
         if let Some(seconds) = tx.time_increase {
             evm_increase_time_and_mine(rpc_url, seconds).await?;
         }
+        let from = if tx_origin::is_assertion(&tx.data) {
+            let origin = tx_origin::authorized_origin(rpc_url, tx.to).await?;
+            set_balance(rpc_url, origin).await?;
+            origin
+        } else {
+            tx.from
+        };
         let request = TransactionRequest::default()
-            .with_from(tx.from)
+            .with_from(from)
             .with_to(tx.to)
             .with_value(tx.value)
             .with_input(tx.data.clone());
