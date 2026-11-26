@@ -1,0 +1,26 @@
+# How the generate / replay / deploy pipeline handles this upgrade (protocol-ops/src/common/upgrade_descriptor.rs).
+# One forge script prepares it; its only L1 transactions are four CREATE2 deployments.
+prepare = "forge-script"
+script = "deploy-scripts/upgrade/v34-era/CTMUpgrade_v34_1Era.s.sol:CTMUpgrade_v34_1Era"
+signature = "prepare(string,string,string)"
+args = [
+  "/upgrade-envs/permanent-values/{env}.toml",
+  "/upgrade-envs/v0.34.1-era/{env}.toml",
+  "/upgrade-envs/v0.34.1-era/output/{env}/ecosystem.toml",
+]
+# On the fork the bundle was replayed on: provenance, keys, governance, both chain-upgrade paths, a test chain.
+verify_fork = ["bash", "upgrade-envs/v0.34.1-era/rehearse.sh"]
+# Read-only against the real chain: every deployed contract has the reviewed code.
+verify_chain = ["bash", "upgrade-envs/v0.34.1-era/rehearse.sh", "--published-only"]
+
+# stage sends the three stages as one proposal through its Emergency Upgrade Board; testnet3 takes the normal path.
+[execution]
+envs = ["stage"]
+script = "deploy-scripts/upgrade/EmergencyStageUpgradeCalldata.s.sol:EmergencyStageUpgradeCalldata"
+signature = "emergencyUpgradeAllStages(string,string,string)"
+args = [
+  "/upgrade-envs/permanent-values/{env}.toml",
+  "/upgrade-envs/v0.34.1-era/output/{env}/ecosystem.toml",
+  "/upgrade-envs/v0.34.1-era/output/{env}/emergency-upgrade-board.json",
+]
+output = "emergency-upgrade-board.json"

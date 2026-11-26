@@ -27,6 +27,8 @@ const KNOWN_FUNCTIONS: &[&str] = &[
     "upgradeChainFromVersion(uint256,((address,uint8,bool,bytes4[])[],address,bytes))",
     // ChainTypeManager
     "setNewVersionUpgrade(((address,uint8,bool,bytes4[])[],address,bytes),uint256,uint256,uint256,address)",
+    // (old, oldDeadline, new, verifier, upgradeContract); the CTM builds the cut itself
+    "createNewPatchUpgrade(uint256,uint256,uint256,address,address)",
     // setChainCreationParams: this line's ChainCreationParams (with genesisAirbenderBatchCommitment),
     // then the pre-Airbender layout of the v31-line CTMs
     "setChainCreationParams((address,bytes32,uint64,bytes32,bytes32,((address,uint8,bool,bytes4[])[],address,bytes),bytes))",
@@ -140,6 +142,25 @@ pub(super) fn annotation(data: &[u8]) -> Option<String> {
             protocol_version(uint(1)?),
             protocol_version(uint(3)?)
         )),
+        "createNewPatchUpgrade" => {
+            let address = |i: usize| {
+                args.get(i)
+                    .and_then(as_address)
+                    .map(|a| a.to_checksum(None))
+            };
+            let old = protocol_version(uint(0)?);
+            // A finite deadline stops chains still on the old version from committing after it.
+            let deadline = match uint(1)? {
+                U256::MAX => format!("no deadline for {old}"),
+                timestamp => format!("{old} deadline at timestamp {timestamp}"),
+            };
+            Some(format!(
+                "{old} to {}, {deadline}, verifier `{}`, upgrade contract `{}`",
+                protocol_version(uint(2)?),
+                address(3)?,
+                address(4)?
+            ))
+        }
         "upgradeChainFromVersion" => {
             let old = if args.len() == 3 { uint(1)? } else { uint(0)? };
             Some(format!("from {}", protocol_version(old)))
