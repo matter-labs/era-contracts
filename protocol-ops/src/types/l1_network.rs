@@ -40,6 +40,9 @@ impl L1Network {
             9 | 31337 => Ok(Self::Localhost),
             17000 => Ok(Self::Holesky),
             11155111 => Ok(Self::Sepolia),
+            // A local node can run any chain id, for example an EVM chain that hosts its own
+            // ecosystem, deployed on a local node with that chain's id before the chain starts.
+            _ if crate::common::preflight::is_local_rpc(rpc_url) => Ok(Self::Localhost),
             other => anyhow::bail!("Unrecognized L1 chain ID: {}", other),
         }
     }
