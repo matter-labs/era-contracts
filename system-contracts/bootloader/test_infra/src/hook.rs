@@ -42,6 +42,7 @@ pub(crate) enum TestVmHook {
     ExpectNoBootloaderLogKey(U256),
     ExpectNoBootloaderLog(U256, U256),
     ExpectSystemLog(U256, U256),
+    ExpectMinted(U256, U256),
     // Testing framework reporting the number of tests.
     TestCount(u32),
     // 104 - test start.
@@ -199,6 +200,7 @@ impl TestVmHook {
                     109 => Self::ExpectNoBootloaderLogKey(vm_hook_params[0]),
                     110 => Self::ExpectNoBootloaderLog(vm_hook_params[0], vm_hook_params[1]),
                     111 => Self::ExpectSystemLog(vm_hook_params[0], vm_hook_params[1]),
+                    112 => Self::ExpectMinted(vm_hook_params[0], vm_hook_params[1]),
                     _ => Self::NoHook,
                 }
             }

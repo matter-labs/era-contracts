@@ -330,31 +330,30 @@ function INT_TEST_forceFailL1Tx() {
 }
 
 function INT_TEST_forceFailL1TxFee() {
-    // Checks the refund with a non-zero gas price.
+    // A force-failed tx with a non-zero gas price pays no fee: the refund recipient gets the whole deposit.
     let txDataOffset := testing_txDataOffset(3)
     let innerTxDataOffset := add(txDataOffset, 0x20)
     testing_assertEq(getTxType(innerTxDataOffset), 255, "tx(3) must be a priority op")
+    testing_assertEq(iszero(getMaxFeePerGas(innerTxDataOffset)), 0, "tx(3) must have a gas price")
+    let canonicalL1TxHash := getCanonicalL1TxHash(txDataOffset)
 
     mstore(testing_txDescriptionPtr(3), 0x0101)
 
-    let billedToUser := safeMul(
-        getMaxFeePerGas(innerTxDataOffset),
-        getGasLimit(innerTxDataOffset),
-        "fee overflow"
-    )
     testing_expectTxFailureNoReturndata(3)
-    testing_expectBootloaderLog(getCanonicalL1TxHash(txDataOffset), 0)
+    testing_expectBootloaderLog(canonicalL1TxHash, 0)
+    testing_expectBootloaderLog(forceFailedL1TxLogKey(), canonicalL1TxHash)
+    // The other priority ops have a zero gas price, so any operator fee from L1 txs would come from tx(3).
+    testing_expectMinted(BOOTLOADER_FORMAL_ADDR(), 0)
+    testing_expectMinted(getReserved1(innerTxDataOffset), getReserved0(innerTxDataOffset))
     testing_expectBalance(getFrom(innerTxDataOffset), 0)
     testing_expectBalance(getTo(innerTxDataOffset), 0)
-    testing_expectBalance(
-        getReserved1(innerTxDataOffset),
-        safeSub(getReserved0(innerTxDataOffset), billedToUser, "fee underflow")
-    )
+    testing_expectBalance(getReserved1(innerTxDataOffset), getReserved0(innerTxDataOffset))
+    expectPriorityQueueAccounting()
 }
 
 function INT_TEST_l1TxRevertBaseline() {
-    // The claim force-fail rests on: a priority op that reverts on its first instruction leaves the
-    // same balances and logs, minus the marker. tx(4) calls a system contract with no such selector.
+    // At a zero gas price, a priority op that reverts on its first instruction leaves the same balances
+    // and logs as a force-failed one, minus the marker. tx(4) calls a system contract with no such selector.
     let txDataOffset := testing_txDataOffset(4)
     let innerTxDataOffset := add(txDataOffset, 0x20)
     testing_assertEq(getTxType(innerTxDataOffset), 255, "tx(4) must be a priority op")

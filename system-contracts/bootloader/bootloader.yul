@@ -1246,6 +1246,11 @@ object "Bootloader" {
                     refundGas := max(getOperatorRefundForTx(transactionIndex), potentialRefund)
                 }
 
+                // A force-failed tx pays no fee: the whole deposit goes to the refund recipient.
+                if forceFail {
+                    refundGas := gasLimit
+                }
+
                 if gt(refundGas, gasLimit) {
                     assertionError("L1: refundGas > gasLimit")
                 }

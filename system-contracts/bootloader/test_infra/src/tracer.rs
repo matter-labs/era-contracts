@@ -31,6 +31,8 @@ pub struct Expectations {
     /// Pairs that must not appear; unlike `forbidden_log_keys`, the key may be shared.
     pub forbidden_logs: Vec<(U256, U256)>,
     pub system_logs: Vec<(U256, U256)>,
+    /// Total base token minted to an account over the batch.
+    pub minted: Vec<(U256, U256)>,
     /// Result of every transaction the bootloader reported, in execution order.
     pub tx_results: Vec<(bool, Option<String>)>,
 }
@@ -43,6 +45,7 @@ impl Expectations {
             || !self.forbidden_logs.is_empty()
             || !self.system_logs.is_empty()
             || !self.balances.is_empty()
+            || !self.minted.is_empty()
     }
 }
 
@@ -201,6 +204,13 @@ impl<S, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for BootloaderTestTracer {
                     .unwrap()
                     .system_logs
                     .push((*key, *value));
+            }
+            TestVmHook::ExpectMinted(account, amount) => {
+                self.expectations
+                    .lock()
+                    .unwrap()
+                    .minted
+                    .push((*account, *amount));
             }
             _ => {}
         }

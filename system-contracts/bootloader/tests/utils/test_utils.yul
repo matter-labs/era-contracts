@@ -90,6 +90,13 @@ function testing_expectBalance(account, balance) {
     setTestHook(108)
 }
 
+// The base token minted to `account` over the batch totals exactly `amount`.
+function testing_expectMinted(account, amount) {
+    storeTestHookParam(0, $llvm_NoInline_llvm$_unoptimized(account))
+    storeTestHookParam(1, $llvm_NoInline_llvm$_unoptimized(amount))
+    setTestHook(112)
+}
+
 function testing_totalTests(tests) {
     storeTestHookParam(0, $llvm_NoInline_llvm$_unoptimized(tests))
     setTestHook(103)

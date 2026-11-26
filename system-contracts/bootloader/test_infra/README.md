@@ -29,7 +29,7 @@ Fixtures are loaded from `src/test_transactions/*.json` in numeric filename orde
 - `0.json`, `1.json` — L2 transactions (EIP-712 and EIP-1559).
 - `2.json` — an L1->L2 transaction transferring its whole deposit, with a zero gas price.
 - `3.json` — the same with a non-zero gas price, so fee and refund effects are visible.
-- `4.json` — one that reverts in the target, the baseline a force-failed transaction must match.
+- `4.json` — one that reverts in the target, the baseline a force-failed transaction must match at a zero gas price.
 
 Only L2 fixtures get their sender funded by the runner; an L1->L2 transaction is funded by the
 bootloader minting its `mintValue`. That mint only works because the runner also presets the
@@ -72,6 +72,7 @@ registered as an expectation and checked by the runner once the batch is done:
 - `testing_expectNoBootloaderLog(key, value)` — it sent no such log, for a key another log owns.
 - `testing_expectSystemLog(key, value)` — it sent this system log (priority-queue accounting).
 - `testing_expectBalance(account, balance)` — exact base token balance at the end of the batch.
+- `testing_expectMinted(account, amount)` — total base token minted to the account over the batch.
 
 Expectations fail closed: a test that registers them and also expects the batch to fail is an
 error (they could never be checked), and an `INT_TEST_*` that registers no assertion at all fails
