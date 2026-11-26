@@ -39,6 +39,8 @@ library ContractsBytecodesLib {
             return Utils.readBytecodeL1("Migrator.sol", "MigratorFacet");
         } else if (Utils.compareStrings(contractIdentifier, "CommitterFacet")) {
             return Utils.readBytecodeL1("Committer.sol", "CommitterFacet");
+        } else if (Utils.compareStrings(contractIdentifier, "ChainConfigFacet")) {
+            return Utils.readBytecodeL1("ChainConfig.sol", "ChainConfigFacet");
         } else if (Utils.compareStrings(contractIdentifier, "BridgedTokenBeacon")) {
             return Utils.readBytecodeL1("UpgradeableBeacon.sol", "UpgradeableBeacon");
         }

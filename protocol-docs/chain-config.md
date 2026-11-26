@@ -124,6 +124,8 @@ subsequent deployments; already deployed large contracts remain callable.
 The filtering, large-contracts, and maximum-transaction-gas setters require the
 chain admin on the active settlement layer. Validators and the chain type manager
 do not have direct permission to call them unless they are also the chain admin.
+The admin can also schedule a change of these values, the pubdata content and the
+DA validator pair for a validator to apply ([below](#scheduled-configuration-updates)).
 
 All committed batches must be verified before a runtime configuration update.
 This existing admin guard is retained even though proof verification now uses the stored
@@ -144,3 +146,46 @@ charge described above, even if filtering was disabled when they were submitted.
 Changing the flag does not alter already-verified batch results. However, verified
 but unexecuted batches may be reverted and their transactions subsequently
 recommitted and reproved with filtering enabled. Executed batches cannot be reverted.
+
+## Scheduled configuration updates
+
+A setter call takes effect in the L1 transaction that makes it, so the node cannot tell which batch
+the change belongs to. A scheduled update instead names a time from which it applies, so the node
+can move to the new configuration at a batch boundary it picks.
+
+The update covers the parameters a chain changes most often: the DA validator pair
+(`l1DAValidator` and the L2 DA commitment scheme), the pubdata content, the maximum transaction gas
+limit, L1 transaction filtering and large contracts. Every other parameter is changed by the admin
+directly.
+
+1. The admin calls `scheduleChainConfigUpdate(update, timestamp)` on the chain's `ChainConfigFacet`.
+   `update` holds the target value of every field, including the ones that stay. The update is
+   stored in the diamond, with `ChainConfigUpdateScheduled`, and exposed by
+   `getPendingChainConfigUpdate()`.
+2. The node reads the pending update. The first batch it seals after `timestamp` runs under the new
+   configuration, and the node holds committing that batch until the update is applied: the
+   committer accepts it only under the new configuration hash.
+3. A validator holding the chain's `UPGRADER_ROLE` on the `ValidatorTimelock` calls
+   `ValidatorTimelock.applyChainConfigUpdate(chain)` once `timestamp` has passed. The timelock
+   forwards it to the chain, which writes the pending update's values with the setters' events,
+   clears it and emits `ChainConfigUpdateApplied`. The chain admin, and the chain type manager, may
+   call `applyChainConfigUpdate` on the chain too; applying before the node has committed the
+   batches it sealed under the old configuration strands them, as a setter call does.
+
+Scheduling runs the setters' checks for each field the update changes; applying runs them again,
+because the chain's state may have changed in between (for example, priority mode allowed after
+filtering was scheduled, or the chain made a permanent rollup after a pubdata change was scheduled).
+A field the update keeps is not checked: a permanent rollup whose DA pair the `RollupDAManager` has
+since disallowed can still change its other fields. When the update changes the configuration hash,
+applying it requires all committed batches to be verified, as the setters do
+([Configuration updates](#configuration-updates)). A change of the DA pair alone does not, as with
+`setDAValidatorPair`.
+
+The admin may replace a pending update with another `scheduleChainConfigUpdate` until it is due.
+After that the node may already run it, so replacing it takes an explicit `cancelChainConfigUpdate`,
+which the admin may call at any time. Cancelling a due update strands the blocks the node already
+produced under it: the committer no longer accepts their configuration hash. Applying takes the
+update pending at that moment, so a replacement scheduled after a cancel applies in its place.
+
+Applying an update writes all of its values, so it undoes a setter call the admin made for one of
+its fields after scheduling it.

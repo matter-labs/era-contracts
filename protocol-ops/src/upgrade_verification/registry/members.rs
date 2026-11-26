@@ -72,6 +72,7 @@ pub(crate) const FACETS: &[&str] = &[
     "ExecutorFacet",
     "MigratorFacet",
     "CommitterFacet",
+    "ChainConfigFacet",
 ];
 pub(crate) const DIAMOND_INIT: &[&str] = &["DiamondInit"];
 pub(crate) const GENESIS_UPGRADE: &[&str] = &["L1GenesisUpgrade"];
@@ -115,6 +116,7 @@ pub(crate) const MEMBER_ARTIFACTS: &[(&str, &str)] = &[
     ("Executor.sol", "ExecutorFacet"),
     ("Migrator.sol", "MigratorFacet"),
     ("Committer.sol", "CommitterFacet"),
+    ("ChainConfig.sol", "ChainConfigFacet"),
     ("DiamondInit.sol", "DiamondInit"),
     ("L1GenesisUpgrade.sol", "L1GenesisUpgrade"),
     ("MultiProofTestnetVerifier.sol", "MultiProofTestnetVerifier"),

@@ -3,6 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {IAdmin} from "./IAdmin.sol";
+import {IChainConfig} from "./IChainConfig.sol";
 import {ICommitter} from "./ICommitter.sol";
 import {IExecutor} from "./IExecutor.sol";
 import {IGetters} from "./IGetters.sol";
@@ -11,7 +12,7 @@ import {IMigrator} from "./IMigrator.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 
-interface IZKChain is IAdmin, ICommitter, IExecutor, IGetters, IMailbox, IMigrator {
+interface IZKChain is IAdmin, IChainConfig, ICommitter, IExecutor, IGetters, IMailbox, IMigrator {
     // We need this structure for the server for now
     event ProposeTransparentUpgrade(
         Diamond.DiamondCutData diamondCut,

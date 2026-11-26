@@ -5,12 +5,13 @@ import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 import {ICommitter} from "../../chain-interfaces/ICommitter.sol";
 import {IChainUpgrader} from "../../chain-interfaces/IChainUpgrader.sol";
+import {IChainConfigApplier} from "../../chain-interfaces/IChainConfigApplier.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The same upgradeable timelock serves chains on different protocol versions, so its external
 /// interface must remain backwards compatible.
-interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
+interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader, IChainConfigApplier {
     /// @notice Struct specifying which validator roles to grant or revoke in a single call.
     /// @param rotatePrecommitterRole Whether to rotate the retired PRECOMMITTER_ROLE. The role gates nothing
     /// any more; the flag is still honoured so grants made before the precommit path was removed can be
@@ -48,7 +49,7 @@ interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
     function PROVER_ROLE() external view returns (bytes32);
     /// @notice Role hash for addresses allowed to execute batches on a chain.
     function EXECUTOR_ROLE() external view returns (bytes32);
-    /// @notice Role hash for addresses allowed to upgrade chains.
+    /// @notice Role hash for addresses allowed to upgrade chains and apply their scheduled configuration updates.
     function UPGRADER_ROLE() external view returns (bytes32);
     /// @notice Deprecated optional admin role hash retained for ABI compatibility.
     function OPTIONAL_PRECOMMITTER_ADMIN_ROLE() external view returns (bytes32);

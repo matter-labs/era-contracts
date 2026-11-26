@@ -6,13 +6,20 @@ import {FeeParams, PriorityModeInformation, PubdataPricingMode, ZKChainStorage} 
 import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
 import {PriorityQueue} from "../../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
-import {NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
+import {L1DAValidatorAddressIsZero, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 import {
     BatchHashMismatch,
     BaseTokenGasPriceDenominatorNotSet,
+    InvalidDAForPermanentRollup,
+    InvalidL2DACommitmentScheme,
+    NotCompatibleWithPriorityMode,
+    PubdataContentLockedForPermanentRollup,
     Unauthorized,
     OnlyNormalMode,
-    OnlyPriorityMode
+    OnlyPriorityMode,
+    ZKsyncOSChainConfigUpdateWithUnverifiedBatches,
+    ZKsyncOSMaxTxGasLimitTooHigh,
+    ZKsyncOSMaxTxGasLimitTooLow
 } from "../../../common/L1ContractErrors.sol";
 import {L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
@@ -24,13 +31,16 @@ import {
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE,
     ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
     ZKSYNC_OS_FRI_PROOF_VERIFICATION_DISABLED,
-    L2DACommitmentScheme
+    ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT,
+    L2DACommitmentScheme,
+    PubdataContent
 } from "../../../common/Config.sol";
 import {CantRevertExecutedBatch, RevertedBatchNotAfterNewLastBatch} from "../../../common/L1ContractErrors.sol";
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IZKsyncOSVerifier} from "../../chain-interfaces/IZKsyncOSVerifier.sol";
 import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 import {StoredBatchHashing} from "../StoredBatchHashing.sol";
+import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
@@ -310,6 +320,96 @@ contract ZKChainBase is ReentrancyGuard {
 
         s.l1DAValidator = _l1DAValidator;
         s.l2DACommitmentScheme = _l2DACommitmentScheme;
+    }
+
+    /// @notice Reverts unless `_l1DAValidator` and `_l2DACommitmentScheme` can be set as the chain's DA validator pair.
+    /// @param _rollupDAManager The RollupDAManager that lists the pairs a permanent rollup may use.
+    /// @param _l1DAValidator The address of the L1 DA validator.
+    /// @param _l2DACommitmentScheme The scheme of the L2 DA commitment.
+    function _validateDAValidatorPair(
+        RollupDAManager _rollupDAManager,
+        address _l1DAValidator,
+        L2DACommitmentScheme _l2DACommitmentScheme
+    ) internal view {
+        if (_l1DAValidator == address(0)) {
+            revert L1DAValidatorAddressIsZero();
+        }
+
+        if (_l2DACommitmentScheme == L2DACommitmentScheme.NONE) {
+            revert InvalidL2DACommitmentScheme(_l2DACommitmentScheme);
+        }
+
+        if (s.isPermanentRollup && !_rollupDAManager.isPairAllowed(_l1DAValidator, _l2DACommitmentScheme)) {
+            revert InvalidDAForPermanentRollup();
+        }
+    }
+
+    /// @notice Reverts unless the chain's pubdata content can be changed.
+    function _validatePubdataContentChange() internal view {
+        // A permanent rollup is locked to `FULL_PUBDATA` — its pubdata content can never be changed (in particular it
+        // can never be relaxed to `LOGS_ONLY`), mirroring how the permanent-rollup flag itself is one-way.
+        if (s.isPermanentRollup) {
+            revert PubdataContentLockedForPermanentRollup();
+        }
+    }
+
+    /// @notice Sets the chain's pubdata content.
+    /// @param _pubdataContent The new pubdata content.
+    function _setPubdataContent(PubdataContent _pubdataContent) internal {
+        emit IAdmin.NewPubdataContent(s.pubdataContent, _pubdataContent);
+        s.pubdataContent = _pubdataContent;
+    }
+
+    /// @notice Reverts unless `_newMaxTxGasLimit` can be set as the ZKsync OS single-transaction gas limit.
+    /// @param _newMaxTxGasLimit The gas limit to check.
+    function _validateZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) internal pure {
+        // The cap may only be raised above Ethereum's EIP-7825 single-tx gas limit, never below.
+        if (_newMaxTxGasLimit < ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT) {
+            revert ZKsyncOSMaxTxGasLimitTooLow();
+        }
+        // The cap must not exceed the ZKsync OS block gas limit: a higher value will halt the block production.
+        if (_newMaxTxGasLimit > ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT) {
+            revert ZKsyncOSMaxTxGasLimitTooHigh();
+        }
+    }
+
+    /// @notice Sets the ZKsync OS single-transaction gas limit.
+    /// @param _newMaxTxGasLimit The new gas limit.
+    function _setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) internal {
+        uint64 oldMaxTxGasLimit = _getZKsyncOSMaxTxGasLimit();
+        s.zksyncOSMaxTxGasLimit = _newMaxTxGasLimit;
+        emit IAdmin.NewZKsyncOSMaxTxGasLimit(oldMaxTxGasLimit, _newMaxTxGasLimit);
+    }
+
+    /// @notice Reverts unless L1 transaction filtering can be set to `_enabled`.
+    /// @param _enabled Whether L1 transactions are to be filtered.
+    function _validateZKsyncOSL1TxFiltering(bool _enabled) internal view {
+        if (_enabled && s.priorityModeInfo.canBeActivated) {
+            revert NotCompatibleWithPriorityMode();
+        }
+    }
+
+    /// @notice Enables or disables L1 transaction filtering.
+    /// @param _enabled Whether L1 transactions are filtered.
+    function _setZKsyncOSL1TxFiltering(bool _enabled) internal {
+        bool oldEnabled = s.zksyncOSL1TxFilteringEnabled;
+        s.zksyncOSL1TxFilteringEnabled = _enabled;
+        emit IAdmin.NewZKsyncOSL1TxFiltering(oldEnabled, _enabled);
+    }
+
+    /// @notice Enables or disables large contracts.
+    /// @param _enabled Whether large contracts are enabled.
+    function _setZKsyncOSLargeContractsEnabled(bool _enabled) internal {
+        bool oldEnabled = s.zksyncOSLargeContractsEnabled;
+        s.zksyncOSLargeContractsEnabled = _enabled;
+        emit IAdmin.NewZKsyncOSLargeContracts(oldEnabled, _enabled);
+    }
+
+    /// @notice Enforces the configuration-update boundary described in {protocol-docs/chain-config.md}.
+    function _enforceNoUnverifiedBatchesForChainConfigUpdate() internal view {
+        if (s.totalBatchesCommitted != s.totalBatchesVerified) {
+            revert ZKsyncOSChainConfigUpdateWithUnverifiedBatches(s.totalBatchesVerified, s.totalBatchesCommitted);
+        }
     }
 
     /// @notice Reverts committed, unexecuted batches.

@@ -32,6 +32,7 @@ import {UtilsFacet} from "../Utils/UtilsFacet.sol";
 
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
+import {ChainConfigFacet} from "contracts/state-transition/chain-deps/facets/ChainConfig.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
@@ -66,6 +67,7 @@ contract ExecutorTest is UtilsCallMockerTest {
     address internal randomSigner;
     address internal l1DAValidator;
     AdminFacet internal admin;
+    ChainConfigFacet internal chainConfig;
     TestExecutor internal executor;
     TestCommitter internal committer;
     L1InteropFeeManager internal interopFeeManager;
@@ -118,6 +120,15 @@ contract ExecutorTest is UtilsCallMockerTest {
         return selectors;
     }
 
+    function getChainConfigSelectors() private view returns (bytes4[] memory) {
+        bytes4[] memory selectors = new bytes4[](3);
+        uint256 i = 0;
+        selectors[i++] = chainConfig.scheduleChainConfigUpdate.selector;
+        selectors[i++] = chainConfig.cancelChainConfigUpdate.selector;
+        selectors[i++] = chainConfig.applyChainConfigUpdate.selector;
+        return selectors;
+    }
+
     function getExecutorSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](6);
         uint256 i = 0;
@@ -138,11 +149,13 @@ contract ExecutorTest is UtilsCallMockerTest {
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](38);
+        bytes4[] memory selectors = new bytes4[](40);
         uint256 i = 0;
         selectors[i++] = getters.getVerifier.selector;
         selectors[i++] = getters.getZKsyncOSChainConfigHash.selector;
         selectors[i++] = getters.getPubdataContent.selector;
+        selectors[i++] = getters.getPendingChainConfigUpdate.selector;
+        selectors[i++] = getters.getDAValidatorPair.selector;
         selectors[i++] = getters.getZKsyncOSMaxTxGasLimit.selector;
         selectors[i++] = getters.getProtocolVersion.selector;
         selectors[i++] = getters.getL2SystemContractsUpgradeTxHash.selector;
@@ -286,6 +299,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         rollupDAManager.acceptOwnership();
 
         admin = new AdminFacet(block.chainid, rollupDAManager);
+        chainConfig = new ChainConfigFacet(rollupDAManager);
         getters = new GettersFacet();
         interopFeeManager = L1InteropFeeManager(
             address(
@@ -358,7 +372,7 @@ contract ExecutorTest is UtilsCallMockerTest {
 
         bytes memory diamondInitData = abi.encodeCall(diamondInit.initialize, (l2ChainId, owner));
 
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](7);
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](8);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(admin),
             action: Diamond.Action.Add,
@@ -401,6 +415,12 @@ contract ExecutorTest is UtilsCallMockerTest {
             isFreezable: true,
             selectors: Utils.getMigratorSelectors()
         });
+        facetCuts[7] = Diamond.FacetCut({
+            facet: address(chainConfig),
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: getChainConfigSelectors()
+        });
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -419,6 +439,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         mailbox = MailboxFacet(address(diamondProxy));
         migrator = MigratorFacet(address(diamondProxy));
         admin = AdminFacet(address(diamondProxy));
+        chainConfig = ChainConfigFacet(address(diamondProxy));
         utilsFacet = UtilsFacet(address(diamondProxy));
         chainTypeManager.setZKChain(address(diamondProxy));
 

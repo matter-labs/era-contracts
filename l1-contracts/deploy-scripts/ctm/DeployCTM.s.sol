@@ -33,6 +33,7 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
+import {ChainConfigFacet} from "contracts/state-transition/chain-deps/facets/ChainConfig.sol";
 import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
@@ -663,12 +664,14 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         ExecutorFacet executorFacet = new ExecutorFacet();
         MigratorFacet migratorFacet = new MigratorFacet(1, false);
         CommitterFacet committerFacet = new CommitterFacet(1);
+        ChainConfigFacet chainConfigFacet = new ChainConfigFacet(RollupDAManager(address(0)));
         bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);
         bytes4[] memory gettersFacetSelectors = Utils.getAllSelectors(address(gettersFacet).code);
         bytes4[] memory mailboxFacetSelectors = Utils.getAllSelectors(address(mailboxFacet).code);
         bytes4[] memory executorFacetSelectors = Utils.getAllSelectors(address(executorFacet).code);
         bytes4[] memory migratorFacetSelectors = Utils.getAllSelectors(address(migratorFacet).code);
         bytes4[] memory committerFacetSelectors = Utils.getAllSelectors(address(committerFacet).code);
+        bytes4[] memory chainConfigFacetSelectors = Utils.getAllSelectors(address(chainConfigFacet).code);
 
         string memory root = vm.projectRoot();
         string memory outputPath = string.concat(root, "/script-out/diamond-selectors.toml");
@@ -679,16 +682,18 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         bytes memory executorFacetSelectorsBytes = abi.encode(executorFacetSelectors);
         bytes memory migratorFacetSelectorsBytes = abi.encode(migratorFacetSelectors);
         bytes memory committerFacetSelectorsBytes = abi.encode(committerFacetSelectors);
+        bytes memory chainConfigFacetSelectorsBytes = abi.encode(chainConfigFacetSelectors);
 
         vm.serializeBytes("diamond_selectors", "admin_facet_selectors", adminFacetSelectorsBytes);
         vm.serializeBytes("diamond_selectors", "getters_facet_selectors", gettersFacetSelectorsBytes);
         vm.serializeBytes("diamond_selectors", "mailbox_facet_selectors", mailboxFacetSelectorsBytes);
         vm.serializeBytes("diamond_selectors", "executor_facet_selectors", executorFacetSelectorsBytes);
         vm.serializeBytes("diamond_selectors", "migrator_facet_selectors", migratorFacetSelectorsBytes);
+        vm.serializeBytes("diamond_selectors", "committer_facet_selectors", committerFacetSelectorsBytes);
         string memory toml = vm.serializeBytes(
             "diamond_selectors",
-            "committer_facet_selectors",
-            committerFacetSelectorsBytes
+            "chain_config_facet_selectors",
+            chainConfigFacetSelectorsBytes
         );
 
         vm.writeToml(toml, outputPath);

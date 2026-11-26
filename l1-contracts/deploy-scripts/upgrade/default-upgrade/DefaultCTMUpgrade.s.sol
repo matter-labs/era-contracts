@@ -681,7 +681,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ///         named here — so "change one contract" cannot quietly become "replace the facet set"
     ///         because the local build differs from the one that produced the live code.
     /// @dev Names are the `deploySimpleContract` names of the members that pass through
-    ///      {DeployCTMUtils._deployReleaseMember}: the six facets, `DiamondInit`, `L1GenesisUpgrade`
+    ///      {DeployCTMUtils._deployReleaseMember}: the facets, `DiamondInit`, `L1GenesisUpgrade`
     ///      and `EIP7702Checker`. The verifier is not among them — a version that replaces it does so
     ///      by overriding the deploy step, which IS the declaration. The default is EMPTY: a
     ///      recurring upgrade that changes nothing about the release reuses all of it, and the
@@ -966,6 +966,11 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             "state_transition",
             "committer_facet_addr",
             ctmAddresses.stateTransition.facets.committerFacet
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "chain_config_facet_addr",
+            ctmAddresses.stateTransition.facets.chainConfigFacet
         );
         vm.serializeAddress(
             "state_transition",

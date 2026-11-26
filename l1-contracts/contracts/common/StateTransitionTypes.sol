@@ -19,6 +19,8 @@ struct Facets {
     address migratorFacet;
     /// @notice Address of the Committer facet contract.
     address committerFacet;
+    /// @notice Address of the ChainConfig facet contract.
+    address chainConfigFacet;
     /// @notice Address of the DiamondInit contract.
     address diamondInit;
 }

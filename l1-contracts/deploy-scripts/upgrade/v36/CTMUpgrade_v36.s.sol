@@ -100,7 +100,8 @@ contract CTMUpgrade_v36 is DefaultCTMUpgrade {
         if (UpgradeHelperLib.isPatchEdge(getOldProtocolVersion(), getNewProtocolVersion())) {
             return members;
         }
-        members = new string[](1);
+        members = new string[](2);
         members[0] = "AdminFacet";
+        members[1] = "GettersFacet";
     }
 }

@@ -26,6 +26,7 @@ const FACETS: Array<{ source: string; contract: string }> = [
   { source: "contracts/state-transition/chain-deps/facets/Executor.sol", contract: "ExecutorFacet" },
   { source: "contracts/state-transition/chain-deps/facets/Migrator.sol", contract: "MigratorFacet" },
   { source: "contracts/state-transition/chain-deps/facets/Committer.sol", contract: "CommitterFacet" },
+  { source: "contracts/state-transition/chain-deps/facets/ChainConfig.sol", contract: "ChainConfigFacet" },
 ];
 
 // Served by every facet, so registering them in a diamond would collide across facets.

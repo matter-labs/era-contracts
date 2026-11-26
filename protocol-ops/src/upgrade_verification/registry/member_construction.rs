@@ -106,6 +106,7 @@ pub(super) const CONSTRUCTOR_EXPECTATIONS: &[(&str, &[(&str, ArgSource)])] = &[
         &[("_l1ChainId", L1ChainId), ("_isTestnet", IsTestnet)],
     ),
     ("CommitterFacet", &[("_l1ChainId", L1ChainId)]),
+    ("ChainConfigFacet", &[("_rollupDAManager", RollupDaManager)]),
     ("DiamondInit", &[]),
     ("L1GenesisUpgrade", &[]),
     (

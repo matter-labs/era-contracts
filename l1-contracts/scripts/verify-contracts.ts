@@ -41,6 +41,8 @@ function fallbackFor(name: string): string[] {
       return ["Migrator"];
     case "CommitterFacet":
       return ["Committer"];
+    case "ChainConfigFacet":
+      return ["ChainConfig"];
     default:
       return [];
   }

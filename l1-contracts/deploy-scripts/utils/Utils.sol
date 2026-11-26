@@ -224,7 +224,7 @@ library Utils {
         string memory json = vm.readFile(path);
         string[] memory sigs = vm.parseJsonKeys(json, ".methodIdentifiers");
 
-        // Every facet exposes getName(), so all six facets share the same selector.
+        // Every facet exposes getName(), so all facets share the same selector.
         // Registering it in the diamond would cause a duplicate-selector revert on the second facet cut.
         // getName() is only meaningful when called directly on the facet, not through the proxy.
         uint256 count = sigs.length;

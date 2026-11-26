@@ -79,6 +79,8 @@ error ChainAlreadyLive();
 error ChainBalanceMustBeZeroBeforeMigration(uint256 chainId, bytes32 assetId, uint256 chainBalance);
 // 0x1ca295a9
 error ChainConfigHashMismatch(bytes32 expected, bytes32 actual);
+// 0x177d0f88
+error ChainConfigUpdateAlreadyDue(uint256 timestamp);
 // 0x24591d89
 error ChainIdAlreadyExists();
 // 0x717a1656
@@ -302,6 +304,8 @@ error NonSequentialVersion();
 error NonZeroBlobToVerifyZKsyncOS(uint256 index, bytes32 blobLinearHash, bytes32 blobOpeningCommitment);
 // 0x31967fc6
 error NonZeroCarriedHash();
+// 0x03e92d9a
+error NoPendingChainConfigUpdate();
 // 0xfa5cd00f
 error NotAllowed(address addr);
 // 0x64846fe4

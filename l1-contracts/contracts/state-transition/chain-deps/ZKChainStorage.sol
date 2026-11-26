@@ -65,6 +65,24 @@ struct PriorityModeInformation {
     address transactionFilterer;
 }
 
+/// @notice The target values of a scheduled chain configuration update.
+/// See {protocol-docs/chain-config.md#scheduled-configuration-updates}.
+/// @param l1DAValidator The L1 DA validator, set together with `l2DACommitmentScheme` as by `setDAValidatorPair`.
+/// @param l2DACommitmentScheme The L2 DA commitment scheme.
+/// @param pubdataContent The pubdata content, as set by `setPubdataContent`.
+/// @param maxTxGasLimit The ZKsync OS single-transaction gas limit, as set by `setZKsyncOSMaxTxGasLimit`.
+/// @param l1TxFilteringEnabled Whether L1 transaction filtering is enabled, as set by `setZKsyncOSL1TxFiltering`.
+/// @param largeContractsEnabled Whether large contracts are enabled, as set by `setZKsyncOSLargeContractsEnabled`.
+// solhint-disable-next-line gas-struct-packing
+struct ChainConfigUpdate {
+    address l1DAValidator;
+    L2DACommitmentScheme l2DACommitmentScheme;
+    PubdataContent pubdataContent;
+    uint64 maxTxGasLimit;
+    bool l1TxFilteringEnabled;
+    bool largeContractsEnabled;
+}
+
 /// @dev storing all storage variables for ZK chain diamond facets
 /// NOTE: It is used in a proxy, so it is possible to add new variables to the end
 /// but NOT to modify already existing variables or change their order.
@@ -302,4 +320,10 @@ struct ZKChainStorage {
     /// See {protocol-docs/interop-gating.md#second-proof-system-requirement}.
     /// @dev STORAGE SLOT: 70
     bool secondProofSystemRequired;
+    /// @dev The configuration update the admin scheduled. See {protocol-docs/chain-config.md#scheduled-configuration-updates}.
+    /// @dev STORAGE SLOT: 71
+    ChainConfigUpdate pendingChainConfigUpdate;
+    /// @dev The timestamp from which `pendingChainConfigUpdate` can be applied. `0` means no update is pending.
+    /// @dev STORAGE SLOT: 72
+    uint256 pendingChainConfigUpdateTimestamp;
 }

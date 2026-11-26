@@ -6,7 +6,7 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {ISelfDescribingFacet} from "../../chain-interfaces/ISelfDescribingFacet.sol";
 
 import {ZKChainBase} from "./ZKChainBase.sol";
-import {PubdataPricingMode} from "../ZKChainStorage.sol";
+import {ChainConfigUpdate, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
@@ -277,6 +277,11 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters, ISelfDescribingF
     }
 
     /// @inheritdoc IGetters
+    function getPendingChainConfigUpdate() external view returns (ChainConfigUpdate memory, uint256) {
+        return (s.pendingChainConfigUpdate, s.pendingChainConfigUpdateTimestamp);
+    }
+
+    /// @inheritdoc IGetters
     function baseTokenSupportsTotalSupply() external view returns (bool) {
         return s.baseTokenHasTotalSupply;
     }
@@ -358,7 +363,7 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters, ISelfDescribingF
     ///      (see `Utils.getAllSelectors`), in ascending selector order. Guarded against drift by
     ///      FacetSelfDescription.t.sol and `yarn l1 facet-selectors --check`.
     function selectors() public pure returns (bytes4[] memory result) {
-        uint32[55] memory list = [
+        uint32[56] memory list = [
             // getPubdataPricingMode()
             uint32(0x06d49e5b),
             // getPriorityTxMaxGasLimit()
@@ -449,6 +454,8 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters, ISelfDescribingF
             uint32(0xcdffacc6),
             // getPendingAdmin()
             uint32(0xd0468156),
+            // getPendingChainConfigUpdate()
+            uint32(0xd0fd87d1),
             // getTotalBatchesCommitted()
             uint32(0xdb1f0bf9),
             // getZKsyncOSMaxTxGasLimit()
