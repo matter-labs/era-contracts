@@ -1218,9 +1218,9 @@
   {
     "contractName": "l1-contracts/ZiskVerifier",
     "evmBytecodePath": "/l1-contracts/out/ZiskVerifier.sol/ZiskVerifier.json",
-    "evmBytecodeHash": "0x0645d5bc8fffeaf033fa6ad158ca2208e562d165816887ef184f768df4ce5898",
-    "evmDeployedBytecodeHash": "0x6fe873de86222af6e08adf55afa8436f74cffd5d33035a920dce93c24fdc1064",
-    "evmDeployedBytecodeBlakeHash": "0xb95ab2e5210cf7dfe263cd99dc0ec7dae84dd4515a4bf6316328772320b74b16",
+    "evmBytecodeHash": "0xffa301dec4992e19322749f5a2fc18b73b726b6c07c0a835e92a43347d5c93d4",
+    "evmDeployedBytecodeHash": "0x6eaf5b2ae8bf1501db1861798498f16ee6c4fa0af6eac02be860264deb8c84ae",
+    "evmDeployedBytecodeBlakeHash": "0x6cbd6e51b15694d54944108c8065817fddb1469233626772ed50902f9f55f90e",
     "evmDeployedBytecodeLength": 2013
   },
   {
