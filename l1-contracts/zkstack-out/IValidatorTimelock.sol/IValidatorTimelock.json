@@ -274,6 +274,19 @@
   },
   {
     "type": "function",
+    "name": "applyChainConfigUpdate",
+    "inputs": [
+      {
+        "name": "_chainAddress",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "chainExecutionDelay",
     "inputs": [
       {
