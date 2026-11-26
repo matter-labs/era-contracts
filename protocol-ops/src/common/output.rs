@@ -248,7 +248,7 @@ fn read_existing_manifest(path: &Path) -> anyhow::Result<(Vec<Value>, Vec<Value>
     Ok((bundles, metadata))
 }
 
-fn safe_txs_from_bundle(bundle: &SafeBundle) -> anyhow::Result<Vec<Value>> {
+pub(crate) fn safe_txs_from_bundle(bundle: &SafeBundle) -> anyhow::Result<Vec<Value>> {
     let mut out = Vec::with_capacity(bundle.txs.len());
     for (idx, tx) in bundle.txs.iter().enumerate() {
         let to = tx
