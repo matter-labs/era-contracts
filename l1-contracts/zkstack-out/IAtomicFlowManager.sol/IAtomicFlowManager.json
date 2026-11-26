@@ -486,6 +486,25 @@
         "type": "bytes32",
         "indexed": true,
         "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "FlowCommitted",
+    "inputs": [
+      {
+        "name": "flowId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "bundleHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
       },
       {
         "name": "deadline",
@@ -504,7 +523,7 @@
   },
   {
     "type": "event",
-    "name": "FlowCommitted",
+    "name": "FlowLegCommitted",
     "inputs": [
       {
         "name": "flowId",
@@ -514,6 +533,19 @@
       },
       {
         "name": "bundleHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "FlowParticipated",
+    "inputs": [
+      {
+        "name": "flowId",
         "type": "bytes32",
         "indexed": true,
         "internalType": "bytes32"
