@@ -100,8 +100,8 @@ atomic-specific happens here; the same channel carries all interop roots.
 finality)`, which:
 
 - re-checks `flowId` and L1 settlement;
-- requires exactly one proof per entry of `legChainIds` (`ManagerProofCountMismatch`): per leg, plus per
-  acceptance in an accepted flow;
+- requires exactly one proof per commitment (`ManagerProofCountMismatch`): per leg in a source-only flow, per
+  participating chain in an accepted flow ({protocol-docs/atomicity/acceptance.md#commitments});
 - for **every** leg, checks the proof's `sourceChainId` equals the declared `legChainIds[i]`, that this
   chain accepts that source ({protocol-docs/interop-gating.md#receive-filter}), and runs
   `AtomicInteropProof.verifyInclusion` against the leg's `commitValue`, the flow `deadline`, and the
@@ -135,7 +135,7 @@ recorded at `initL2`.
 | Function                                                              | Caller            | Effect                                                                                    |
 | --------------------------------------------------------------------- | ----------------- | ----------------------------------------------------------------------------------------- |
 | `append(bundleHash, destinationChainId, lowNullifierIndex, preimage)` | `InteropCenter`   | Validate + commit a leg (step 1). `Unset -> Committed`.                                   |
-| `accept(bundleHash, lowNullifierIndex, preimage)`                     | `InteropHandler`  | Accepted flows: insert this chain's acceptance of a leg. See acceptance.md.               |
+| `accept(bundleHash, lowNullifierIndex, preimage)`                     | `InteropHandler`  | Accepted flows: record this chain's acceptance of a leg. See acceptance.md.               |
 | `requireFlowFinalized(bundleHash, finality)`                          | `InteropHandler`  | `view`. Prove every leg committed in time (step 3). No state change.                      |
 | `authorizeRefund(flow, missingLegIndex, absence)`                     | anyone            | Prove a leg absent past the deadline; flip this chain's `Committed` legs `-> Revertable`. |
 | `claimRefund(flowId, bundle)`                                         | anyone            | Reverse a `Revertable` leg's burn; `-> Reverted`. See recovery.md.                        |

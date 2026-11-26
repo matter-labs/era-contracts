@@ -73,8 +73,9 @@ struct AtomicFlow {
 /// plus one IMT inclusion proof per commitment. Passed as one calldata reference to
 /// `L2InteropHandler.executeAtomicBundle` / `AtomicFlowManager.requireFlowFinalized`.
 /// @param flow The flow definition (see {AtomicFlow}).
-/// @param proofs One inclusion proof per entry of `flow.preimage.legChainIds`, in the same order: the
-/// legs' commit values, followed (accepted flows only) by the legs' accept values.
+/// @param proofs Source-only flows: one inclusion proof per leg's commit value, in `legChainIds` order.
+/// Accepted flows: one inclusion proof per participating chain's participation value, in order of each
+/// chain's first appearance in `legChainIds`. See {protocol-docs/atomicity/acceptance.md#commitments}.
 struct AtomicFinalityProof {
     AtomicFlow flow;
     ImtProof[] proofs;
@@ -85,10 +86,10 @@ struct AtomicFinalityProof {
 /// `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
 bytes4 constant ATOMIC_COMMIT_LEAF_TAG = bytes4(keccak256("AtomicInterop.commit.v1"));
 
-/// @dev Domain tag of the value a destination chain inserts into its own IMT when it accepts a leg of an
-/// accepted flow. Distinct from {ATOMIC_COMMIT_LEAF_TAG}, so an acceptance can never stand in for a commit.
-/// `acceptValue = uint256(keccak256(abi.encode(ATOMIC_ACCEPT_LEAF_TAG, flowId, bundleHash)))`.
-bytes4 constant ATOMIC_ACCEPT_LEAF_TAG = bytes4(keccak256("AtomicInterop.accept.v1"));
+/// @dev Domain tag of the single value each chain of an accepted flow inserts into its own IMT. Distinct from
+/// {ATOMIC_COMMIT_LEAF_TAG}, so a participation can never stand in for a commit.
+/// `participationValue = uint256(keccak256(abi.encode(ATOMIC_PARTICIPATION_LEAF_TAG, flowId, chainId)))`.
+bytes4 constant ATOMIC_PARTICIPATION_LEAF_TAG = bytes4(keccak256("AtomicInterop.participation.v1"));
 
 /// @dev {AtomicFlowPreimage.version} values (same versioning convention as {INTEROP_BUNDLE_VERSION} /
 /// {INTEROP_CALL_VERSION}). Each version is validated under its own rules, so a preimage of one version can
@@ -97,14 +98,14 @@ bytes4 constant ATOMIC_ACCEPT_LEAF_TAG = bytes4(keccak256("AtomicInterop.accept.
 /// so in-flight prior-version flows stay finalizable and refundable.
 /// @dev Source-only flow: only the legs' source chains commit.
 bytes1 constant ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY = 0x01;
-/// @dev Accepted flow: every leg's destination chain must also accept it in time. See
-/// {protocol-docs/atomicity/acceptance.md}.
+/// @dev Accepted flow: each chain of the flow commits its outgoing legs, accepts its incoming legs, and then
+/// inserts one participation value, all in time. See {protocol-docs/atomicity/acceptance.md}.
 bytes1 constant ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED = 0x02;
 
 /// @dev The maximum number of legs in an atomic flow. Committing a leg is cheap (one IMT insert), but
 /// finalizing ANY leg requires verifying one full inclusion proof — a settlement-layer Merkle proof
-/// plus an IMT membership proof — per commitment of the flow, i.e. one per leg or two for an accepted
-/// flow ({AtomicFlowManager.requireFlowFinalized}), so
+/// plus an IMT membership proof — per commitment of the flow, i.e. one per leg, or one per participating
+/// chain (at most two per leg) for an accepted flow ({AtomicFlowManager.requireFlowFinalized}), so
 /// an unbounded leg count would make destination-side execution arbitrarily expensive. The cap is
 /// part of preimage validation ({AtomicFlowManager._validateAndComputeFlowId}), so an oversized flow
 /// is rejected identically on the append, finalize and refund paths and can never commit a leg.

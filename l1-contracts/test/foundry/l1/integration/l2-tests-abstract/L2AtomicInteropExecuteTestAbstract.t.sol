@@ -16,7 +16,7 @@ import {
     AtomicFlow,
     AtomicFlowPreimage,
     ImtProof,
-    ATOMIC_ACCEPT_LEAF_TAG,
+    ATOMIC_PARTICIPATION_LEAF_TAG,
     ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED,
     ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY
 } from "contracts/atomic-interop/IAtomicInterop.sol";
@@ -436,10 +436,15 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
 
     // Accepted flows: the destination accepts the leg before execution
     // ({protocol-docs/atomicity/acceptance.md}). Source and destination share this EVM, so the canonical
-    // tree holds both the source's commit (leaf 1) and, after `acceptAtomicBundle`, the destination's
-    // acceptance (leaf 2); each finality proof binds its leaf to one chain via its `sourceChainId`.
+    // tree holds both the source's participation (leaf 1, inserted by the send) and, after
+    // `acceptAtomicBundle`, the destination's (leaf 2); each finality proof binds its leaf to one chain via
+    // its `sourceChainId`.
 
     uint256 internal constant ACCEPT_LEAF_INDEX = 2;
+
+    function _participationValue(uint256 _chainId) internal view returns (uint256) {
+        return uint256(keccak256(abi.encode(ATOMIC_PARTICIPATION_LEAF_TAG, ectx.flowId, _chainId)));
+    }
 
     /// @dev Real send of a token-transfer leg as an accepted single-leg flow to `destinationChainId`.
     function _sendAcceptedSingleLeg(bytes32 _salt) internal {
@@ -478,8 +483,8 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         ectxBundleBytes = abi.encode(sentBundle);
     }
 
-    /// @dev Finality for the accepted single-leg flow: the commit on the source, the acceptance on the
-    /// destination (`_acceptLeafIndex` in the canonical tree), both in time.
+    /// @dev Finality for the accepted single-leg flow: the source's participation (leaf 1) and the
+    /// destination's (`_acceptLeafIndex` in the canonical tree), both in time.
     function _acceptedSingleLegFinality(
         uint256 _sourceChainId,
         uint256 _acceptLeafIndex
@@ -495,8 +500,8 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         );
     }
 
-    /// @notice Happy path: the destination accepts the leg (accept value in its IMT, bundle still
-    /// `Unreceived`), and once the commit and the acceptance are proven in time the bundle executes.
+    /// @notice Happy path: the destination accepts the leg (its participation value in its IMT, bundle still
+    /// `Unreceived`), and once both chains' participations are proven in time the bundle executes.
     function test_acceptAtomicBundle_ThenExecute_AcceptedSingleLeg() public {
         _setUpAtomicStack();
         _sendAcceptedSingleLeg(keccak256("accepted single leg salt"));
@@ -504,7 +509,9 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         vm.chainId(destinationChainId);
 
         vm.expectEmit(true, true, true, true, L2_ATOMIC_FLOW_MANAGER_ADDR);
-        emit IAtomicFlowManager.FlowAccepted(ectx.flowId, ectx.bundleHash, DEADLINE, ACCEPT_LEAF_INDEX);
+        emit IAtomicFlowManager.FlowAccepted(ectx.flowId, ectx.bundleHash);
+        vm.expectEmit(true, true, true, true, L2_ATOMIC_FLOW_MANAGER_ADDR);
+        emit IAtomicFlowManager.FlowParticipated(ectx.flowId, DEADLINE, ACCEPT_LEAF_INDEX);
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).acceptAtomicBundle(ectxBundleBytes, ectxPreimage, 0);
 
         L2InteropHandler handler = L2InteropHandler(L2_INTEROP_HANDLER_ADDR);
@@ -513,9 +520,14 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
             "acceptance recorded"
         );
         assertEq(
+            L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafAt(1).value,
+            _participationValue(sourceChainId),
+            "the send inserted the source's participation value"
+        );
+        assertEq(
             L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafAt(ACCEPT_LEAF_INDEX).value,
-            uint256(keccak256(abi.encode(ATOMIC_ACCEPT_LEAF_TAG, ectx.flowId, ectx.bundleHash))),
-            "accept value in the destination's IMT"
+            _participationValue(destinationChainId),
+            "participation value in the destination's IMT"
         );
         assertEq(uint256(handler.bundleStatus(ectx.bundleHash)), uint256(BundleStatus.Unreceived), "not executed yet");
 
@@ -531,8 +543,8 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         assertEq(uint256(handler.bundleStatus(ectx.bundleHash)), uint256(BundleStatus.FullyExecuted), "executed");
     }
 
-    /// @notice Without the destination's acceptance an accepted flow cannot execute, even with its source
-    /// commit proven: the only leaf the destination could point at is the commit itself.
+    /// @notice Without the destination's acceptance an accepted flow cannot execute, even with the source's
+    /// participation proven: the only leaf the destination could point at is the source's.
     function test_executeAtomicBundle_AcceptedFlow_RevertWhen_NotAccepted() public {
         _setUpAtomicStack();
         _sendAcceptedSingleLeg(keccak256("unaccepted single leg salt"));
@@ -543,8 +555,8 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         vm.expectRevert(
             abi.encodeWithSelector(
                 IMTLeafValueMismatch.selector,
-                uint256(keccak256(abi.encode(ATOMIC_ACCEPT_LEAF_TAG, ectx.flowId, ectx.bundleHash))),
-                AtomicFlowFixtures.commitValue(ectx.flowId, ectx.bundleHash)
+                _participationValue(destinationChainId),
+                _participationValue(sourceChainId)
             )
         );
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).executeAtomicBundle(ectxBundleBytes, finality);

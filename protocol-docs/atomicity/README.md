@@ -28,7 +28,7 @@ with an engineer-facing summary and defers the rigorous arguments to clearly-mar
 | [flow.md](./flow.md)             | End-to-end lifecycle, the shared data structures, and the `AtomicFlowManager` state machine              | engineers             |
 | [proofs.md](./proofs.md)         | The proof system: the two authenticated clocks, finality, the timeout branches, soundness & completeness | auditors              |
 | [recovery.md](./recovery.md)     | The timeout/refund path and its best-effort recovery semantics                                           | engineers + auditors  |
-| [acceptance.md](./acceptance.md) | Accepted flows (`0x02`): receipt of each leg on its destination and timeout refunds for missing receipts | engineers + auditors  |
+| [acceptance.md](./acceptance.md) | Accepted flows (`0x02`): every chain accepts its incoming legs and inserts one participation value       | engineers + auditors  |
 | [security.md](./security.md)     | Guarantees, non-guarantees, on-chain preconditions, trust assumptions, edge cases                        | auditors              |
 
 The atomic protocol's **integration** with the surrounding stack is documented where that stack lives,
@@ -75,8 +75,9 @@ interop-side send wiring.
 4. **Timeout / refund.** If a leg never commits in time, a single absence proof authorizes refunds; each
    committed leg reverses its own burn best-effort.
 
-In an **accepted flow** each destination also accepts its leg into its own IMT between steps 1 and 3, and
-finality and the timeout cover those acceptances like commits. See [acceptance.md](./acceptance.md).
+In an **accepted flow** each destination also accepts its incoming legs between steps 1 and 3, and each chain
+inserts one participation value instead of one commit value per leg; finality and the timeout cover those values
+like commits. See [acceptance.md](./acceptance.md).
 
 Steps 1 and 3–4 are detailed in [flow.md](./flow.md); the proof mechanics of steps 3–4 in
 [proofs.md](./proofs.md); the refund in [recovery.md](./recovery.md); step 2's channel in

@@ -59,7 +59,7 @@ import {RecoverToL1NotSupported, Unauthorized} from "../common/L1ContractErrors.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice See {IAtomicFlowManager}. Coordinates atomic interop flows on this chain (send-side commit,
-/// destination-side acceptance, finality gate, timeout refund); it never custodies funds. See {protocol-docs/atomicity/flow.md#the-atomicflowmanager};
+/// destination-side acceptance, per-chain participation, finality gate, timeout refund); it never custodies funds. See {protocol-docs/atomicity/flow.md#the-atomicflowmanager};
 /// the exact finalization/timeout conditions live in the {AtomicInteropProof} library header.
 contract AtomicFlowManager is IAtomicFlowManager {
     /// @dev (flowId, bundleHash) => source-leg state on this chain.
@@ -149,6 +149,12 @@ contract AtomicFlowManager is IAtomicFlowManager {
         // Effects before interaction: mark committed before touching the tree.
         _state[flowId][_bundleHash] = LegState.Committed;
 
+        if (_flowPreimage.version == ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED) {
+            emit FlowLegCommitted(flowId, _bundleHash);
+            _participateIfComplete(flowId, _flowPreimage, _lowNullifierIndex);
+            return;
+        }
+
         uint256 value = AtomicInteropProof.commitValue(flowId, _bundleHash);
         // slither-disable-next-line unused-return
         (uint256 index, ) = IL2InteropCommitmentTree(commitmentTree()).insert(value, _lowNullifierIndex);
@@ -191,12 +197,9 @@ contract AtomicFlowManager is IAtomicFlowManager {
             revert ManagerLegAlreadyAccepted(flowId, _bundleHash);
         }
         _accepted[flowId][_bundleHash] = true;
+        emit FlowAccepted(flowId, _bundleHash);
 
-        uint256 value = AtomicInteropProof.acceptValue(flowId, _bundleHash);
-        // slither-disable-next-line unused-return
-        (uint256 index, ) = IL2InteropCommitmentTree(commitmentTree()).insert(value, _lowNullifierIndex);
-
-        emit FlowAccepted(flowId, _bundleHash, _flowPreimage.deadline, index);
+        _participateIfComplete(flowId, _flowPreimage, _lowNullifierIndex);
     }
 
     /// @inheritdoc IAtomicFlowManager
@@ -209,15 +212,15 @@ contract AtomicFlowManager is IAtomicFlowManager {
         _checkFlowId(flow);
         _checkSettlementLayerIsL1(preimage.settlementLayerChainId);
 
-        // One proof per commitment: the legs' commits, then (accepted flows) the legs' acceptances.
-        uint256 m = preimage.legChainIds.length;
+        (uint256[] memory chainIds, uint256[] memory values) = _finalityCommitments(flow.flowId, preimage);
+        uint256 m = chainIds.length;
         if (_finality.proofs.length != m) {
             revert ManagerProofCountMismatch(m, _finality.proofs.length);
         }
 
         // Every commitment must satisfy the finality condition (see the {AtomicInteropProof} library
         // header). The per-proof chain check is defense-in-depth here (inclusion self-binds via the
-        // chain-specific bundle hash) but load-bearing on the symmetric refund path.
+        // chain-specific value) but load-bearing on the symmetric refund path.
         uint256 n = preimage.legBundleHashes.length;
         bool executingIsLeg = false;
         for (uint256 i = 0; i < n; ++i) {
@@ -227,13 +230,13 @@ contract AtomicFlowManager is IAtomicFlowManager {
             }
         }
         for (uint256 j = 0; j < m; ++j) {
-            if (_finality.proofs[j].sourceChainId != preimage.legChainIds[j]) {
-                revert ProofSourceChainMismatch(preimage.legChainIds[j], _finality.proofs[j].sourceChainId);
+            if (_finality.proofs[j].sourceChainId != chainIds[j]) {
+                revert ProofSourceChainMismatch(chainIds[j], _finality.proofs[j].sourceChainId);
             }
-            _checkLegChainAllowed(preimage.legChainIds[j]);
+            _checkLegChainAllowed(chainIds[j]);
             AtomicInteropProof.verifyInclusion(
                 _finality.proofs[j],
-                _commitmentValue(flow.flowId, preimage, j),
+                values[j],
                 preimage.deadline,
                 preimage.settlementLayerChainId
             );
@@ -248,7 +251,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
         _checkFlowId(_flow);
         _checkSettlementLayerIsL1(_flow.preimage.settlementLayerChainId);
 
-        // Bind the absence proof to the missing leg's declared source chain: a commit value is trivially
+        // Bind the absence proof to the chain declared at the index: a commitment value is trivially
         // absent from any OTHER chain's tree, so an unbound proof would allow a double-mint refund of a
         // finalized flow. See {protocol-docs/atomicity/proofs.md#timeout}.
         AtomicFlowPreimage calldata preimage = _flow.preimage;
@@ -408,18 +411,78 @@ contract AtomicFlowManager is IAtomicFlowManager {
         return n;
     }
 
-    /// @dev The IMT value of the flow's `_index`-th commitment, laid out as {AtomicFlowPreimage.legChainIds}:
-    /// leg commits first, then (accepted flows) leg acceptances.
+    /// @dev The IMT value that `legChainIds[_index]` must hold for the flow: leg `_index`'s commit value in a
+    /// source-only flow, or that chain's participation value in an accepted flow.
     function _commitmentValue(
         bytes32 _flowId,
         AtomicFlowPreimage calldata _preimage,
         uint256 _index
     ) internal pure returns (uint256) {
-        uint256 n = _preimage.legBundleHashes.length;
-        if (_index < n) {
+        if (_preimage.version == ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY) {
             return AtomicInteropProof.commitValue(_flowId, _preimage.legBundleHashes[_index]);
         }
-        return AtomicInteropProof.acceptValue(_flowId, _preimage.legBundleHashes[_index - n]);
+        return AtomicInteropProof.participationValue(_flowId, _preimage.legChainIds[_index]);
+    }
+
+    /// @dev The commitments finality proves, in proof order (see {AtomicFinalityProof.proofs}): each leg's commit
+    /// on its source for a source-only flow, or each distinct chain's participation, in order of first
+    /// appearance in `legChainIds`, for an accepted flow.
+    function _finalityCommitments(
+        bytes32 _flowId,
+        AtomicFlowPreimage calldata _preimage
+    ) internal pure returns (uint256[] memory chainIds, uint256[] memory values) {
+        uint256 m = _preimage.legChainIds.length;
+        chainIds = new uint256[](m);
+        values = new uint256[](m);
+        uint256 count = 0;
+        for (uint256 i = 0; i < m; ++i) {
+            uint256 chainId = _preimage.legChainIds[i];
+            if (_preimage.version == ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED && _isListed(chainIds, count, chainId)) {
+                continue;
+            }
+            chainIds[count] = chainId;
+            values[count] = _commitmentValue(_flowId, _preimage, i);
+            ++count;
+        }
+        assembly ("memory-safe") {
+            mstore(chainIds, count)
+            mstore(values, count)
+        }
+    }
+
+    /// @dev Whether `_chainId` is among the first `_count` entries of `_chainIds`.
+    function _isListed(uint256[] memory _chainIds, uint256 _count, uint256 _chainId) internal pure returns (bool) {
+        for (uint256 i = 0; i < _count; ++i) {
+            if (_chainIds[i] == _chainId) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// @dev Inserts this chain's participation value once every leg the preimage declares from this chain is
+    /// committed and every leg declared to it is accepted. Called after each such step, so the last one inserts.
+    function _participateIfComplete(
+        bytes32 _flowId,
+        AtomicFlowPreimage calldata _flowPreimage,
+        uint256 _lowNullifierIndex
+    ) internal {
+        uint256 n = _flowPreimage.legBundleHashes.length;
+        for (uint256 i = 0; i < n; ++i) {
+            bytes32 leg = _flowPreimage.legBundleHashes[i];
+            if (_flowPreimage.legChainIds[i] == block.chainid && _state[_flowId][leg] == LegState.Unset) {
+                return;
+            }
+            if (_flowPreimage.legChainIds[n + i] == block.chainid && !_accepted[_flowId][leg]) {
+                return;
+            }
+        }
+
+        uint256 value = AtomicInteropProof.participationValue(_flowId, block.chainid);
+        // slither-disable-next-line unused-return
+        (uint256 index, ) = IL2InteropCommitmentTree(commitmentTree()).insert(value, _lowNullifierIndex);
+
+        emit FlowParticipated(_flowId, _flowPreimage.deadline, index);
     }
 
     /// @dev Atomic interop is L1-settling only in this release (see {protocol-docs/atomicity/security.md#trust-assumptions});

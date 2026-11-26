@@ -13,11 +13,13 @@ import {IInteropHandlerBase} from "./IInteropHandlerBase.sol";
 /// imports {L2ContractInterfaces}, i.e. it breaks that import cycle).
 interface IL2InteropHandler is IInteropHandlerBase {
     /// @notice Accepts a leg of an accepted atomic flow whose destination is this chain, before the flow's
-    /// deadline: inserts the leg's accept value into this chain's IMT. Permissionless; the chain's operator
-    /// decides what it includes. See {protocol-docs/atomicity/acceptance.md}.
+    /// deadline. The bundle bytes travel in this call, so this chain's history holds them. If this was the
+    /// chain's last step in the flow, it inserts the chain's participation value into its IMT. Permissionless.
+    /// See {protocol-docs/atomicity/acceptance.md}.
     /// @param _bundle ABI-encoded InteropBundle of the leg.
     /// @param _flowPreimage The flow's full `flowId` preimage.
-    /// @param _lowNullifierIndex The low-nullifier slot for the accept value (from the IMT engine).
+    /// @param _lowNullifierIndex The low-nullifier slot for the participation value, if this call inserts it
+    /// (from the IMT engine).
     function acceptAtomicBundle(
         bytes memory _bundle,
         AtomicFlowPreimage calldata _flowPreimage,

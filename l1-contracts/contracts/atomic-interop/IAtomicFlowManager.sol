@@ -6,15 +6,20 @@ import {LegState, AtomicFlow, AtomicFlowPreimage, ImtProof, AtomicFinalityProof}
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Per-chain coordinator for the atomic interop flow: `append` commits a source leg at send
-/// time, `accept` records the destination's acceptance of a leg (accepted flows), `requireFlowFinalized`
+/// time, `accept` records the destination's acceptance of a leg (accepted flows), and the last of this
+/// chain's steps in an accepted flow inserts its participation value; `requireFlowFinalized`
 /// gates atomic execution on the destination, and `authorizeRefund`/`claimRefund` implement the timeout
 /// path. Never custodies funds. Deployed as an
 /// L2 predeploy (no constructor). See {protocol-docs/atomicity/flow.md#the-atomicflowmanager}.
 interface IAtomicFlowManager {
-    /// @notice Emitted when a source leg is committed to this chain's IMT.
+    /// @notice Emitted when a source leg of a source-only flow is committed to this chain's IMT.
     event FlowCommitted(bytes32 indexed flowId, bytes32 indexed bundleHash, uint64 deadline, uint256 leafIndex);
-    /// @notice Emitted when this chain, as a leg's destination, accepts it into its IMT.
-    event FlowAccepted(bytes32 indexed flowId, bytes32 indexed bundleHash, uint64 deadline, uint256 leafIndex);
+    /// @notice Emitted when a source leg of an accepted flow is committed on this chain (no IMT leaf of its own).
+    event FlowLegCommitted(bytes32 indexed flowId, bytes32 indexed bundleHash);
+    /// @notice Emitted when this chain, as a leg's destination, accepts it (no IMT leaf of its own).
+    event FlowAccepted(bytes32 indexed flowId, bytes32 indexed bundleHash);
+    /// @notice Emitted when this chain inserts its participation value for an accepted flow into its IMT.
+    event FlowParticipated(bytes32 indexed flowId, uint64 deadline, uint256 leafIndex);
     /// @notice Emitted per source leg marked `Revertable` by a timeout proof.
     event FlowRefundAuthorized(bytes32 indexed flowId, bytes32 indexed bundleHash);
     /// @notice Emitted when a `Revertable` leg's refund claim is consumed. Funds move only for the
@@ -24,16 +29,18 @@ interface IAtomicFlowManager {
 
     /// @notice Records an atomic source leg: recomputes `flowId` from the supplied preimage, verifies
     /// the committing bundle is one of the flow's legs (declared with this chain as its source) and
-    /// that every other leg declares an interop-registered source chain, then inserts the leg's commit
-    /// value into the interop IMT. For an accepted flow, the leg's declared destination must match the
-    /// bundle's. State `Unset -> Committed`. Callable only by the {InteropCenter}.
+    /// that every other leg declares an interop-registered source chain. A source-only flow inserts the
+    /// leg's commit value into the interop IMT. An accepted flow checks the leg's declared destination
+    /// against the bundle's and inserts this chain's participation value if this was its last step.
+    /// State `Unset -> Committed`. Callable only by the {InteropCenter}.
     /// @dev Taking the full preimage (not an opaque `flowId`) is what couples the committed leg to its
     /// flow; a wrong or stale preimage reverts the whole send instead of stranding the burned funds.
     /// See {protocol-docs/atomicity/flow.md#1-atomic-send-append}.
     /// @param _bundleHash `keccak256(interopBundleBytes)` of this leg (chain-specific via the bundle's
     /// own `sourceChainId` field).
     /// @param _destinationChainId The bundle's destination chain.
-    /// @param _lowNullifierIndex The low-nullifier slot for the commit value (from the IMT engine).
+    /// @param _lowNullifierIndex The low-nullifier slot for the value this call inserts, if any (from the IMT
+    /// engine).
     /// @param _flowPreimage The full `flowId` preimage ({AtomicFlowPreimage}).
     function append(
         bytes32 _bundleHash,
@@ -44,10 +51,12 @@ interface IAtomicFlowManager {
 
     /// @notice Records this chain's acceptance of an accepted flow's leg: recomputes `flowId`, verifies the
     /// bundle is a leg declared with this chain as its destination and that every chain of the flow is
-    /// registered and passes this chain's receive filter, then inserts the leg's accept value into the
-    /// interop IMT. Callable only by the {InteropHandler}. See {protocol-docs/atomicity/acceptance.md}.
+    /// registered and passes this chain's receive filter, then inserts this chain's participation value if
+    /// this was its last step. Callable only by the {InteropHandler}. See
+    /// {protocol-docs/atomicity/acceptance.md}.
     /// @param _bundleHash `keccak256(interopBundleBytes)` of the accepted leg.
-    /// @param _lowNullifierIndex The low-nullifier slot for the accept value (from the IMT engine).
+    /// @param _lowNullifierIndex The low-nullifier slot for the participation value, if this call inserts it
+    /// (from the IMT engine).
     /// @param _flowPreimage The full `flowId` preimage; must be {ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED}.
     function accept(
         bytes32 _bundleHash,
@@ -56,8 +65,8 @@ interface IAtomicFlowManager {
     ) external;
 
     /// @notice Reverts unless every commitment of the flow was made in time (per-commitment IMT inclusion
-    /// proofs — see the {AtomicInteropProof} library header): each leg committed on its source and, for an
-    /// accepted flow, accepted on its destination, all on chains this chain accepts
+    /// proofs — see the {AtomicInteropProof} library header): each leg committed on its source or, for an
+    /// accepted flow, each participating chain's participation value, all on chains this chain accepts
     /// ({protocol-docs/interop-gating.md#receive-filter}); and the executing bundle is a leg of the flow.
     /// Callable only by the {InteropHandler}.
     /// @param _executingBundleHash The bundle hash the handler is about to execute.
@@ -65,12 +74,13 @@ interface IAtomicFlowManager {
     function requireFlowFinalized(bytes32 _executingBundleHash, AtomicFinalityProof calldata _finality) external view;
 
     /// @notice Mark this chain's committed source legs `Revertable` for a flow that can no longer
-    /// finalize, proven by a timeout for one commitment (a leg's commit or, for an accepted flow, its
-    /// acceptance) on a chain this chain accepts ({protocol-docs/interop-gating.md#receive-filter}).
+    /// finalize, proven by a timeout for one commitment (a leg's commit or, for an accepted flow, a chain's
+    /// participation) on a chain this chain accepts ({protocol-docs/interop-gating.md#receive-filter}).
     /// Permissionless.
     /// @param _flow The flow definition ({AtomicFlow}). The absence proof must target
     /// `_flow.preimage.legChainIds[_missingLegIndex]`.
-    /// @param _missingLegIndex Index into `_flow.preimage.legChainIds` of the commitment proven absent.
+    /// @param _missingLegIndex Index into `_flow.preimage.legChainIds` naming the commitment proven absent: that
+    /// leg's commit (source-only flows) or that chain's participation (accepted flows).
     /// @param _absence Timeout proof for the missing commitment's value
     /// (see {AtomicInteropProof.verifyTimeoutAbsence}).
     function authorizeRefund(AtomicFlow calldata _flow, uint256 _missingLegIndex, ImtProof calldata _absence) external;

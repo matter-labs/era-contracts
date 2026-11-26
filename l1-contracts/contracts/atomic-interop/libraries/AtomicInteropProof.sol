@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {IndexedMerkleTree} from "../../common/libraries/IndexedMerkleTree.sol";
 import {Merkle} from "../../common/libraries/Merkle.sol";
-import {ImtProof, ATOMIC_COMMIT_LEAF_TAG, ATOMIC_ACCEPT_LEAF_TAG} from "../IAtomicInterop.sol";
+import {ImtProof, ATOMIC_COMMIT_LEAF_TAG, ATOMIC_PARTICIPATION_LEAF_TAG} from "../IAtomicInterop.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
 import {ChainBatchRootTree} from "../../common/libraries/ChainBatchRootTree.sol";
 import {L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_VERIFICATION} from "../../common/l2-helpers/L2ContractInterfaces.sol";
@@ -35,9 +35,9 @@ library AtomicInteropProof {
         return uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, _flowId, _specHash)));
     }
 
-    /// @notice The value a destination chain inserts into its IMT when it accepts a flow leg.
-    function acceptValue(bytes32 _flowId, bytes32 _bundleHash) internal pure returns (uint256) {
-        return uint256(keccak256(abi.encode(ATOMIC_ACCEPT_LEAF_TAG, _flowId, _bundleHash)));
+    /// @notice The value a chain of an accepted flow inserts into its IMT once it took every local step.
+    function participationValue(bytes32 _flowId, uint256 _chainId) internal pure returns (uint256) {
+        return uint256(keccak256(abi.encode(ATOMIC_PARTICIPATION_LEAF_TAG, _flowId, _chainId)));
     }
 
     /// @notice Verifies `_commitValue` is present in `_proof.sourceChainId`'s batch-END IMT root as of

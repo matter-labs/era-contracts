@@ -184,9 +184,10 @@ A chain S is **allowed** for a chain C if S is C, or if C's `L2Bridgehub.isPeerA
 `AtomicFlowManager` reverts with `ManagerLegChainNotAllowed` otherwise:
 
 - **Finality** ([`requireFlowFinalized`](./atomicity/flow.md#3-finalize--requireflowfinalized)) needs every
-  commitment's chain to be allowed: all sources, plus all destinations for [accepted flows](./atomicity/acceptance.md).
+  commitment's chain to be allowed: all sources, or all participating chains for
+  [accepted flows](./atomicity/acceptance.md).
 - **Refunds** ([`authorizeRefund`](./atomicity/recovery.md#authorizerefund--claimrefund)) need the chain of the
-  missing commitment to be allowed: the source for a missing commit or the destination for a missing acceptance.
+  missing commitment to be allowed: the source for a missing commit or the chain whose participation is missing.
 
 The filter reads the whitelist when the bundle is verified, or executed if it wasn't verified first, not when it was
 sent. A bundle from a peer that is removed stays unreceived, and executes once the admin allows the peer again; one
