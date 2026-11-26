@@ -27,7 +27,12 @@ import {L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBas
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IServerNotifier} from "contracts/governance/IServerNotifier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
-import {ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {
+    ChainCreationParams,
+    ChainTypeManagerInitializeData,
+    IChainTypeManager
+} from "contracts/state-transition/IChainTypeManager.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IEraMultiProofVerifier} from "contracts/state-transition/chain-interfaces/IEraMultiProofVerifier.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
@@ -178,6 +183,28 @@ contract V34EraUpgradeForkTest is Test {
         ServerNotifier(address(serverNotifier)).initialize(address(this));
         vm.expectRevert("Initializable: contract is already initialized");
         ServerNotifier(serverNotifierImplementation).initialize(address(this));
+    }
+
+    /// @dev v34.1 reads them from this output and requires the CTM's.
+    function test_outputChainCreationParamsAreTheCtms() public {
+        ChainCreationParams memory params = abi.decode(
+            vm.parseTomlBytes(_output(), "$.contracts_config.new_chain_creation_params"),
+            (ChainCreationParams)
+        );
+        assertEq(params.genesisUpgrade, ctm.l1GenesisUpgrade(), "creation params: genesis upgrade");
+        // `_batchZero` reads only these.
+        Genesis memory genesis;
+        genesis.root = params.genesisBatchHash;
+        genesis.leafIndex = params.genesisIndexRepeatedStorageChanges;
+        genesis.batchCommitment = params.genesisBatchCommitment;
+        genesis.airbenderBatchCommitment = params.genesisAirbenderBatchCommitment;
+        assertEq(ctm.storedBatchZero(), keccak256(abi.encode(_batchZero(genesis))), "creation params: batch zero");
+        assertEq(keccak256(abi.encode(params.diamondCut)), ctm.initialCutHash(), "creation params: diamond cut");
+        assertEq(
+            keccak256(abi.encode(params.forceDeploymentsData)),
+            ChainTypeManagerBase(address(ctm)).initialForceDeploymentHash(),
+            "creation params: force deployments"
+        );
     }
 
     // ─── The chains ──────────────────────────────────────────────────────────────────

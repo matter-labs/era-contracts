@@ -163,12 +163,18 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
 
     // ======================== Output ========================
 
-    /// @dev What the base `saveOutput` leaves out: the Airbender verifier.
+    /// @dev What the base `saveOutput` leaves out: the Airbender verifier, and the chain creation params v34.1 reads.
     function saveOutputVersionSpecific() internal override {
+        string memory path = upgradeConfig.outputPath;
         vm.writeToml(
             vm.toString(ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk),
-            upgradeConfig.outputPath,
+            path,
             ".state_transition.airbender_verifier_addr"
+        );
+        vm.writeToml(
+            vm.toString(abi.encode(getChainCreationParams(ctmAddresses.stateTransition))),
+            path,
+            ".contracts_config.new_chain_creation_params"
         );
     }
 }
