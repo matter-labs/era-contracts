@@ -22,9 +22,9 @@ import {UpgradeHelperLib} from "../default-upgrade/UpgradeHelperLib.sol";
 import {UpgradeUtils} from "../default-upgrade/UpgradeUtils.sol";
 import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 
-/// @notice v34 Era: moves an Era CTM from v0.33.0 to v0.34.0. From then on every batch needs a Boojum and an
-/// Airbender proof; the release also ships the force-fail bootloader, the 15M user L1->L2 gas cap and an EVM
-/// emulator fix.
+/// @notice v34 Era: moves an Era CTM from v0.33.0 to the v34 genesis's version (v0.34.1). From then on every batch
+/// needs a Boojum and an Airbender proof; the release also ships the force-fail bootloader, the 15M user L1->L2 gas
+/// cap and an EVM emulator fix.
 /// @dev Initialized by `initializeWithArgs` from the env's permanent values; the rest is introspected from the CTM
 /// or read from the v34 genesis. `prepareCTMUpgrade` deploys, through CREATE2 with the input's salt, what
 /// `deployNewCTMContracts` lists below plus the six facets and `DiamondInit`. Output and test calls are the base's.
@@ -75,7 +75,7 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
     function _checkLiveState() internal view {
         IChainTypeManager ctm = IChainTypeManager(newConfig.ctm);
         require(!ctm.isZKsyncOS(), "v34: not an Era CTM");
-        require(!UpgradeHelperLib.isPatchUpgrade(getNewProtocolVersion()), "v34: must be a minor upgrade");
+        // A minor upgrade whatever the new patch: the L2 upgrade tx's nonce is the minor.
         require(
             UpgradeHelperLib.getProtocolUpgradeNonce(getNewProtocolVersion()) ==
                 UpgradeHelperLib.getProtocolUpgradeNonce(getOldProtocolVersion()) + 1,
