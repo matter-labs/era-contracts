@@ -6,8 +6,8 @@ era-contracts holds the protocol contracts of ZKsync chains (the ZK Stack):
 
 - `l1-contracts/`, the settlement contracts on Ethereum. These are `L1Bridgehub`; the shared bridge
   (`L1AssetRouter`, `L1NativeTokenVault`, `L1Nullifier`); the chain type managers; and one diamond proxy per
-  chain whose facets (`Committer`, `Executor`, `Mailbox`, `Admin`, `Getters`) commit batches, verify proofs,
-  run the priority queue and store batch commitments. The same tree holds the L2 halves of the bridge
+  chain whose facets (`Committer`, `Executor`, `Mailbox`, `Admin`, `Getters`, `Migrator`) commit batches, verify
+  proofs, run the priority queue and store batch commitments. The same tree holds the L2 halves of the bridge
   (`L2AssetRouter`, `L2NativeTokenVault`, `BridgedStandardERC20`) and the L2 base token (`L2BaseTokenEra`, and
   `BaseTokenHolder`, whose reserve pays out base token in place of minting).
 - `system-contracts/`, the EraVM system contracts and the bootloader: `bootloader/bootloader.yul`,
@@ -21,14 +21,16 @@ All chains share one set of L1 bridge contracts, so the escrow of every chain si
 L1 does not cap what each chain can withdraw (per-chain balances were removed, see `docs/bridging.md`): only
 the proofs stop a chain from withdrawing funds deposited into other chains. This is by design; do not report
 the missing cap. The one cap left on L1 is `L1NativeTokenVault.bridgedOut`, the total of each L1-native asset
-bridged out to all chains, which `populateBridgedOut` fills in for escrow from before the upgrade.
+bridged out to all chains, which the permissionless `populateBridgedOut` fills in for escrow from before the
+upgrade. Until it has run for an asset, that asset's pre-upgrade escrow cannot be withdrawn; this is expected.
 
 Untrusted input:
 
 - Any L1 account: deposits and L1->L2 transactions through `L1Bridgehub` and `Mailbox`, withdrawal
-  finalization and failed-deposit claims with Merkle proofs (`L1Nullifier`, `L1AssetRouter`), and every
-  other permissionless entry point. An L1 contract acts on L2 only from its aliased address
-  (`AddressAliasHelper`); `Mailbox` leaves EOAs and EIP-7702 accounts (`EIP7702Checker`) unaliased.
+  finalization and failed-deposit claims with Merkle proofs (`L1Nullifier`, `L1AssetRouter`,
+  `L1InteropHandler`), and every other permissionless entry point. An L1 contract acts on L2 only from its
+  aliased address (`AddressAliasHelper`); `Mailbox` leaves EOAs and EIP-7702 accounts (`EIP7702Checker`)
+  unaliased.
 - Any L2 account: transactions processed by the bootloader, including custom accounts and paymasters;
   calls into the system contracts; contract deployment, EraVM bytecode and EVM bytecode run by the
   emulator; precompile inputs; withdrawals and L2->L1 messages.
@@ -39,7 +41,8 @@ Untrusted input:
   that only the people who chose to hold it are affected, do not report it.
 - Custom asset handlers and asset deployment trackers: anyone can deploy one, and it is trusted only for
   its own asset.
-- Batch data, DA pubdata and proofs submitted by chain operators (see the trust assumptions below).
+- Batch data, DA pubdata and proofs submitted by chain operators, or by anyone in Priority Mode (see the trust
+  assumptions and Priority Mode below).
 
 ## Trust assumptions
 
@@ -53,6 +56,10 @@ Untrusted input:
 - Operators and validators (`ValidatorTimelock`) may delay or refuse to process batches. They must not be
   able to get a batch executed without a valid proof, execute a batch that differs from what was committed,
   skip, reorder or forge priority transactions, or bypass the execution delay.
+- Some chains also require independent validators to sign off on their batches, the "2FA" of
+  `docs/bridging.md`: `MultisigCommitter` checks validator signatures before a commit (ZKsync OS chains), and
+  `EraMultisigValidator` checks multisig approvals before an execute (Era chains). Operators must not be able
+  to commit or execute a batch without the signatures or approvals the chain requires.
 - The proof system itself (circuits and provers) is out of scope: assume a proof that verifies attests to
   the bootloader and system contracts having run as written. That makes their logic in scope. A bug in
   them is a bug in what the chain proves. So are the on-chain verifiers (`EraVerifierPlonk`,
@@ -64,32 +71,58 @@ Untrusted input:
   `BlobsL1DAValidatorZKsyncOS`) is in scope, since a bug there reaches every chain's escrow.
 - Inside EraVM, system contracts are privileged: functions restricted to the bootloader, to system calls or
   to other system contracts must not be reachable by an ordinary L2 account.
+- Service transactions (`Mailbox.requestL2ServiceTransaction`) are privileged L1->L2 transactions: free, with a
+  72M gas limit, and sent from `SERVICE_TRANSACTION_SENDER`, which `L2Bridgehub`, `L2ChainAssetHandler` and
+  `ContractDeployer.setAllowedBytecodeTypesToDeploy` trust on L2. Only the senders that `onlyServiceTransaction`
+  lists may send one: the chain's own diamond (`Admin.allowEvmEmulation`), `L1ChainAssetHandler` (Gateway only)
+  and the bridgehub's `chainRegistrationSender` (not deployed).
 - `EraTestnetVerifier`, `ZKsyncOSTestnetVerifier` and `TestnetPaymaster` are never used on mainnet. Findings
   that need them are out of scope.
 
 ## Gateway
 
 Gateway is not used in production: every chain settles on L1, and chain migrations between settlement layers
-are disabled in code. `CHAIN_MIGRATIONS_ENABLED` is `false` in `common/Config.sol`, and `whenMigrationsEnabled`
-makes the chain asset handlers' `bridgeBurn` and `bridgeMint` revert. Lifting it takes a protocol upgrade, not
-a governance call (`docs/chain-lifecycle.md`). A finding must work while every chain settles on L1 and the flag
-is `false`. Any path that migrates a chain while the flag is `false` is Critical.
+are disabled in code. `CHAIN_MIGRATIONS_ENABLED` is `false` in `l1-contracts/contracts/common/Config.sol`, and
+`whenMigrationsEnabled` makes the chain asset handlers' `bridgeBurn` and `bridgeMint` revert. There is no
+setter: lifting the ban takes new chain asset handler implementations (`docs/chain-lifecycle.md`). A finding
+must work while every chain settles on L1 and the flag is `false`. Any path that migrates a chain while the
+flag is `false` is Critical.
+
+Some chains settled on the legacy Era Gateway (`L1MessageRoot.ERA_GATEWAY_CHAIN_ID`) before migrations were
+disabled; `L1ChainAssetHandler.setHistoricalMigrationInterval` records those batch ranges. L1 still finalizes
+withdrawals from those batches with proofs that go through the Gateway, and that path is in scope.
 
 Out of scope: what happens once a chain settles on or migrates to a Gateway, and the code that only serves
-Gateway: `state-transition/chain-deps/gateway-ctm-deployer/`, `GatewayTransactionFilterer`, `CalldataDAGateway`,
-`RelayedSLDAValidator` and `CTMDeploymentTracker`.
+Gateway: `l1-contracts/contracts/state-transition/chain-deps/gateway-ctm-deployer/`, `GatewayTransactionFilterer`,
+`CalldataDAGateway` and `RelayedSLDAValidator`.
 
 Gateway code that is reachable while every chain settles on L1 stays in scope, rated by its impact on chains
 that settle on L1. That includes:
 
 - the entry points of the chain asset handlers and their checks (`onlyAssetRouter`, the chain admin check,
   `whenMigrationsEnabled`);
+- the entry points of `CTMDeploymentTracker` and their owner checks (`bridgehubDeposit` through
+  `L1Bridgehub.requestL2TransactionTwoBridges`, and `bridgeCheckCounterpartAddress`);
 - `L1ChainAssetHandler.bridgeConfirmTransferResult`, which the flag deliberately does not gate, and the
   `forwardedBridgeConfirmTransferResult` calls it makes into the chain type manager and the `Migrator` facet;
 - `Migrator.pauseDepositsBeforeInitiatingMigration` and `Migrator.unpauseDeposits`;
 - the settlement-layer hop that `MessageHashing` still accepts in L2->L1 message proofs, and
-  `L1ChainAssetHandler.isValidSettlementLayer` as `L1MessageRoot` calls it;
+  `L1ChainAssetHandler.isValidSettlementLayer` as `L1MessageRoot` calls it, including the historical intervals
+  above;
 - any other branch for a settlement layer other than L1 that an L1 or L2 user can enter.
+
+## Priority Mode
+
+Priority Mode is the escape hatch of ZKsync OS chains that settle on L1
+(`docs/system/contracts/chain_management/stage1.md`). A chain admin opts in, irreversibly, with
+`Admin.permanentlyAllowPriorityMode`. Once a priority transaction has waited `PRIORITY_EXPIRATION`, anyone can
+call `Admin.activatePriorityMode`, which reverts the batches not yet executed. From then on anyone can commit,
+prove and execute batches through `PermissionlessValidator.settleBatchesSharedBridge`.
+
+No chain intends to opt in. Review the code anyway for harm an opted-in chain, or anyone settling its batches,
+can do to the ecosystem: other chains' escrow, the shared contracts, messages attributed to other chains. That
+Priority Mode keeps its guarantees to the chain's own users (censorship resistance, liveness) matters less: a
+finding that only breaks those is at most Medium.
 
 ## EVM emulator
 
@@ -102,7 +135,9 @@ returndata pointers. EraVM does not enforce STATICCALL between EVM contracts; th
 hands over through `EvmGasManager` does. For any EVM bytecode:
 
 - only `EvmEmulator.yul` runs as an account marked EVM: no DELEGATECALL from an EVM contract into EraVM code,
-  and no EraVM code at an address marked EVM;
+  and no EraVM code at an address marked EVM. The one exception is `DefaultAccount`, which EraVM runs for an
+  address without code and for an EVM contract still being constructed; its functions do nothing in a
+  delegate call (`ignoreInDelegateCall`);
 - the target of a call the bytecode directs never receives a system call, including the call that
   `MsgValueSimulator` forwards for a call with value, and gets no calldata beyond the opcode's operands;
 - no state changes inside a STATICCALL;
@@ -110,7 +145,11 @@ hands over through `EvmGasManager` does. For any EVM bytecode:
 - the gas and static flag pushed to `EvmGasManager` reach only the callee they were pushed for: a call that
   fails, or never reaches an EVM callee, leaves none for a later one;
 - contracts are deployed only to the address CREATE or CREATE2 would give on Ethereum, and never over
-  existing code.
+  existing code. The exception is `EvmPredeploysManager.deployPredeployedContract`, which deploys a fixed list
+  of contracts at their Ethereum addresses, each with a fixed bytecode and constructor input.
+
+Breaking one of the first four rules, or deploying over existing code, is Critical. A wrong gas or static-flag
+handoff, or a deployment address that differs from Ethereum's, is rated by its impact.
 
 EraVM and compiler (zksolc, LLVM) bugs are out of scope on their own. An EraVM or compiler behaviour that EVM
 bytecode can reach through the emulator and that breaks a rule above is in scope as an emulator finding.
@@ -119,33 +158,40 @@ The differences from Ethereum listed in
 https://docs.zksync.io/zksync-protocol/era-vm/evm-interpreter/evm-differences are known; do not report them.
 Any other difference that breaks a guarantee Ethereum contracts rely on for safety (the 2300-gas stipend, the
 63/64 rule, CREATE2 addresses, EXTCODEHASH and EXTCODESIZE) is rated by its impact on contracts deployed on
-Era, not as Medium by default. Warm and cold access state (EIP-2929) lasts for the whole transaction, as on
-Ethereum; an error in it is rated by its effect on gas.
+Era, not as Medium by default. Warm and cold access state (EIP-2929) follows Ethereum: it lasts for the whole
+transaction, and a frame that reverts rolls back what it warmed. An error in it is rated by its effect on gas.
 
 ## Components that matter most / least
 
-Highest priority (they hold funds, mint base token, or decide what L1 accepts):
+Highest priority (they hold funds, mint base token, decide what L1 accepts, or run attacker code with system
+privileges):
 
 - The EVM emulator: `system-contracts/contracts/EvmEmulator.yul`, `EvmGasManager.yul`, `EvmHashesStorage`,
   `EvmPredeploysManager`, and the EVM paths of `ContractDeployer` and `AccountCodeStorage`.
 - `l1-contracts/contracts/bridge/`: `L1AssetRouter`, `L1NativeTokenVault`, `L1Nullifier`, `AssetRouterBase`,
-  `NativeTokenVaultBase`, the L2 halves, `BridgedStandardERC20`, `L2WrappedBaseToken`.
-- `l1-contracts/contracts/core/`: `L1Bridgehub`, `L1MessageRoot`, and the entry points of
-  `L1ChainAssetHandler` that are reachable while every chain settles on L1 (see Gateway); and
-  `l1-contracts/contracts/interop/L2MessageVerification.sol`.
-- `l1-contracts/contracts/state-transition/`: the chain type managers, `validators/ValidatorTimelock`,
-  `chain-deps/` (the diamond, its storage and all facets, including the L1->L2 sender aliasing in
-  `Mailbox`), `libraries/` (`PriorityTree`, `PriorityQueue`, `BatchDecoder`, `TransactionValidator`, ...),
-  `verifiers/`, `data-availability/`.
+  `NativeTokenVaultBase`, the L2 halves, `BridgedStandardERC20`, `L2WrappedBaseToken`; and
+  `l1-contracts/contracts/interop/interop-handler/L1InteropHandler.sol`, whose `executeBundle` finalizes
+  withdrawals out of the L1 escrow.
+- `l1-contracts/contracts/core/`: `L1Bridgehub`, `L1MessageRoot`, the entry points of `L1ChainAssetHandler`
+  that are reachable while every chain settles on L1 (see Gateway), and their L2 counterparts `L2Bridgehub`,
+  `L2MessageRoot` and `L2ChainAssetHandler`.
+- L2 message verification: `l1-contracts/contracts/interop/L2MessageVerification.sol`,
+  `interop/L2InteropRootStorage.sol` and `atomic-interop/L2InteropCommitmentTree.sol`.
+- `l1-contracts/contracts/state-transition/`: the chain type managers, `validators/` (`ValidatorTimelock`,
+  `MultisigCommitter`, `EraMultisigValidator`, `PermissionlessValidator`), `chain-deps/` (the diamond, its
+  storage and all facets, including the L1->L2 sender aliasing and service transactions in `Mailbox`),
+  `libraries/` (`PriorityTree`, `PriorityQueue`, `BatchDecoder`, `TransactionValidator`, ...), `verifiers/`,
+  `data-availability/`.
 - `l1-contracts/contracts/common/`: `MessageVerification` and `libraries/` (Merkle trees and proofs,
   `MessageHashing`, `DataEncoding`, `UnsafeBytes`).
+- The L2 base token supply, in `l1-contracts/contracts/l2-system/`: `era/L2BaseTokenEra.sol` and
+  `BaseTokenHolder.sol` (payouts from the holder's reserve replace minting), and `L2InteropHandler`
+  (`interop/interop-handler/`), the only caller of `BaseTokenHolder.give`.
 - `system-contracts/`: the bootloader (fee and refund accounting, transaction validation, L1->L2
-  transaction processing, pubdata and L2->L1 log publishing), `MsgValueSimulator`, and in
-  `l1-contracts/contracts/l2-system/`, `era/L2BaseTokenEra.sol` and `BaseTokenHolder.sol` (base token supply:
-  payouts from the holder's reserve replace minting), `NonceHolder` and account abstraction rules,
-  `ContractDeployer`, `KnownCodesStorage` and `AccountCodeStorage` (which bytecode runs at an address),
-  `L1Messenger`, `Compressor` and `libraries/L2DAValidator.sol` (what reaches L1), and the precompiles,
-  especially signature verification (`Ecrecover`, `P256Verify`) and the elliptic-curve ones.
+  transaction processing, pubdata and L2->L1 log publishing), `MsgValueSimulator`, `NonceHolder` and account
+  abstraction rules, `ContractDeployer`, `KnownCodesStorage` and `AccountCodeStorage` (which bytecode runs at
+  an address), `L1Messenger`, `Compressor` and `libraries/L2DAValidator.sol` (what reaches L1), and the
+  precompiles, especially signature verification (`Ecrecover`, `P256Verify`) and the elliptic-curve ones.
 - `da-contracts/contracts/`: the L1 DA validators and `EIP7702Checker`.
 - `l1-contracts/contracts/governance/` and `upgrades/`: `ChainAdmin` and its restrictions, `Governance`,
   `ServerNotifier`, the upgrade contracts (a non-governance actor triggering an upgrade, or an upgrade
@@ -154,15 +200,14 @@ Highest priority (they hold funds, mint base token, or decide what L1 accepts):
 
 Lower priority: `l2-contracts/contracts/ConsensusRegistry.sol` and `da-contracts/contracts/da-layers/`.
 
-In scope without a section here yet, rated by the severity rules below: `l1-contracts/contracts/interop/`
-(other than `L2MessageVerification`), `l1-contracts/contracts/atomic-interop/`, `L2AssetTracker`,
-`PrividiumTransactionFilterer`, the validators other than `ValidatorTimelock` (`EraMultisigValidator`,
-`MultisigCommitter`, `PermissionlessValidator`), and the ZKsync OS L2 contracts
-(`l1-contracts/contracts/l2-system/zksync-os/`, `L2NativeTokenVaultZKOS`).
+In scope without a section here yet, rated by the severity rules below: the rest of
+`l1-contracts/contracts/interop/` and `l1-contracts/contracts/atomic-interop/`, `L2AssetTracker`,
+`PrividiumTransactionFilterer`, and the ZKsync OS L2 contracts (`l1-contracts/contracts/l2-system/zksync-os/`,
+`L2NativeTokenVaultZKOS`).
 
 Out of scope: `dev-contracts/`, `test-contracts/`, `test/`, `deploy-scripts/`, `scripts/`, `upgrade-system/`,
 `tools/`, `lib/`, `Dummy*` contracts, `EraTestnetVerifier`, `ZKsyncOSTestnetVerifier`, `TestnetPaymaster`,
-and the Gateway-only code listed under Gateway.
+`ChainRegistrationSender` (not deployed), and the Gateway-only code listed under Gateway.
 
 ## How to exercise it
 
@@ -194,17 +239,20 @@ and the Gateway-only code listed under Gateway.
 - Critical: theft or permanent freezing of funds held by the L1 bridge contracts or of bridged tokens on L2;
   minting unbacked tokens or base token; finalizing a withdrawal twice, or one never initiated on L2;
   forging an L2->L1 message, or one attributed to another chain; an L1 contract acting on L2 from its own,
-  unaliased address; L1 executing a batch that was not proven, or whose proven public input differs from what
-  was committed; one chain spending or minting against another chain's balance; an ordinary L2 account
-  reaching a system-only function, changing another account's nonce or code, or passing validation for an
-  account it does not control; EVM bytecode that breaks one of the emulator rules above; migrating a chain
-  while migrations are disabled; a precompile that accepts a forged signature; taking over governance, an
-  upgrade path or another chain's admin.
+  unaliased address; sending a service transaction from anyone other than the senders `onlyServiceTransaction`
+  lists, or choosing its target or calldata; L1 executing a batch that was not proven, or whose proven public
+  input differs from what was committed; one chain spending or minting against another chain's balance; an
+  ordinary L2 account reaching a system-only function, changing another account's nonce or code, or passing
+  validation for an account it does not control; EVM bytecode that breaks one of the first four emulator rules
+  or deploys over existing code; migrating a chain while migrations are disabled; a precompile that accepts a
+  forged signature; taking over governance, an upgrade path or another chain's admin.
 - High: temporary freezing of funds; blocking deposits or withdrawals for every chain, or for a chain other
   than the attacker's; skipping, reordering or censoring priority transactions; a transaction that halts
-  batch production, produces a batch that cannot be proven, or bricks a chain so that only a governance
-  upgrade recovers it; fee or refund accounting in the bootloader that lets users steal from the operator or
-  from each other; a chain admin escaping an enforced restriction with bounded impact.
+  batch production, produces a batch that cannot be proven (shown from the code here, since the circuits are
+  out of scope), or bricks a chain so that only a governance upgrade recovers it; committing or executing a
+  batch without the validator signatures or approvals the chain requires; fee or refund accounting in the
+  bootloader that lets users steal from the operator or from each other; a chain admin escaping an enforced
+  restriction with bounded impact.
 - Medium: EVM emulator or precompile behaviour that differs from Ethereum with limited impact; griefing with
   bounded impact that recovers without governance; a single user's or asset's flow stuck but recoverable.
 - Low: events, getters and view functions; issues that need trusted governance to misconfigure something.
