@@ -426,6 +426,24 @@ pub struct UpgradePrepareAllArgs {
     /// version must leave the live handler alone. Requires a PUH-governed env.
     #[clap(long, default_value_t = false)]
     pub redeploy_zk_governance: bool,
+
+    /// Prepare an upgrade that only replaces the ZKsync OS verifier (a new VK; facets, L2 and
+    /// governance untouched) instead of the release: `ZKsyncOSVerifierOnlyUpgrade` with
+    /// `upgrade-envs/<--upgrade>/<--env>.toml` as its input, which also carries the salt. Writes
+    /// `upgrade-envs/<--upgrade>/output/<--env>/ecosystem.toml`. What `upgrade.toml`'s
+    /// `verifier_only = true` runs.
+    #[clap(
+        long,
+        requires_all = ["upgrade", "env"],
+        conflicts_with_all = ["ctm_proxies", "ctm_config", "create2_factory_salt", "redeploy_zk_governance"]
+    )]
+    #[serde(default)]
+    pub verifier_only: bool,
+
+    /// With `--verifier-only`: the upgrade directory under `upgrade-envs/`.
+    #[clap(long, requires = "verifier_only")]
+    #[serde(default)]
+    pub upgrade: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -544,6 +562,9 @@ pub async fn run_list_ctms(args: ListCtmsArgs) -> anyhow::Result<()> {
 }
 
 pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow::Result<()> {
+    if args.verifier_only {
+        return run_verifier_only_prepare(&args).await;
+    }
     // ── env preset auto-fills ────────────────────────────────────────
     let env_cfg = args.topology.env_config()?;
     if let Some(ref cfg) = env_cfg {
@@ -931,6 +952,59 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     .await?;
 
     logger::success("upgrade-prepare-all completed");
+    Ok(())
+}
+
+/// `upgrade-prepare-all --verifier-only`: the verifier-only prepare script on the fork, as a dry
+/// run. Its deployments are the deployer's bundle under `--out` (default
+/// `upgrade-envs/<upgrade>/output/<env>/prepare/`), packed like the release's.
+async fn run_verifier_only_prepare(args: &UpgradePrepareAllArgs) -> anyhow::Result<()> {
+    let upgrade = args
+        .upgrade
+        .as_deref()
+        .ok_or_else(|| anyhow::anyhow!("--verifier-only needs --upgrade"))?;
+    let env = args
+        .topology
+        .env
+        .as_deref()
+        .ok_or_else(|| anyhow::anyhow!("--verifier-only needs --env"))?;
+    let deployer = args
+        .deployer_address
+        .ok_or_else(|| anyhow::anyhow!("--deployer-address is required"))?;
+    let input = crate::common::upgrade_descriptor::verifier_only_input(upgrade, env)?;
+    anyhow::ensure!(
+        input.is_file(),
+        "no verifier-only input for --env {env} at {}",
+        input.display()
+    );
+    let output_dir = crate::common::env_config::protocol_ops_out_dir(upgrade, env)?;
+    let out = args
+        .shared
+        .out
+        .clone()
+        .unwrap_or_else(|| output_dir.join("prepare"));
+    let script = crate::common::upgrade_descriptor::verifier_only_prepare(upgrade)?;
+    run_forge_script_prepare(
+        upgrade,
+        &script,
+        env,
+        &args.shared.l1_rpc_url,
+        deployer,
+        &out,
+        &output_dir.join("extra-verification-logs.txt"),
+    )
+    .await?;
+    let ecosystem_toml = output_dir.join("ecosystem.toml");
+    anyhow::ensure!(
+        ecosystem_toml.is_file(),
+        "{} did not write {}",
+        script.script,
+        ecosystem_toml.display()
+    );
+    logger::success(format!(
+        "upgrade-prepare-all --verifier-only completed: {}",
+        ecosystem_toml.display()
+    ));
     Ok(())
 }
 
@@ -1337,7 +1411,9 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<(Vec<CtmInputs>, Option<bool>)
 /// Prepare a `forge-script` upgrade (see `upgrade_descriptor`): run its entry point on
 /// `l1_rpc_url` as `deployer` and write the deployer's transactions as Safe bundles plus
 /// `manifest.json` under `out` — the packaging `upgrade-prepare-all` uses, so the deploy
-/// bundle, its replay and its broadcast are shared with the `prepare-all` flow.
+/// bundle, its replay and its broadcast are shared with the `prepare-all` flow. The
+/// `forge verify-contract` lines the script logs for its deployments go to
+/// `verification_logs`, which the deploy bundle carries for the Etherscan step.
 ///
 /// The script runs as a dry run: forge records the transactions without sending them, so
 /// the fork stays at its pre-upgrade state and the caller can replay the packed bundle on it.
@@ -1348,6 +1424,7 @@ pub async fn run_forge_script_prepare(
     l1_rpc_url: &str,
     deployer: Address,
     out: &Path,
+    verification_logs: &Path,
 ) -> anyhow::Result<()> {
     let shared = crate::common::SharedRunArgs {
         l1_rpc_url: l1_rpc_url.to_string(),
@@ -1371,6 +1448,7 @@ pub async fn run_forge_script_prepare(
     runner
         .run(script)
         .with_context(|| format!("failed to execute {}", upgrade.script))?;
+    runner.write_extra_verification_logs(verification_logs)?;
     crate::common::output::write_output_if_requested(
         &format!("ecosystem.prepare.{upgrade_name}"),
         &shared,

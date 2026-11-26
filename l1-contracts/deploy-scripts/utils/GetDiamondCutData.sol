@@ -112,7 +112,18 @@ library GetDiamondCutData {
     ) internal returns (bytes memory diamondCutData, bytes memory forceDeploymentsData) {
         ChainTypeManagerBase chainTypeManager = ChainTypeManagerBase(ctm);
         uint256 protocolVersion = chainTypeManager.protocolVersion();
-        uint256 blockWithData = chainTypeManager.newChainCreationParamsBlock(protocolVersion);
+        return
+            _getDiamondCutAndForceDeploymentAtBlock(ctm, chainTypeManager.newChainCreationParamsBlock(protocolVersion));
+    }
+
+    /// @notice Read the chain creation params from the CTM's `NewChainCreationParams` event at `blockWithData`.
+    /// @dev For a CTM whose `newChainCreationParamsBlock` for its current version is unset: it is stamped with the
+    /// version current when `setChainCreationParams` runs, so params set before `setNewVersionUpgrade` land under the
+    /// previous version.
+    function _getDiamondCutAndForceDeploymentAtBlock(
+        address ctm,
+        uint256 blockWithData
+    ) internal returns (bytes memory diamondCutData, bytes memory forceDeploymentsData) {
         Vm.EthGetLogs[] memory logs = _fetchLogsFromBlock(
             blockWithData,
             ctm,

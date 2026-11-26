@@ -70,6 +70,10 @@ file per consecutive run of transactions by the same signer, plus a **`manifest.
 | **`bundles`**  | One entry per bundle file, in execution order: `index`, `file`, `target` (the signer), `steps`, `tx_count`.                         |
 | **`metadata`** | One entry per command run into this directory: `command` (CLI path id, e.g. `chain.init`), `input` and `output` (both may be `{}`). |
 
+`chain upgrade` and `chain set-upgrade-timestamp` end every bundle with `assertTxOrigin()` on an env
+that configures a `TxOriginAsserter`, unless `--skip-tx-origin-assertion` is passed: see
+[`upgrade-envs/README.md`](../l1-contracts/upgrade-envs/README.md).
+
 Without `--out` no bundles are written, unless the command derives a default from `--env`:
 `upgrade-prepare-all` (which also rewrites the release's canonical `ecosystem.toml`),
 `upgrade-governance`, `stage3` and `chain upgrade` do.

@@ -173,11 +173,10 @@ Every chain here already has a committed transaction-simulator scenario, one fil
 ```bash
 protocol_ops ecosystem manifest-to-simulator --manifest <dir>/manifest.json \
   --network sepolia --tag chain_upgrade_<id> \
-  --descriptions ../../sim-descriptions.toml \
   --emulate-all-batches-executed-for <chain diamond> --out <scenario>.json
 ```
 
-Three things about those files:
+Two things about those files:
 
 - **Order.** The simulator shares one fork across scenario files and walks them in alphabetical
   order, so a chain scenario must sort **after** the ecosystem one — otherwise the cut it consumes
@@ -186,7 +185,3 @@ Three things about those files:
 - **`emulateAllBatchesExecutedFor`.** Set to the chain's own DiamondProxy, not the `to` of the
   transaction: the `to` is the ChainAdmin, and the batch counters that precondition 4 reads live on
   the diamond.
-- **Descriptions.** `sim-descriptions.toml` carries a label per ChainAdmin plus two entries per
-  chain, told apart by the inner selector — `0xe2a9d554` for the timestamp and `0x3b6d7534` for the
-  cut, since both arrive as `ChainAdmin.multicall`. Without them every line reads `[unlabelled]`,
-  which is what a reviewer would have to decode by hand.

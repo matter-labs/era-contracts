@@ -93,6 +93,7 @@ contract EmergencyUpgradeCalldataTest is Test {
     uint256 constant COUNCIL_THRESHOLD = 3;
     /// @dev approveHash on every approving Guardian and Council member and on the ZK Foundation Safe, then execute.
     uint256 constant TX_COUNT = GUARDIANS_THRESHOLD + COUNCIL_THRESHOLD + 2;
+    uint256 constant GOVERNANCE_STAGE_COUNT = 3;
     /// @dev `core_contracts.governance_kind` of an env whose bridgehub is owned by a ProtocolUpgradeHandler.
     string constant PUH_GOVERNANCE_KIND = "puh";
 
@@ -163,51 +164,28 @@ contract EmergencyUpgradeCalldataTest is Test {
         assertTrue(vm.keyExistsJson(json, string.concat(".transactions[", vm.toString(TX_COUNT - 1), "]")));
         assertFalse(vm.keyExistsJson(json, string.concat(".transactions[", vm.toString(TX_COUNT), "]")));
 
-        IProtocolUpgradeHandler.Call[] memory calls = _allCalls();
-        bytes32 id = keccak256(
-            abi.encode(IProtocolUpgradeHandler.UpgradeProposal({calls: calls, executor: address(board), salt: 0}))
-        );
-        for (uint256 i = 0; i < GUARDIANS_THRESHOLD; ++i) {
-            _assertApproveHash(
-                json,
-                i,
-                string.concat("GUARDIANS ", vm.toString(i + 1)),
-                guardianSafes[i],
-                EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH,
-                id
-            );
-        }
-        for (uint256 i = 0; i < COUNCIL_THRESHOLD; ++i) {
-            _assertApproveHash(
-                json,
-                GUARDIANS_THRESHOLD + i,
-                string.concat("SECURITY_COUNCIL ", vm.toString(i + 1)),
-                councilSafes[i],
-                EXECUTE_EMERGENCY_UPGRADE_SECURITY_COUNCIL_TYPEHASH,
-                id
-            );
-        }
-        _assertApproveHash(
-            json,
-            TX_COUNT - 2,
-            "ZK_FOUNDATION",
-            zkFoundationSafe,
-            EXECUTE_EMERGENCY_UPGRADE_ZK_FOUNDATION_TYPEHASH,
-            id
-        );
+        _assertProposal(json, 0, "", _allCalls());
+    }
 
-        bytes memory marker = abi.encodePacked(bytes32(uint256(uint160(owner))), bytes32(0), uint8(1));
-        bytes memory expectedExecute = abi.encodeCall(
-            IEmergencyUpgrageBoard.executeEmergencyUpgrade,
-            (
-                calls,
-                bytes32(0),
-                abi.encode(_first(guardianSafes, GUARDIANS_THRESHOLD), _copies(marker, GUARDIANS_THRESHOLD)),
-                abi.encode(_first(councilSafes, COUNCIL_THRESHOLD), _copies(marker, COUNCIL_THRESHOLD)),
-                marker
-            )
-        );
-        _assertTx(json, TX_COUNT - 1, "EXECUTE", address(board), expectedExecute);
+    /// One proposal per stage, back to back. Each has its own id, so its approvals are of that stage alone, and
+    /// its execute call carries only that stage's calls.
+    function test_emergencyUpgradeEachStageWritesOneProposalPerStage() public {
+        _writeInputs("each-stage", PUH_GOVERNANCE_KIND);
+        script.emergencyUpgradeEachStage(permanentValues, ecosystemToml, outputJson);
+        string memory json = vm.readFile(string.concat(vm.projectRoot(), outputJson));
+        vm.removeFile(string.concat(vm.projectRoot(), outputJson));
+        _removeInputs();
+
+        assertEq(vm.parseJsonAddress(json, ".emergency_upgrade_board"), address(board));
+        assertEq(vm.parseJsonAddress(json, ".protocol_upgrade_handler"), address(handler));
+        assertEq(vm.parseJsonAddress(json, ".owner"), owner);
+        uint256 total = GOVERNANCE_STAGE_COUNT * TX_COUNT;
+        assertTrue(vm.keyExistsJson(json, string.concat(".transactions[", vm.toString(total - 1), "]")));
+        assertFalse(vm.keyExistsJson(json, string.concat(".transactions[", vm.toString(total), "]")));
+
+        _assertProposal(json, 0, "STAGE 0 ", stage0);
+        _assertProposal(json, TX_COUNT, "STAGE 1 ", stage1);
+        _assertProposal(json, 2 * TX_COUNT, "STAGE 2 ", stage2);
     }
 
     function test_revertWhen_envIsNotGovernedByAHandler() public {
@@ -253,6 +231,68 @@ contract EmergencyUpgradeCalldataTest is Test {
         vm.expectRevert(_notOneOfOne(address(zkFoundationSafe)));
         script.printEmergencyBoard(permanentValues);
         _removeInputs();
+    }
+
+    /// @dev The `TX_COUNT` transactions of one proposal of `_calls`, starting at `_offset`: one approveHash per
+    /// approving Safe (the first `EIP1271_THRESHOLD` members of each multisig, then the ZK Foundation Safe), each
+    /// of the board digest for that role, and last the execute call with `_calls` and an approved-hash marker of
+    /// the owner per approving Safe. Every label starts with `_labelPrefix`.
+    function _assertProposal(
+        string memory _json,
+        uint256 _offset,
+        string memory _labelPrefix,
+        IProtocolUpgradeHandler.Call[] memory _calls
+    ) internal view {
+        bytes32 id = keccak256(
+            abi.encode(IProtocolUpgradeHandler.UpgradeProposal({calls: _calls, executor: address(board), salt: 0}))
+        );
+        for (uint256 i = 0; i < GUARDIANS_THRESHOLD; ++i) {
+            _assertApproveHash(
+                _json,
+                _offset + i,
+                string.concat(_labelPrefix, "GUARDIANS ", vm.toString(i + 1)),
+                guardianSafes[i],
+                EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH,
+                id
+            );
+        }
+        for (uint256 i = 0; i < COUNCIL_THRESHOLD; ++i) {
+            _assertApproveHash(
+                _json,
+                _offset + GUARDIANS_THRESHOLD + i,
+                string.concat(_labelPrefix, "SECURITY_COUNCIL ", vm.toString(i + 1)),
+                councilSafes[i],
+                EXECUTE_EMERGENCY_UPGRADE_SECURITY_COUNCIL_TYPEHASH,
+                id
+            );
+        }
+        _assertApproveHash(
+            _json,
+            _offset + TX_COUNT - 2,
+            string.concat(_labelPrefix, "ZK_FOUNDATION"),
+            zkFoundationSafe,
+            EXECUTE_EMERGENCY_UPGRADE_ZK_FOUNDATION_TYPEHASH,
+            id
+        );
+
+        bytes memory marker = abi.encodePacked(bytes32(uint256(uint160(owner))), bytes32(0), uint8(1));
+        bytes memory expectedExecute = abi.encodeCall(
+            IEmergencyUpgrageBoard.executeEmergencyUpgrade,
+            (
+                _calls,
+                bytes32(0),
+                abi.encode(_first(guardianSafes, GUARDIANS_THRESHOLD), _copies(marker, GUARDIANS_THRESHOLD)),
+                abi.encode(_first(councilSafes, COUNCIL_THRESHOLD), _copies(marker, COUNCIL_THRESHOLD)),
+                marker
+            )
+        );
+        _assertTx(
+            _json,
+            _offset + TX_COUNT - 1,
+            string.concat(_labelPrefix, "EXECUTE"),
+            address(board),
+            expectedExecute
+        );
     }
 
     function _assertApproveHash(

@@ -5,9 +5,9 @@ use std::path::{Path, PathBuf};
 use alloy::primitives::{address, keccak256, Address, Bytes, FixedBytes, U256};
 use alloy::sol_types::SolCall;
 
-use super::decode::{self, protocol_version};
 use super::load::relative_link;
 use super::*;
+use crate::common::calldata::{self as decode, protocol_version};
 use crate::common::env_config::EnvConfig;
 
 alloy::sol! {
@@ -619,6 +619,15 @@ fn known_functions_have_the_selectors_the_contracts_use() {
         ("0xfc57565f", "`upgradeChainFromVersion(...)`"),
         ("0x8265f458", "`setNewVersionUpgrade(...)`"),
         ("0x9b016b8b", "`setChainCreationParams(...)`"),
+        (
+            "0xca4ea357",
+            "`createNewVerifierOnlyUpgrade(uint256,uint256,uint256,address)`",
+        ),
+        ("0xa39f7449", "`startTimer()`"),
+        ("0x43bf9936", "`checkDeadline()`"),
+        ("0x386584cf", "`checkMigrationsPaused()`"),
+        ("0x37076ce3", "`checkProtocolUpgradePresence()`"),
+        ("0x407a5a0b", "`checkMigrationsUnpaused()`"),
         ("0xac700e63", "`pauseMigration()`"),
         ("0xf7c7eb92", "`unpauseMigration()`"),
         ("0x79ba5097", "`acceptOwnership()`"),
@@ -740,4 +749,45 @@ fn rendered_pages_are_prettier_stable() {
         .status()
         .unwrap();
     assert!(status.success(), "prettier would reformat a rendered page");
+}
+
+/// One proposal per stage: rounds of approvals, each closed by its own executeEmergencyUpgrade.
+#[test]
+fn emergency_lists_take_one_proposal_after_another() {
+    let sepolia = LoadOptions {
+        chain_id: Some(11_155_111),
+        ..Default::default()
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let renumber = |txs: &mut Vec<serde_json::Value>| {
+        for (i, tx) in txs.iter_mut().enumerate() {
+            tx["step"] = serde_json::json!(i + 1);
+        }
+    };
+
+    let path = emergency_fixture(dir.path(), |json| {
+        let mut txs = json["transactions"].as_array().unwrap().clone();
+        txs.extend(txs.clone());
+        renumber(&mut txs);
+        json["transactions"] = serde_json::Value::Array(txs);
+    });
+    let out = dir.path().join(RUNBOOK_FILE);
+    let runbook = load(&path, &out, &sepolia).unwrap();
+    assert_eq!(runbook.txs.len(), 26);
+    write(&out, &render(&runbook));
+    let page = fs::read_to_string(&out).unwrap();
+    assert!(
+        page.contains("2 emergency proposals, one after the other: txs 1 to 12 approve, tx 13 executes; txs 14 to 25 approve, tx 26 executes"),
+        "{page}"
+    );
+
+    // An execute must follow approvals of its own.
+    let path = emergency_fixture(dir.path(), |json| {
+        let mut txs = json["transactions"].as_array().unwrap().clone();
+        let execute = txs.last().unwrap().clone();
+        txs.push(execute);
+        renumber(&mut txs);
+        json["transactions"] = serde_json::Value::Array(txs);
+    });
+    assert!(load_error(&path, &sepolia).contains("must follow its proposal's approveHash txs"));
 }
