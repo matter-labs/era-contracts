@@ -6,10 +6,12 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainConfig} from "../../chain-interfaces/IChainConfig.sol";
 import {ISelfDescribingFacet} from "../../chain-interfaces/ISelfDescribingFacet.sol";
 import {ChainConfigUpdate} from "../ZKChainStorage.sol";
+import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {
     ChainConfigUpdateAlreadyDue,
     NoPendingChainConfigUpdate,
+    Unauthorized,
     UpgradeTimestampNotReached,
     ZeroUpgradeTimestamp
 } from "../../../common/L1ContractErrors.sol";
@@ -31,6 +33,20 @@ contract ChainConfigFacet is ZKChainBase, IChainConfig, ISelfDescribingFacet {
 
     constructor(RollupDAManager _rollupDAManager) {
         ROLLUP_DA_MANAGER = _rollupDAManager;
+    }
+
+    /// @notice Checks that the message sender is the chain admin, the chain type manager or its ValidatorTimelock.
+    /// @dev Unlike `onlyAdminOrChainTypeManagerOrValidator`, a validator whitelisted on the chain directly is not
+    /// accepted: the ValidatorTimelock checks the caller's `UPGRADER_ROLE` before it forwards the call.
+    modifier onlyAdminOrChainTypeManagerOrValidatorTimelock() {
+        if (
+            msg.sender != s.admin &&
+            msg.sender != s.chainTypeManager &&
+            msg.sender != IChainTypeManager(s.chainTypeManager).validatorTimelockPostV29()
+        ) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
     }
 
     /// @inheritdoc IChainConfig
@@ -66,7 +82,7 @@ contract ChainConfigFacet is ZKChainBase, IChainConfig, ISelfDescribingFacet {
     /// @inheritdoc IChainConfig
     function applyChainConfigUpdate(
         address // _chainAddress (unused in this specific implementation)
-    ) external onlyAdminOrChainTypeManagerOrValidator onlySettlementLayer {
+    ) external onlyAdminOrChainTypeManagerOrValidatorTimelock onlySettlementLayer {
         uint256 timestamp = s.pendingChainConfigUpdateTimestamp;
         if (timestamp == 0) {
             revert NoPendingChainConfigUpdate();

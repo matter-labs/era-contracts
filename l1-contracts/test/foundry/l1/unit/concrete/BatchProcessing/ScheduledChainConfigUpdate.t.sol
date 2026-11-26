@@ -10,6 +10,7 @@ import {
     ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT
 } from "contracts/common/Config.sol";
 import {ChainConfigUpdate} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IChainConfig} from "contracts/state-transition/chain-interfaces/IChainConfig.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
@@ -359,10 +360,22 @@ contract ScheduledChainConfigUpdateTest is ChainConfigTest {
         _assertNoPending();
     }
 
+    function test_chainTypeManagerCanApply() public {
+        ChainConfigUpdate memory update = _changingUpdate();
+        _schedule(update, block.timestamp + DELAY);
+        vm.warp(block.timestamp + DELAY);
+
+        vm.prank(getters.getChainTypeManager());
+        chainConfig.applyChainConfigUpdate(address(chainConfig));
+
+        _assertConfig(update);
+        _assertNoPending();
+    }
+
     function testFuzz_RevertWhen_applyByUnauthorizedCaller(address _caller) public {
         vm.assume(_caller != getters.getAdmin());
         vm.assume(_caller != getters.getChainTypeManager());
-        vm.assume(!getters.isValidator(_caller));
+        vm.assume(_caller != address(validatorTimelock));
         ChainConfigUpdate memory update = _changingUpdate();
         _schedule(update, block.timestamp + DELAY);
         vm.warp(block.timestamp + DELAY);
@@ -370,6 +383,50 @@ contract ScheduledChainConfigUpdateTest is ChainConfigTest {
         vm.prank(_caller);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, _caller));
         chainConfig.applyChainConfigUpdate(address(chainConfig));
+
+        _assertPending(update, block.timestamp);
+    }
+
+    /// @dev A validator whitelisted on the chain itself cannot apply without the ValidatorTimelock's
+    /// `UPGRADER_ROLE`, and one holding it still has to go through the timelock.
+    function test_RevertWhen_applyByValidatorWhitelistedOnTheChain() public {
+        address directValidator = makeAddr("directValidator");
+        vm.prank(getters.getChainTypeManager());
+        admin.setValidator(directValidator, true);
+        assertTrue(getters.isValidator(directValidator));
+        assertFalse(
+            validatorTimelock.hasRole(address(chainConfig), validatorTimelock.UPGRADER_ROLE(), directValidator)
+        );
+        assertTrue(getters.isValidator(validator));
+        assertTrue(validatorTimelock.hasRole(address(chainConfig), validatorTimelock.UPGRADER_ROLE(), validator));
+        ChainConfigUpdate memory update = _changingUpdate();
+        _schedule(update, block.timestamp + DELAY);
+        vm.warp(block.timestamp + DELAY);
+
+        address[2] memory validators = [directValidator, validator];
+        for (uint256 i = 0; i < validators.length; ++i) {
+            vm.prank(validators[i]);
+            vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, validators[i]));
+            chainConfig.applyChainConfigUpdate(address(chainConfig));
+        }
+
+        _assertPending(update, block.timestamp);
+    }
+
+    /// @dev The chain accepts the ValidatorTimelock its chain type manager currently designates.
+    function test_RevertWhen_applyThroughATimelockTheChainTypeManagerReplaced() public {
+        ChainConfigUpdate memory update = _changingUpdate();
+        _schedule(update, block.timestamp + DELAY);
+        vm.warp(block.timestamp + DELAY);
+        vm.mockCall(
+            getters.getChainTypeManager(),
+            abi.encodeWithSelector(IChainTypeManager.validatorTimelockPostV29.selector),
+            abi.encode(makeAddr("newValidatorTimelock"))
+        );
+
+        vm.prank(validator);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(validatorTimelock)));
+        validatorTimelock.applyChainConfigUpdate(address(chainConfig));
 
         _assertPending(update, block.timestamp);
     }

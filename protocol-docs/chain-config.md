@@ -169,8 +169,9 @@ directly.
    `ValidatorTimelock.applyChainConfigUpdate(chain)` once `timestamp` has passed. The timelock
    forwards it to the chain, which writes the pending update's values with the setters' events,
    clears it and emits `ChainConfigUpdateApplied`. The chain admin, and the chain type manager, may
-   call `applyChainConfigUpdate` on the chain too; applying before the node has committed the
-   batches it sealed under the old configuration strands them, as a setter call does.
+   call `applyChainConfigUpdate` on the chain too; a validator whitelisted on the chain itself may
+   not. Applying before the node has committed the batches it sealed under the old configuration
+   strands them, as a setter call does.
 
 Scheduling runs the setters' checks for each field the update changes; applying runs them again,
 because the chain's state may have changed in between (for example, priority mode allowed after
