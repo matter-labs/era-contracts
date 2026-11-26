@@ -68,7 +68,7 @@ from calldata:
   executors are identified by construction alone — getters answering the reviewed values would
   admit any counterfeit that answers them too.
 - **Members** (`members.rs`) — every member an object names runs the reviewed build's code for its
-  role: a release's genesis facets (one of the six facets), `DiamondInit`, `L1GenesisUpgrade`, its
+  role: a release's genesis facets, `DiamondInit`, `L1GenesisUpgrade`, its
   verifier (a top-level verifier) and every sub-verifier the verifier names through its
   `*_VERIFIER()` getters; a transition's engine `DefaultUpgrade`, a proxy upgrade transition's
   `DefaultProxyUpgradeEngine`, an L2 plan's `L2DefaultDelegateCalldataComposer`. The one exception is the

@@ -422,6 +422,8 @@ library AddressIntrospector {
             _facets.migratorFacet = _facet;
         } else if (nameHash == keccak256(bytes("CommitterFacet"))) {
             _facets.committerFacet = _facet;
+        } else if (nameHash == keccak256(bytes("ChainConfigFacet"))) {
+            _facets.chainConfigFacet = _facet;
         }
     }
 

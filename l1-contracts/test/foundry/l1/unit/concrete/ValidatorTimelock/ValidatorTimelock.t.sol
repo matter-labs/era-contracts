@@ -6,6 +6,7 @@ import {Utils} from "../Utils/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IChainConfig} from "contracts/state-transition/chain-interfaces/IChainConfig.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfoZKsyncOS, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
@@ -15,6 +16,7 @@ import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts
 import {
     ExecutionDelayNotIncreased,
     ExecutionDelayTooLarge,
+    NoPendingChainConfigUpdate,
     NotAZKChain,
     ProtocolIdMismatch,
     RoleAccessDenied,
@@ -356,6 +358,30 @@ contract ValidatorTimelockTest is Test {
         vm.prank(alice);
         vm.expectRevert(reason);
         validator.upgradeChainFromVersion(zkSync, oldProtocolVersion);
+    }
+
+    function test_applyChainConfigUpdate_PropagatesToDiamondProxy() public {
+        vm.mockCall(zkSync, abi.encodeCall(IChainConfig.applyChainConfigUpdate, (zkSync)), "");
+        vm.expectCall(zkSync, abi.encodeCall(IChainConfig.applyChainConfigUpdate, (zkSync)));
+
+        vm.prank(alice);
+        validator.applyChainConfigUpdate(zkSync);
+    }
+
+    function test_RevertWhen_applyChainConfigUpdateNotUpgrader() public {
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, upgraderRole, bob));
+        validator.applyChainConfigUpdate(zkSync);
+    }
+
+    /// @notice The chain's revert reaches the caller with its data unchanged.
+    function test_RevertWhen_applyChainConfigUpdateRevertsInTheChain() public {
+        bytes memory reason = abi.encodeWithSelector(NoPendingChainConfigUpdate.selector);
+        vm.mockCallRevert(zkSync, abi.encodeCall(IChainConfig.applyChainConfigUpdate, (zkSync)), reason);
+
+        vm.prank(alice);
+        vm.expectRevert(reason);
+        validator.applyChainConfigUpdate(zkSync);
     }
 
     function test_executeBatchesSharedBridge() public {

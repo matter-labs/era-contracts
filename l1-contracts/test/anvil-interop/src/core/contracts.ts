@@ -90,6 +90,7 @@ const ARTIFACTS = {
   MailboxFacet: "Mailbox.sol/MailboxFacet.json",
   CommitterFacet: "Committer.sol/CommitterFacet.json",
   MigratorFacet: "Migrator.sol/MigratorFacet.json",
+  ChainConfigFacet: "ChainConfig.sol/ChainConfigFacet.json",
   MockContractDeployer: "MockContractDeployer.sol/MockContractDeployer.json",
   FixedDelegateCalldataComposer: "FixedDelegateCalldataComposer.sol/FixedDelegateCalldataComposer.json",
   MockL1MessengerHook: "MockL1MessengerHook.sol/MockL1MessengerHook.json",

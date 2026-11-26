@@ -15,6 +15,19 @@
   },
   {
     "type": "function",
+    "name": "applyChainConfigUpdate",
+    "inputs": [
+      {
+        "name": "_chainAddress",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "baseTokenGasPriceMultiplierDenominator",
     "inputs": [],
     "outputs": [
@@ -133,6 +146,13 @@
         "internalType": "uint64"
       }
     ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "cancelChainConfigUpdate",
+    "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -666,6 +686,56 @@
         "name": "",
         "type": "address",
         "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getPendingChainConfigUpdate",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "update",
+        "type": "tuple",
+        "internalType": "struct ChainConfigUpdate",
+        "components": [
+          {
+            "name": "l1DAValidator",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "l2DACommitmentScheme",
+            "type": "uint8",
+            "internalType": "enum L2DACommitmentScheme"
+          },
+          {
+            "name": "pubdataContent",
+            "type": "uint8",
+            "internalType": "enum PubdataContent"
+          },
+          {
+            "name": "maxTxGasLimit",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "l1TxFilteringEnabled",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "largeContractsEnabled",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ]
+      },
+      {
+        "name": "timestamp",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -1388,6 +1458,56 @@
   },
   {
     "type": "function",
+    "name": "scheduleChainConfigUpdate",
+    "inputs": [
+      {
+        "name": "_update",
+        "type": "tuple",
+        "internalType": "struct ChainConfigUpdate",
+        "components": [
+          {
+            "name": "l1DAValidator",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "l2DACommitmentScheme",
+            "type": "uint8",
+            "internalType": "enum L2DACommitmentScheme"
+          },
+          {
+            "name": "pubdataContent",
+            "type": "uint8",
+            "internalType": "enum PubdataContent"
+          },
+          {
+            "name": "maxTxGasLimit",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "l1TxFilteringEnabled",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "largeContractsEnabled",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ]
+      },
+      {
+        "name": "_timestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setDAValidatorPair",
     "inputs": [
       {
@@ -1732,6 +1852,108 @@
       },
       {
         "name": "_amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ChainConfigUpdateApplied",
+    "inputs": [
+      {
+        "name": "update",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct ChainConfigUpdate",
+        "components": [
+          {
+            "name": "l1DAValidator",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "l2DACommitmentScheme",
+            "type": "uint8",
+            "internalType": "enum L2DACommitmentScheme"
+          },
+          {
+            "name": "pubdataContent",
+            "type": "uint8",
+            "internalType": "enum PubdataContent"
+          },
+          {
+            "name": "maxTxGasLimit",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "l1TxFilteringEnabled",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "largeContractsEnabled",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ChainConfigUpdateCancelled",
+    "inputs": [],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ChainConfigUpdateScheduled",
+    "inputs": [
+      {
+        "name": "update",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct ChainConfigUpdate",
+        "components": [
+          {
+            "name": "l1DAValidator",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "l2DACommitmentScheme",
+            "type": "uint8",
+            "internalType": "enum L2DACommitmentScheme"
+          },
+          {
+            "name": "pubdataContent",
+            "type": "uint8",
+            "internalType": "enum PubdataContent"
+          },
+          {
+            "name": "maxTxGasLimit",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "l1TxFilteringEnabled",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "largeContractsEnabled",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ]
+      },
+      {
+        "name": "timestamp",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"

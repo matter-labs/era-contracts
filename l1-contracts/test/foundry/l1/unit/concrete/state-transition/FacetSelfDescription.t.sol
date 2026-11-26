@@ -13,6 +13,7 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
+import {ChainConfigFacet} from "contracts/state-transition/chain-deps/facets/ChainConfig.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 
@@ -76,5 +77,9 @@ contract FacetSelfDescriptionTest is Test {
 
     function test_committerFacetSelfDescription() public {
         _assertSelfDescription(new CommitterFacet(block.chainid), "CommitterFacet");
+    }
+
+    function test_chainConfigFacetSelfDescription() public {
+        _assertSelfDescription(new ChainConfigFacet(RollupDAManager(address(0))), "ChainConfigFacet");
     }
 }

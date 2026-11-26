@@ -106,6 +106,7 @@ abstract contract DeployCTMUtils is DeployUtils, BytecodeInfoCache {
         facets.executorFacet = _deployReleaseFacet("ExecutorFacet", facets.executorFacet, true);
         facets.migratorFacet = _deployReleaseFacet("MigratorFacet", facets.migratorFacet, false);
         facets.committerFacet = _deployReleaseFacet("CommitterFacet", facets.committerFacet, true);
+        facets.chainConfigFacet = _deployReleaseFacet("ChainConfigFacet", facets.chainConfigFacet, false);
         deployAdditionalReleaseFacets();
         facets.diamondInit = _deployReleaseMember("DiamondInit", facets.diamondInit);
         ctmAddresses.stateTransition.genesisUpgrade = _deployReleaseMember(
@@ -425,6 +426,8 @@ abstract contract DeployCTMUtils is DeployUtils, BytecodeInfoCache {
             return abi.encode();
         } else if (compareStrings(contractName, "GettersFacet")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "ChainConfigFacet")) {
+            return abi.encode(ctmAddresses.daAddresses.daContracts.rollupDAManager);
         } else if (compareStrings(contractName, "ServerNotifier")) {
             return abi.encode();
         } else if (compareStrings(contractName, "MultisigCommitter")) {

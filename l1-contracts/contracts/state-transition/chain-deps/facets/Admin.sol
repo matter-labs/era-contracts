@@ -16,8 +16,6 @@ import {
     PRICE_UPDATE_INTERVAL,
     PRIORITY_EXPIRATION,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
-    ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT,
     ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE
 } from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
@@ -25,7 +23,6 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {
-    L1DAValidatorAddressIsZero,
     NotL1,
     PriorityModeAlreadyAllowed,
     SecondProofSystemAlreadyRequired,
@@ -34,14 +31,12 @@ import {
 } from "../../L1StateTransitionErrors.sol";
 import {
     AlreadyPermanentRollup,
-    PubdataContentLockedForPermanentRollup,
     DenominatorIsZero,
     DiamondAlreadyFrozen,
     DiamondNotFrozen,
     FeeParamsChangeTooLarge,
     InvalidDAForPermanentRollup,
     InvalidProofSystem,
-    InvalidL2DACommitmentScheme,
     InvalidPubdataPricingMode,
     NonFullPubdataContentForPermanentRollup,
     NotMultiProofMode,
@@ -56,10 +51,7 @@ import {
     TooMuchGas,
     Unauthorized,
     UpgradeTimestampNotReached,
-    NotCompatibleWithPriorityMode,
-    ZKsyncOSChainConfigUpdateWithUnverifiedBatches,
-    ZKsyncOSMaxTxGasLimitTooHigh,
-    ZKsyncOSMaxTxGasLimitTooLow
+    NotCompatibleWithPriorityMode
 } from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
@@ -171,47 +163,22 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
 
     /// @inheritdoc IAdmin
     function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external onlyAdmin onlySettlementLayer {
-        // The cap may only be raised above Ethereum's EIP-7825 single-tx gas limit, never below.
-        if (_newMaxTxGasLimit < ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT) {
-            revert ZKsyncOSMaxTxGasLimitTooLow();
-        }
-        // The cap must not exceed the ZKsync OS block gas limit: a higher value will halt the block production.
-        if (_newMaxTxGasLimit > ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT) {
-            revert ZKsyncOSMaxTxGasLimitTooHigh();
-        }
+        _validateZKsyncOSMaxTxGasLimit(_newMaxTxGasLimit);
         _enforceNoUnverifiedBatchesForChainConfigUpdate();
-
-        uint64 oldMaxTxGasLimit = _getZKsyncOSMaxTxGasLimit();
-        s.zksyncOSMaxTxGasLimit = _newMaxTxGasLimit;
-        emit NewZKsyncOSMaxTxGasLimit(oldMaxTxGasLimit, _newMaxTxGasLimit);
+        _setZKsyncOSMaxTxGasLimit(_newMaxTxGasLimit);
     }
 
     /// @inheritdoc IAdmin
     function setZKsyncOSL1TxFiltering(bool _enabled) external onlyAdmin onlySettlementLayer {
-        if (_enabled && s.priorityModeInfo.canBeActivated) {
-            revert NotCompatibleWithPriorityMode();
-        }
+        _validateZKsyncOSL1TxFiltering(_enabled);
         _enforceNoUnverifiedBatchesForChainConfigUpdate();
-
-        bool oldEnabled = s.zksyncOSL1TxFilteringEnabled;
-        s.zksyncOSL1TxFilteringEnabled = _enabled;
-        emit NewZKsyncOSL1TxFiltering(oldEnabled, _enabled);
+        _setZKsyncOSL1TxFiltering(_enabled);
     }
 
     /// @inheritdoc IAdmin
     function setZKsyncOSLargeContractsEnabled(bool _enabled) external onlyAdmin onlySettlementLayer {
         _enforceNoUnverifiedBatchesForChainConfigUpdate();
-
-        bool oldEnabled = s.zksyncOSLargeContractsEnabled;
-        s.zksyncOSLargeContractsEnabled = _enabled;
-        emit NewZKsyncOSLargeContracts(oldEnabled, _enabled);
-    }
-
-    /// @notice Enforces the configuration-update boundary described in {protocol-docs/chain-config.md}.
-    function _enforceNoUnverifiedBatchesForChainConfigUpdate() internal view {
-        if (s.totalBatchesCommitted != s.totalBatchesVerified) {
-            revert ZKsyncOSChainConfigUpdateWithUnverifiedBatches(s.totalBatchesVerified, s.totalBatchesCommitted);
-        }
+        _setZKsyncOSLargeContractsEnabled(_enabled);
     }
 
     /// @inheritdoc IAdmin
@@ -382,31 +349,15 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
 
     /// @inheritdoc IAdmin
     function setDAValidatorPair(address _l1DAValidator, L2DACommitmentScheme _l2DACommitmentScheme) external onlyAdmin {
-        if (_l1DAValidator == address(0)) {
-            revert L1DAValidatorAddressIsZero();
-        }
-
-        if (_l2DACommitmentScheme == L2DACommitmentScheme.NONE) {
-            revert InvalidL2DACommitmentScheme(_l2DACommitmentScheme);
-        }
-
-        if (s.isPermanentRollup && !ROLLUP_DA_MANAGER.isPairAllowed(_l1DAValidator, _l2DACommitmentScheme)) {
-            revert InvalidDAForPermanentRollup();
-        }
-
+        _validateDAValidatorPair(ROLLUP_DA_MANAGER, _l1DAValidator, _l2DACommitmentScheme);
         _setDAValidatorPair(_l1DAValidator, _l2DACommitmentScheme);
     }
 
     /// @inheritdoc IAdmin
     function setPubdataContent(PubdataContent _pubdataContent) external onlyAdmin {
-        // A permanent rollup is locked to `FULL_PUBDATA` — its pubdata content can never be changed (in particular it
-        // can never be relaxed to `LOGS_ONLY`), mirroring how the permanent-rollup flag itself is one-way.
-        if (s.isPermanentRollup) {
-            revert PubdataContentLockedForPermanentRollup();
-        }
+        _validatePubdataContentChange();
         _enforceNoUnverifiedBatchesForChainConfigUpdate();
-        emit NewPubdataContent(s.pubdataContent, _pubdataContent);
-        s.pubdataContent = _pubdataContent;
+        _setPubdataContent(_pubdataContent);
     }
 
     /// @inheritdoc IAdmin

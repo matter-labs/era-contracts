@@ -2,14 +2,15 @@
 
 Each chain has an L1 diamond proxy whose facets share `ZKChainStorage`:
 
-| Facet            | Responsibility                                                                                                                             |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `CommitterFacet` | Precommit and commit batches, validate the batch encoding and timestamps, call the configured L1 DA validator, and store commitments.      |
-| `ExecutorFacet`  | Verify proofs, execute proven batches, consume priority-tree entries, store L2 -> L1 roots, and update message-root state.                 |
-| `MailboxFacet`   | Accept L1 -> L2 priority operations, quote base cost, and expose transaction and priority-tree state.                                      |
-| `AdminFacet`     | Apply CTM-approved upgrades and manage chain-local fee, DA, Priority Mode, pause/freeze, and transaction-filter settings.                  |
-| `GettersFacet`   | Expose chain state and EIP-2535 diamond-loupe views without mutating storage.                                                              |
-| `MigratorFacet`  | Hold deposit-pause and migration-compatibility entry points; production chain migration is disabled by the current release-level constant. |
+| Facet              | Responsibility                                                                                                                                       |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CommitterFacet`   | Precommit and commit batches, validate the batch encoding and timestamps, call the configured L1 DA validator, and store commitments.                |
+| `ExecutorFacet`    | Verify proofs, execute proven batches, consume priority-tree entries, store L2 -> L1 roots, and update message-root state.                           |
+| `MailboxFacet`     | Accept L1 -> L2 priority operations, quote base cost, and expose transaction and priority-tree state.                                                |
+| `AdminFacet`       | Apply CTM-approved upgrades and manage chain-local fee, DA, Priority Mode, pause/freeze, and transaction-filter settings.                            |
+| `GettersFacet`     | Expose chain state and EIP-2535 diamond-loupe views without mutating storage.                                                                        |
+| `MigratorFacet`    | Hold deposit-pause and migration-compatibility entry points; production chain migration is disabled by the current release-level constant.           |
+| `ChainConfigFacet` | Schedule, cancel and apply the chain configuration updates described in [chain-config.md](../../../chain-config.md#scheduled-configuration-updates). |
 
 The proxy fallback dispatches selectors to facets. Freezing the diamond blocks facets marked freezable;
 getter and recovery paths that must remain available are configured accordingly.

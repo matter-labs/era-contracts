@@ -146,6 +146,11 @@
                     "internalType": "address"
                   },
                   {
+                    "name": "chainConfigFacet",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
                     "name": "diamondInit",
                     "type": "address",
                     "internalType": "address"

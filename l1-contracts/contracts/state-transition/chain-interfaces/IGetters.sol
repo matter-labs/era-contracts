@@ -3,7 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {VerifierParams} from "../chain-interfaces/IVerifier.sol";
-import {PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
+import {ChainConfigUpdate, PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
 import {IZKChainBase} from "./IZKChainBase.sol";
 import {DisabledProofSystems, L2DACommitmentScheme, PubdataContent} from "../../common/Config.sol";
 
@@ -199,6 +199,10 @@ interface IGetters is IZKChainBase {
 
     /// @return The pubdata content (full pubdata vs logs-only).
     function getPubdataContent() external view returns (PubdataContent);
+
+    /// @return update The configuration update the admin scheduled.
+    /// @return timestamp The timestamp from which `update` can be applied; `0` if no update is pending.
+    function getPendingChainConfigUpdate() external view returns (ChainConfigUpdate memory update, uint256 timestamp);
 
     /// @return Whether the chain uses ZKsync OS.
     function getZKsyncOS() external view returns (bool);

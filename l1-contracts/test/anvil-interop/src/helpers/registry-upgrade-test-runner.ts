@@ -556,6 +556,7 @@ async function readLiveUpgradeInputs(
     { name: "ExecutorFacet", selector: "0xa085344d" }, // executeBatchesSharedBridge(...)
     { name: "MigratorFacet", selector: "0x64b554ad" }, // forwardedBridgeBurn(...)
     { name: "CommitterFacet", selector: "0x0db9eb87" }, // commitBatchesSharedBridge(...)
+    { name: "ChainConfigFacet", selector: "0xc659d785" }, // cancelChainConfigUpdate()
   ];
   const otherFacets: { name: string; address: string }[] = [];
   for (const probe of facetProbes) {
@@ -783,6 +784,7 @@ type DeployedImplementations = {
   newExecutorFacet: string;
   newMigratorFacet: string;
   newCommitterFacet: string;
+  newChainConfigFacet: string;
   newDefaultUpgrade: string;
   newDiamondInit: string;
   newVerifierPlonk: string;
@@ -844,6 +846,7 @@ async function deployUpgradeImplementations(
     newExecutorFacet: await deployFromOut("ExecutorFacet", []),
     newMigratorFacet: await deployFromOut("MigratorFacet", [params.l1ChainId, true /* _isTestnet */]),
     newCommitterFacet: await deployFromOut("CommitterFacet", [params.l1ChainId]),
+    newChainConfigFacet: await deployFromOut("ChainConfigFacet", [params.rollupDAManager]),
     newDefaultUpgrade: await deployFromOut("DefaultUpgrade", []),
     newDiamondInit: await deployFromOut("DiamondInit", []),
     // A multi-proof testnet verifier like the live one: the ZKsync OS testnet verifier over the plonk
@@ -920,6 +923,7 @@ function buildRegistryManifest(
     ExecutorFacet: true,
     MigratorFacet: false,
     CommitterFacet: true,
+    ChainConfigFacet: false,
   };
 
   // The release's complete facet surface; the transition DERIVES its delta on-chain from
@@ -930,6 +934,7 @@ function buildRegistryManifest(
     { name: "ExecutorFacet", address: deployed.newExecutorFacet },
     { name: "MigratorFacet", address: deployed.newMigratorFacet },
     { name: "CommitterFacet", address: deployed.newCommitterFacet },
+    { name: "ChainConfigFacet", address: deployed.newChainConfigFacet },
     { name: "MailboxFacet", address: liveFacet(live, "MailboxFacet") },
   ];
   const genesisFacets = installedFacets.map(({ name, address }) => ({

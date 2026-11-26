@@ -15,6 +15,7 @@ import {MAX_VALIDATOR_TIMELOCK_EXECUTION_DELAY} from "../../common/Config.sol";
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
 import {IValidatorTimelock} from "./interfaces/IValidatorTimelock.sol";
 import {IChainUpgrader} from "../chain-interfaces/IChainUpgrader.sol";
+import {IChainConfigApplier} from "../chain-interfaces/IChainConfigApplier.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -350,6 +351,11 @@ contract ValidatorTimelock is
         address _chainAddress,
         uint256 // _oldProtocolVersion (unused in this specific implementation)
     ) external onlyRole(_chainAddress, UPGRADER_ROLE) {
+        _propagateToAddress(_chainAddress);
+    }
+
+    /// @inheritdoc IChainConfigApplier
+    function applyChainConfigUpdate(address _chainAddress) external onlyRole(_chainAddress, UPGRADER_ROLE) {
         _propagateToAddress(_chainAddress);
     }
 
