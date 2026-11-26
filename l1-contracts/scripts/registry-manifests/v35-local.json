@@ -7,7 +7,7 @@
       "L1MessageRoot": {
         "proxy": "0x512533Bded6B8c649c97884614272ddF12026194",
         "expectedOldImpl": "0x1093C0945f92EAFfC5c07C6CA587FA5c7d91178C",
-        "implNew": "0xf090f16dEc8b6D24082Edd25B1C8D26f2bC86128"
+        "implNew": "0x56D13Eb21a625EdA8438F55DF2C31dC3632034f5"
       }
     }
   },
@@ -15,39 +15,44 @@
     {
       "name": "ZKsyncOS",
       "isZKsyncOS": true,
-      "ctmProxy": "0x1d41C394ef70d6475ad86eA02810Fc84fCD1b718",
+      "ctmProxy": "0x81AE1061339c5ACC9a5eF7ad26e257b5432a7534",
       "release": {
         "diamondInit": {
-          "address": "0xdFdE6B33f13de2CA1A75A6F7169f50541B14f75b"
+          "address": "0x38A70c040CA5F5439ad52d0e821063b0EC0B52b6"
         },
         "verifier": {
-          "address": "0x54B8d8E2455946f2A5B8982283f2359812e815ce"
+          "address": "0xd9140951d8aE6E5F625a02F5908535e16e3af964"
         },
         "genesisFacets": [
           {
             "name": "AdminFacet",
-            "address": "0xC66AB83418C20A65C3f8e83B3d11c8C3a6097b6F",
-            "isFreezable": false
-          },
-          {
-            "name": "GettersFacet",
             "address": "0xeF31027350Be2c7439C1b0BE022d49421488b72C",
             "isFreezable": false
           },
           {
-            "name": "ExecutorFacet",
+            "name": "GettersFacet",
             "address": "0x12Bcb546bC60fF39F1Adfc7cE4605d5Bd6a6A876",
+            "isFreezable": false
+          },
+          {
+            "name": "ExecutorFacet",
+            "address": "0xaC47e91215fb80462139756f43438402998E4A3a",
             "isFreezable": true
           },
           {
             "name": "MigratorFacet",
-            "address": "0xaC47e91215fb80462139756f43438402998E4A3a",
+            "address": "0x9BcC604D4381C5b0Ad12Ff3Bf32bEdE063416BC7",
             "isFreezable": false
           },
           {
             "name": "CommitterFacet",
-            "address": "0x9BcC604D4381C5b0Ad12Ff3Bf32bEdE063416BC7",
+            "address": "0x63fea6E447F120B8Faf85B53cdaD8348e645D80E",
             "isFreezable": true
+          },
+          {
+            "name": "ChainConfigFacet",
+            "address": "0xdFdE6B33f13de2CA1A75A6F7169f50541B14f75b",
+            "isFreezable": false
           },
           {
             "name": "MailboxFacet",
@@ -87,9 +92,9 @@
         }
       },
       "transition": {
-        "fromRelease": "0x0E256d3fd46A6FBe9EEE1bE9Aae8BAC2ce3042A7",
+        "fromRelease": "0x83dE596a1381527c40d053E42f0C9cc6E2CD8cfb",
         "chainUpgradeEngine": {
-          "address": "0x63fea6E447F120B8Faf85B53cdaD8348e645D80E"
+          "address": "0xaC9fCBA56E42d5960f813B9D0387F3D3bC003338"
         },
         "oldProtocolVersionDeadline": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         "upgradeTimestamp": 0,
