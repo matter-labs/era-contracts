@@ -47,7 +47,7 @@ RUN yarn --cwd system-contracts build:foundry
 ENV FOUNDRY_OFFLINE=true
 
 # Offline from here, and these must succeed: each suite's own script with `--list` appended (Yarn 1 adds it to the
-# script's last command), which runs the setup scripts and compiles the test set without running it.
+# script's last command), which compiles the test set without running it.
 RUN (cd l1-contracts && yarn test:foundry --list > /dev/null && yarn test:zkfoundry --list > /dev/null) \
  && (cd l2-contracts && yarn test:foundry --list > /dev/null)
 
@@ -59,6 +59,6 @@ RUN (cd l1-contracts && timeout 1200 yarn test:foundry \
  && (cd l2-contracts && timeout 600 yarn test:foundry \
       || echo "WARNING: l2-contracts yarn test:foundry reported failures or timed out")
 
-# The L1 test runs above rewrite or delete l1-contracts/snapshots/Executor.json (forge gas snapshots). Start the scan
-# from a tree identical to HEAD, so a patch carries only its own changes.
+# Start the scan from a tree identical to HEAD, in case a test run above changed a tracked file, so a patch carries
+# only its own changes.
 RUN git checkout -- .
