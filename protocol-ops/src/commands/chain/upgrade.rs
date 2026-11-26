@@ -3,20 +3,13 @@ use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
-use crate::common::abi::AdminFunctionsAbi;
 use crate::common::addresses::ZERO_ADDRESS;
+use crate::common::chain_upgrade_calls::{self, DaValidatorPair};
 use crate::common::env_config::default_protocol_ops_out_dir;
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
 use crate::common::SharedRunArgs;
 use crate::types::L2DACommitmentScheme;
-
-/// DA validator pair to set atomically in the same multicall as the upgrade.
-#[derive(Debug, Clone, Copy)]
-struct DaValidatorPair {
-    l1_da_validator: Address,
-    l2_da_commitment_scheme: L2DACommitmentScheme,
-}
 
 #[derive(Serialize)]
 struct ChainUpgradeOutput {
@@ -175,19 +168,15 @@ async fn run_one(
 ) -> anyhow::Result<()> {
     let mut runner = ForgeRunner::new(shared)?;
 
-    let chain_address =
-        crate::common::l1_contracts::resolve_zk_chain(&runner.rpc_url, bridgehub, chain_id)
-            .await
-            .context("resolving chain diamond proxy from L1")?;
-    let admin_address =
-        crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, bridgehub, chain_id)
-            .await
-            .context("resolving chain admin from L1")?;
-    // The Solidity helper executes through ChainAdmin, but broadcasts from
-    // ChainAdmin.owner() or the AccessControlRestriction default admin inside adminExecuteCalls.
-    let sender = runner
-        .prepare_chain_admin_broadcaster(bridgehub, chain_id, access_control_restriction)
-        .await?;
+    let (chain_address, call) = chain_upgrade_calls::upgrade(
+        &runner,
+        bridgehub,
+        chain_id,
+        access_control_restriction,
+        da_validator_pair,
+    )
+    .await?;
+    let admin_address = call.admin;
 
     let step_label = if da_validator_pair.is_some() {
         "upgradeChainFromCTMAndSetDAValidatorPair"
@@ -212,35 +201,7 @@ async fn run_one(
     }
     logger::info(format!("RPC URL: {}", shared.l1_rpc_url));
 
-    // `--broadcast` against the anvil fork (applied inside the helper). In this
-    // mode the target RPC is the anvil fork, so "broadcast" produces no
-    // real-chain effect — it just records the tx in forge's run file so
-    // protocol-ops can extract it into the Safe bundle. Without this the Safe
-    // output would be empty.
-    //
-    // When a DA validator pair is supplied, drive the combined entrypoint so the
-    // upgrade and `setDAValidatorPair` execute in one `ChainAdmin.multicall`
-    // (one atomic L1 tx) instead of two separate Safe transactions.
-    let script = match da_validator_pair {
-        Some(pair) => runner.script_call(
-            AdminFunctionsAbi::upgradeChainFromCTMAndSetDAValidatorPairCall {
-                _chainAddress: chain_address,
-                _adminAddr: admin_address,
-                _accessControlRestriction: access_control_restriction,
-                _l1DaValidator: pair.l1_da_validator,
-                _l2DaCommitmentScheme: pair.l2_da_commitment_scheme as u8,
-            },
-        ),
-        None => runner.script_call(AdminFunctionsAbi::upgradeChainFromCTMCall {
-            _chainAddress: chain_address,
-            _adminAddr: admin_address,
-            _accessControlRestriction: access_control_restriction,
-        }),
-    }
-    .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
-    .with_wallet(&sender);
-    runner
-        .run(script)
+    call.run(&mut runner)
         .context("Failed to execute forge script for chain upgrade")?;
 
     crate::common::output::write_output_if_requested(
@@ -253,7 +214,7 @@ async fn run_one(
             chain_address,
             admin_address,
             chain_admin_owner: (access_control_restriction == Address::ZERO)
-                .then_some(sender.address),
+                .then_some(call.sender.address),
             access_control_restriction,
             l1_da_validator: da_validator_pair.map(|p| p.l1_da_validator),
             l2_da_commitment_scheme: da_validator_pair.map(|p| p.l2_da_commitment_scheme),

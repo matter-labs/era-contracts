@@ -5,17 +5,14 @@
 //! supplier, CTM deployment tracker, …) directly from L1 rather than
 //! requiring callers to pass them explicitly.
 
-use alloy::network::Ethereum;
-use alloy::primitives::{Address, U256};
-use alloy::providers::{ProviderBuilder, RootProvider};
+use alloy::primitives::{Address, Bytes, U256};
 use anyhow::Context;
 
 use crate::common::abi::{BridgehubAbi, IChainTypeManagerAbi, ZkChainAbi};
-
-type AlloyProvider = RootProvider<Ethereum>;
+use crate::common::ethereum::{get_read_provider, AlloyProvider};
 
 fn provider(rpc_url: &str) -> anyhow::Result<AlloyProvider> {
-    Ok(ProviderBuilder::default().connect_http(rpc_url.parse()?))
+    get_read_provider(rpc_url)
 }
 
 fn ensure_nonzero(addr: Address, what: &str) -> anyhow::Result<Address> {
@@ -367,16 +364,50 @@ pub async fn resolve_is_zksync_os(l1_rpc_url: &str, ctm_proxy: Address) -> anyho
         .context("ctm.isZKsyncOS() call failed")
 }
 
+/// Whether the node answered that the call reverted, rather than failing to answer.
+pub(crate) fn is_execution_revert(error: &alloy::transports::TransportError) -> bool {
+    error
+        .as_error_resp()
+        .is_some_and(|response| response.message.to_lowercase().contains("revert"))
+}
+
+/// The revert data if the node answered that the call reverted; none for data that doesn't
+/// parse, which is no answer either.
+pub(crate) fn execution_revert_data(error: &alloy::transports::TransportError) -> Option<Bytes> {
+    if !is_execution_revert(error) {
+        return None;
+    }
+    // Not `as_revert_data()`: it reads the data only after a lowercase "revert".
+    match &error.as_error_resp()?.data {
+        Some(data) => serde_json::from_str(data.get()).ok(),
+        None => Some(Bytes::new()),
+    }
+}
+
+/// A revert without data: what a contract with neither the function nor a fallback does.
+pub(crate) fn reverted_without_data(error: &alloy::contract::Error) -> bool {
+    matches!(error, alloy::contract::Error::TransportError(error)
+        if execution_revert_data(error).is_some_and(|data| data.is_empty()))
+}
+
+/// From a verifier with code: a production one lacks the getter; any other error, a revert
+/// with data included, is no answer.
+fn testnet_flag(answer: Result<bool, alloy::contract::Error>) -> anyhow::Result<bool> {
+    match answer {
+        Ok(is_testnet) => Ok(is_testnet),
+        Err(error) if reverted_without_data(&error) => Ok(false),
+        Err(error) => Err(error).context("IS_TESTNET_VERIFIER() neither answered nor lacks it"),
+    }
+}
+
 /// Resolve whether the current verifier is a testnet verifier by querying
-/// `IS_TESTNET_VERIFIER()` on the verifier contract.
-///
-/// Returns `false` if the verifier doesn't expose this constant (production
-/// verifiers or older deployments).
+/// `IS_TESTNET_VERIFIER()` on the verifier contract (see `testnet_flag`).
 pub async fn resolve_is_testnet_verifier(
     l1_rpc_url: &str,
     ctm_proxy: Address,
 ) -> anyhow::Result<bool> {
     use crate::common::abi::ITestnetVerifier;
+    use alloy::providers::Provider;
 
     let p = provider(l1_rpc_url)?;
     let ctm = IChainTypeManagerAbi::new(ctm_proxy, p.clone());
@@ -392,18 +423,95 @@ pub async fn resolve_is_testnet_verifier(
         .await
         .context("ctm.protocolVersionVerifier() call failed")?;
     ensure_nonzero(verifier, "ctm.protocolVersionVerifier()")?;
+    let code = p
+        .get_code_at(verifier)
+        .await
+        .with_context(|| format!("eth_getCode({verifier:#x})"))?;
+    anyhow::ensure!(!code.is_empty(), "verifier {verifier:#x} has no code");
 
-    let verifier_contract = ITestnetVerifier::new(verifier, p);
-    match verifier_contract.IS_TESTNET_VERIFIER().call().await {
-        Ok(is_testnet) => Ok(is_testnet),
-        // Older verifiers don't expose IS_TESTNET_VERIFIER — treat as production.
-        Err(_) => Ok(false),
-    }
+    testnet_flag(
+        ITestnetVerifier::new(verifier, p)
+            .IS_TESTNET_VERIFIER()
+            .call()
+            .await,
+    )
+    .with_context(|| format!("verifier {verifier:#x}"))
 }
 
 #[cfg(test)]
 mod tests {
-    // Verify these symbols compile and resolve — actual calls require a live RPC.
-    #[allow(unused_imports)]
-    use super::{resolve_bytecodes_supplier, resolve_is_testnet_verifier};
+    use std::sync::atomic::Ordering;
+
+    use alloy::transports::{RpcError, TransportErrorKind};
+
+    use super::*;
+    use crate::common::ethereum::tests::serve;
+
+    /// Protocol version 1, verifier 0x…01 or `true`.
+    const ONE: (&str, &str) = (
+        "200 OK",
+        r#""result":"0x0000000000000000000000000000000000000000000000000000000000000001""#,
+    );
+    const CODE: (&str, &str) = ("200 OK", r#""result":"0x00""#);
+    const NO_CODE: (&str, &str) = ("200 OK", r#""result":"0x""#);
+    const REVERT: (&str, &str) = (
+        "200 OK",
+        r#""error":{"code":3,"message":"execution reverted","data":"0x"}"#,
+    );
+    /// Not retried, unlike a rate limit.
+    const FAILED: (&str, &str) = (
+        "200 OK",
+        r#""error":{"code":-32603,"message":"internal error"}"#,
+    );
+
+    #[test]
+    fn a_reverting_testnet_getter_means_production_and_other_errors_propagate() {
+        // The responses anvil and geth give when the getter doesn't exist.
+        for response in [
+            r#"{"code":3,"message":"execution reverted","data":"0x"}"#,
+            r#"{"code":-32000,"message":"execution reverted"}"#,
+        ] {
+            let revert = RpcError::ErrorResp(serde_json::from_str(response).unwrap());
+            assert!(!testnet_flag(Err(alloy::contract::Error::TransportError(revert))).unwrap());
+        }
+        assert!(testnet_flag(Ok(true)).unwrap());
+
+        let unreachable = TransportErrorKind::custom_str("connection refused");
+        let error = testnet_flag(Err(alloy::contract::Error::TransportError(unreachable)));
+        assert!(format!("{:#}", error.unwrap_err()).contains("connection refused"));
+        // A non-revert error (e.g. a rate limit) is no answer either, nor a revert with data
+        // (the getter exists and failed).
+        for response in [
+            r#"{"code":-32005,"message":"limit exceeded"}"#,
+            r#"{"code":3,"message":"execution reverted","data":"0x82b42900"}"#,
+            r#"{"code":3,"message":"Execution Reverted","data":"0x82b42900"}"#,
+            r#"{"code":3,"message":"execution reverted","data":"0xzz"}"#,
+        ] {
+            let error = RpcError::ErrorResp(serde_json::from_str(response).unwrap());
+            assert!(
+                testnet_flag(Err(alloy::contract::Error::TransportError(error))).is_err(),
+                "{response}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_failed_testnet_flag_read_is_an_error_not_a_production_verifier() {
+        // protocolVersion(), protocolVersionVerifier(), eth_getCode, IS_TESTNET_VERIFIER().
+        let cases: [(&'static [_], Result<bool, &str>); 4] = [
+            (&[ONE, ONE, CODE, ONE], Ok(true)),
+            (&[ONE, ONE, CODE, REVERT], Ok(false)),
+            (&[ONE, ONE, CODE, FAILED], Err("internal error")),
+            (&[ONE, ONE, NO_CODE], Err("has no code")),
+        ];
+        for (responses, expected) in cases {
+            let (url, requests) = serve(responses);
+            let flag = resolve_is_testnet_verifier(&url, Address::repeat_byte(0x11)).await;
+            match expected {
+                Ok(expected) => assert_eq!(flag.unwrap(), expected),
+                Err(reason) => assert!(format!("{:#}", flag.unwrap_err()).contains(reason)),
+            }
+            assert_eq!(requests.load(Ordering::SeqCst), responses.len());
+        }
+    }
 }
