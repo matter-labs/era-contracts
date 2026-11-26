@@ -18,6 +18,8 @@ name: "Ecosystem Upgrade: Deploy + Verify"
 # `manifest.bundles[].target` is the deployer EOA. The legacy-Governance /
 # ProtocolUpgradeHandler (Camp-B) bundles are the governance ceremony and are
 # executed separately by their own multisig; `--skip-unkeyed` drops them here.
+# A forge-script bundle is the deployer's alone, so it runs without the flag:
+# any other signer fails before anything is sent.
 #
 # The sender broadcasts strictly one tx at a time and is robust to public-L1
 # hazards: a stuck (underpriced) tx is re-broadcast at a higher gas price up to
@@ -471,11 +473,13 @@ jobs:
           esac
           MANIFEST="$DEPLOY_BUNDLE_DIR/prepare/manifest.json"
           echo "Manifest: $MANIFEST"
+          skip_unkeyed=(--skip-unkeyed)
+          if [ "$UPGRADE_KIND" = "forge-script" ]; then skip_unkeyed=(); fi
           ./protocol-ops/target/release/protocol_ops ecosystem upgrade-broadcast \
             --manifest "$MANIFEST" \
             --l1-rpc-url "$L1_RPC_URL" \
             --key "${DEPLOYER_ADDR}=${pk}" \
-            --skip-unkeyed \
+            "${skip_unkeyed[@]}" \
             --max-gas-price-gwei "$MAX_GAS_PRICE_GWEI" \
             --out "$DEPLOY_OUTDIR/deploy-executed.json"
           echo "=== transactions.txt ==="

@@ -151,7 +151,9 @@ at the repository root): macOS zksolc hashes differ, and the prepare's factory-d
 **What it does.** Broadcasts **only the deployer bundles** (the ones whose
 `manifest.bundles[].target` is the deployer EOA) to a real L1 — the legacy-Gov /
 ProtocolUpgradeHandler (Camp-B) bundles are the governance ceremony and are run
-separately by their multisig, so `--skip-unkeyed` drops them. Every deployer tx
+separately by their multisig, so `--skip-unkeyed` drops them. A forge-script
+bundle is the deployer's alone, so it runs without the flag: any other signer
+fails before anything is sent. Every deployer tx
 is broadcast **one at a time** and confirmed, then the deployed contracts are
 verified on Etherscan.
 

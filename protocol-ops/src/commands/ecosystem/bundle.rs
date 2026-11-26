@@ -217,7 +217,25 @@ fn read_manifest(path: &Path) -> anyhow::Result<BundleManifest> {
     Ok(manifest)
 }
 
-/// The deployer transactions of every bundle the manifest names.
+/// A rehearsal replays every signer, but a real broadcast has only the deployer's key.
+fn ensure_deployer_only(manifest_path: &Path, deployer: Address) -> anyhow::Result<()> {
+    let others: Vec<String> = read_manifest(manifest_path)?
+        .bundles
+        .into_iter()
+        .filter(|bundle| bundle.target != deployer)
+        .map(|bundle| format!("{} ({:#x})", bundle.file, bundle.target))
+        .collect();
+    anyhow::ensure!(
+        others.is_empty(),
+        "{}: a real broadcast can't send bundles signed by others than the deployer \
+         {deployer:#x}: {}",
+        manifest_path.display(),
+        others.join(", ")
+    );
+    Ok(())
+}
+
+/// Every bundle's transactions, which [`ensure_deployer_only`] has made the deployer's.
 fn deployer_transactions(manifest_path: &Path) -> anyhow::Result<Vec<forge_checks::SafeTx>> {
     #[derive(Deserialize)]
     struct SafeFile {
@@ -1110,6 +1128,7 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
                 upgrade.script,
                 paths.ecosystem_toml.display()
             );
+            ensure_deployer_only(&paths.manifest, args.deployer_address)?;
         }
     }
 
@@ -1331,6 +1350,12 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
         env_cfg.env,
         bundle_dir.display()
     ));
+    // --verify-only sends nothing.
+    if matches!(descriptor, UpgradeDescriptor::ForgeScript(_))
+        && !matches!(mode, ReplayMode::Verify { .. })
+    {
+        ensure_deployer_only(&paths.manifest, deployer)?;
+    }
 
     // Which chain the bundle is for is recorded in its metadata, never inferred from the
     // env name. Confirm the endpoint agrees BEFORE anything is signed: the deployer address
@@ -1640,6 +1665,30 @@ mod tests {
         );
         assert!(error_of(verify_bundle_integrity(dir.path()))
             .contains("path must stay inside the bundle"));
+    }
+
+    #[test]
+    fn a_forge_script_manifest_must_be_the_deployers_alone() {
+        const OTHER: &str = "0x0000000000000000000000000000000000000003";
+        let dir = valid_bundle();
+        let manifest = dir.path().join(MANIFEST_FILE);
+        let deployer: Address = TARGET.parse().unwrap();
+        ensure_deployer_only(&manifest, deployer).unwrap();
+
+        write(
+            &manifest,
+            &format!(
+                r#"{{"bundles":[{{"index":1,"file":"01.safe.json","target":"{TARGET}"}},{{"index":2,"file":"02.safe.json","target":"{OTHER}"}}]}}"#
+            ),
+        );
+        let error = ensure_deployer_only(&manifest, deployer)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains(&format!("02.safe.json ({OTHER})")),
+            "{error}"
+        );
+        assert!(!error.contains("01.safe.json"), "{error}");
     }
 
     #[test]
