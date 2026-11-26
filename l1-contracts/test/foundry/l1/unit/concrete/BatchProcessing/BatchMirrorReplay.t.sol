@@ -60,6 +60,9 @@ contract BatchMirrorReplayTest is ExecutorTest {
         vm.stopPrank();
 
         AcceptingVerifier acceptingVerifier = new AcceptingVerifier();
+        ZKsyncOSTestnetVerifier airbenderVerifier = new ZKsyncOSTestnetVerifier(acceptingVerifier);
+        MultiProofVerifier multiProofVerifier = new MultiProofVerifier(airbenderVerifier, acceptingVerifier);
+        MultiProofTestnetVerifier mirrorVerifier = new MultiProofTestnetVerifier(multiProofVerifier);
         ZKsyncOSBatchMirrorInitParams memory params = ZKsyncOSBatchMirrorInitParams({
             owner: owner,
             bridgehub: address(hostBridgehub),
@@ -68,9 +71,7 @@ contract BatchMirrorReplayTest is ExecutorTest {
             chainTypeManager: hostChainTypeManager,
             // The fixture chain's base token is the ETH asset of this chain, which every Bridgehub registers.
             baseTokenAssetId: baseTokenAssetId,
-            verifier: new MultiProofTestnetVerifier(
-                new MultiProofVerifier(new ZKsyncOSTestnetVerifier(acceptingVerifier), acceptingVerifier)
-            ),
+            verifier: mirrorVerifier,
             // The configuration as the settlement layer reports it.
             chainConfig: ZKsyncOSChainConfig({
                 maxTxGasLimit: getters.getZKsyncOSMaxTxGasLimit(),
