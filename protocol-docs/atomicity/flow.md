@@ -15,7 +15,7 @@ All defined in `atomic-interop/IAtomicInterop.sol` unless noted.
 | `AtomicFlowPreimage`  | The hashed field set that defines a flow: `version` (a `bytes1` format tag), `deadline` (a settlement-layer timestamp), `settlementLayerChainId`, `legBundleHashes[]`, `legChainIds[]`.                                                                                                                                                                                                                                                 |
 | `AtomicFlow`          | `{ flowId, preimage }`. `flowId` is always recomputed from `preimage` and matched before use, so it is a convenience field, never a trust anchor.                                                                                                                                                                                                                                                                                       |
 | `ImtProof`            | One IMT proof against a source chain's commitment tree — used for both inclusion (finality) and non-inclusion (timeout). See below and proofs.md.                                                                                                                                                                                                                                                                                       |
-| `AtomicFinalityProof` | `{ flow, proofs[] }` — the flow definition plus one inclusion proof per entry of `legChainIds`, in that order. The whole thing a destination needs to execute.                                                                                                                                                                                                                                                                          |
+| `AtomicFinalityProof` | `{ flow, proofs[] }` — the flow definition plus one inclusion proof per commitment: per entry of `legChainIds` in a source-only flow, per participating chain in an accepted flow ([acceptance.md](./acceptance.md#commitments)), in that order. The whole thing a destination needs to execute.                                                                                                                                        |
 | `LegState`            | Per-`(flowId, bundleHash)` source-leg lifecycle: `Unset -> Committed -> Revertable -> Reverted`.                                                                                                                                                                                                                                                                                                                                        |
 | `AtomicSend`          | Out-of-band send metadata (`interop/IInteropCenter.sol`): `{ flowPreimage, lowNullifierIndex, isAtomic }`, parsed from the `atomicBundle` ERC-7786 attribute by `InteropAttributeParser.parseAtomicSend`. `isAtomic` is simply "the attribute was present" — the `InteropCenter` requires it for every L2->L2 send and forbids it for an L2->L1 withdrawal. Never enters the bundle, so `bundleHash` stays independent of the preimage. |
 
@@ -62,7 +62,7 @@ lowNullifierIndex, preimage)`. `append`:
 
 1. **Recomputes and validates `flowId`** from the preimage (`_validateAndComputeFlowId`): `version`
    manager-supported (`ManagerFlowPreimageVersionMismatch`), at most `MAX_ATOMIC_FLOW_LEGS` (8) legs
-   (`ManagerTooManyLegs` — appending is cheap, but finalization verifies one Merkle proof per leg),
+   (`ManagerTooManyLegs` — appending is cheap, but finalization verifies one Merkle proof per commitment),
    `legBundleHashes` strictly ascending, `legChainIds` length matching.
 2. **Requires L1 settlement** (`_checkSettlementLayerIsL1`) — this release anchors proofs only on the L1
    message root (see {protocol-docs/atomicity/security.md#trust-assumptions}).
@@ -86,7 +86,9 @@ lowNullifierIndex, preimage)`. `append`:
    `commitValue` into this chain's `L2InteropCommitmentTree`, emitting
    `FlowCommitted(flowId, bundleHash, deadline, leafIndex)`. The tree additionally mirrors the inserted
    value into an L2->L1 log for data availability (see {protocol-docs/atomicity/imt.md} and
-   {protocol-docs/atomicity/security.md#data-availability}).
+   {protocol-docs/atomicity/security.md#data-availability}). An accepted flow inserts no per-leg value:
+   `append` emits `FlowLegCommitted` and inserts the chain's participation value only if this was its last
+   local step ([acceptance](./acceptance.md#accepting-a-leg)).
 
 ### 2. Root settlement + import
 
@@ -102,22 +104,23 @@ finality)`, which:
 - re-checks `flowId` and L1 settlement;
 - requires exactly one proof per commitment (`ManagerProofCountMismatch`): per leg in a source-only flow, per
   participating chain in an accepted flow ({protocol-docs/atomicity/acceptance.md#commitments});
-- for **every** leg, checks the proof's `sourceChainId` equals the declared `legChainIds[i]`, that this
-  chain accepts that source ({protocol-docs/interop-gating.md#receive-filter}), and runs
-  `AtomicInteropProof.verifyInclusion` against the leg's `commitValue`, the flow `deadline`, and the
-  settlement layer;
+- for **every** commitment, checks the proof's `sourceChainId` equals the commitment's chain (the leg's
+  declared source, or the participating chain), that this chain accepts that chain
+  ({protocol-docs/interop-gating.md#receive-filter}), and runs `AtomicInteropProof.verifyInclusion` against
+  the commitment value (the leg's `commitValue` or the chain's participation value), the flow `deadline`, and
+  the settlement layer;
 - requires the executing bundle to be one of the legs (`ManagerExecutingBundleNotInFlow`).
 
-If all legs are proven committed in time, the handler executes the bundle's calls (the destination
-mint). The per-proof source-chain check is defense-in-depth here (inclusion self-binds via the
-chain-specific `commitValue`) but load-bearing on the refund path. `verifyAtomicBundle` is a mint-free
+If every commitment is proven in time, the handler executes the bundle's calls (the destination
+mint). The per-proof chain check is defense-in-depth here (inclusion self-binds via the chain-specific
+commitment value) but load-bearing on the refund path. `verifyAtomicBundle` is a mint-free
 variant that runs the same gate and only records verification (`BundleStatus.Verified`); a subsequent
 `executeAtomicBundle` then skips the gate, since the proof was already spent. `receiveMessage` can route
 to either.
 
 ### 4. Timeout / refund
 
-If a leg never commits in time, `authorizeRefund` takes one absence proof and flips this chain's
+If a commitment is missing at the deadline, `authorizeRefund` takes one absence proof and flips this chain's
 `Committed` legs to `Revertable`; `claimRefund` then _attempts_ to reverse the recoverable burns — it
 succeeds as long as no attempted recovery reverts (a claim that recovers nothing still consumes the
 leg). Detailed in
@@ -126,22 +129,22 @@ leg). Detailed in
 
 ## The `AtomicFlowManager`
 
-The manager is the only stateful atomic contract. Its state is a single mapping
-`_state[flowId][bundleHash] => LegState`; it holds no funds and no configuration beyond the L1 chain id
-recorded at `initL2`.
+The manager is the only stateful atomic contract. Its state is `_state[flowId][bundleHash] => LegState`
+plus, for accepted flows, this chain's acceptances `_accepted[flowId][bundleHash]`; it holds no funds and no
+configuration beyond the L1 chain id recorded at `initL2`.
 
 ### Entry points
 
-| Function                                                              | Caller            | Effect                                                                                    |
-| --------------------------------------------------------------------- | ----------------- | ----------------------------------------------------------------------------------------- |
-| `append(bundleHash, destinationChainId, lowNullifierIndex, preimage)` | `InteropCenter`   | Validate + commit a leg (step 1). `Unset -> Committed`.                                   |
-| `accept(bundleHash, lowNullifierIndex, preimage)`                     | `InteropHandler`  | Accepted flows: record this chain's acceptance of a leg. See acceptance.md.               |
-| `requireFlowFinalized(bundleHash, finality)`                          | `InteropHandler`  | `view`. Prove every leg committed in time (step 3). No state change.                      |
-| `authorizeRefund(flow, missingLegIndex, absence)`                     | anyone            | Prove a leg absent past the deadline; flip this chain's `Committed` legs `-> Revertable`. |
-| `claimRefund(flowId, bundle)`                                         | anyone            | Reverse a `Revertable` leg's burn; `-> Reverted`. See recovery.md.                        |
-| `legState(flowId, bundleHash)`                                        | anyone            | `view` accessor.                                                                          |
-| `legAccepted(flowId, bundleHash)`                                     | anyone            | `view` accessor for this chain's acceptances.                                             |
-| `initL2(l1ChainId)`                                                   | `ComplexUpgrader` | One-time genesis wiring: records `L1_CHAIN_ID`. Rejects a zero id and a second call.      |
+| Function                                                              | Caller            | Effect                                                                                           |
+| --------------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------ |
+| `append(bundleHash, destinationChainId, lowNullifierIndex, preimage)` | `InteropCenter`   | Validate + commit a leg (step 1). `Unset -> Committed`.                                          |
+| `accept(bundleHash, lowNullifierIndex, preimage)`                     | `InteropHandler`  | Accepted flows: record this chain's acceptance of a leg. See acceptance.md.                      |
+| `requireFlowFinalized(bundleHash, finality)`                          | `InteropHandler`  | `view`. Prove every commitment in time (step 3). No state change.                                |
+| `authorizeRefund(flow, missingLegIndex, absence)`                     | anyone            | Prove a commitment absent past the deadline; flip this chain's `Committed` legs `-> Revertable`. |
+| `claimRefund(flowId, bundle)`                                         | anyone            | Reverse a `Revertable` leg's burn; `-> Reverted`. See recovery.md.                               |
+| `legState(flowId, bundleHash)`                                        | anyone            | `view` accessor.                                                                                 |
+| `legAccepted(flowId, bundleHash)`                                     | anyone            | `view` accessor for this chain's acceptances.                                                    |
+| `initL2(l1ChainId)`                                                   | `ComplexUpgrader` | One-time genesis wiring: records `L1_CHAIN_ID`. Rejects a zero id and a second call.             |
 
 `append` and `requireFlowFinalized` are gated to the canonical `InteropCenter` / `InteropHandler`
 addresses (`onlyInteropCenter` / `onlyInteropHandler`, reverting `ManagerNotInteropCenter` /

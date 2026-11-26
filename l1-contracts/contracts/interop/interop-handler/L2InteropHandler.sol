@@ -67,7 +67,7 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
     /// (via the AtomicFlowManager) that every leg of the flow was committed in its source chain's IMT or, for
     /// an accepted flow, that every chain of the flow inserted its participation value, before the deadline,
     /// and that this bundle is one of the flow's legs.
-    /// @dev No gateway-settlement requirement: an atomic bundle's cross-chain binding comes from the per-leg
+    /// @dev No gateway-settlement requirement: an atomic bundle's cross-chain binding comes from the flow's
     /// IMT inclusion proofs authenticated against the interop root. This release supports only L1 as the
     /// settlement layer — the flow's `settlementLayerChainId` must equal the L1 chain id, enforced in
     /// {AtomicFlowManager}/{AtomicInteropProof} (`ManagerSettlementLayerNotL1`). No
@@ -75,7 +75,7 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
     /// running any call), so a reentrant call for this bundle hits the status check; a global lock would also
     /// block legitimate nested interop.
     /// @param _bundle ABI-encoded InteropBundle to execute (carries the `atomicBundle` attribute at send time).
-    /// @param _finality The flow definition (`flowId`, legs, deadline) + one IMT inclusion proof per leg.
+    /// @param _finality The flow definition (`flowId`, legs, deadline) + one IMT inclusion proof per commitment.
     function executeAtomicBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) public override {
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
@@ -97,7 +97,7 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
 
     /// @notice Verifies receipt of an atomic bundle without executing its calls, enabling the verify->unbundle flow.
     /// @param _bundle ABI-encoded InteropBundle to verify.
-    /// @param _finality The flow definition + one IMT inclusion proof per leg.
+    /// @param _finality The flow definition + one IMT inclusion proof per commitment.
     function verifyAtomicBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) public override {
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 

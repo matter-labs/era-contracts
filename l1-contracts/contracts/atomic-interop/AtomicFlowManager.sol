@@ -528,7 +528,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
         }
         uint256 n = _preimage.legBundleHashes.length;
         // See {MAX_ATOMIC_FLOW_LEGS}: appending a leg is cheap, but finalization verifies one Merkle
-        // proof per leg, so the leg count must stay bounded.
+        // proof per commitment, so the leg count must stay bounded.
         if (n > MAX_ATOMIC_FLOW_LEGS) {
             revert ManagerTooManyLegs(MAX_ATOMIC_FLOW_LEGS, n);
         }

@@ -24,8 +24,9 @@ import {
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Cross-chain authentication for the atomic interop flow: verifies a leg's commit value
-/// present in (finality) or absent from (timeout) its source chain's IMT, with the claimed IMT root
+/// @notice Cross-chain authentication for the atomic interop flow: verifies a commitment value (a leg's
+/// commit value or a chain's participation value) present in (finality) or absent from (timeout) its
+/// chain's IMT, with the claimed IMT root
 /// authenticated as a chain-batch-root leaf against an imported interop root. The finality/timeout
 /// conditions and their soundness/completeness arguments are specified canonically in
 /// {protocol-docs/atomicity/proofs.md}.
@@ -43,8 +44,8 @@ library AtomicInteropProof {
     /// @notice Verifies `_commitValue` is present in `_proof.sourceChainId`'s batch-END IMT root as of
     /// a batch settled on `_expectedSlChainId` with `l1BatchTimestamp <= _deadline` (the finality
     /// condition from the library header).
-    /// @dev Inclusion is self-binding: `_commitValue` bakes in the chain-specific `bundleHash`, so it
-    /// can only ever pass against the leg's true source chain.
+    /// @dev Inclusion is self-binding: `_commitValue` bakes in the chain-specific `bundleHash` (or, for a
+    /// participation value, the chain id), so it can only ever pass against its true chain.
     /// @param _expectedSlChainId The flow's `settlementLayerChainId` the proof's root must settle on.
     function verifyInclusion(
         ImtProof calldata _proof,

@@ -15,7 +15,7 @@ enum LegState {
 }
 
 /// @notice A single IMT proof against a source chain's interop commitment tree, used both for
-/// inclusion ({AtomicInteropProof.verifyInclusion}; `leaf` holds the commit value) and non-inclusion
+/// inclusion ({AtomicInteropProof.verifyInclusion}; `leaf` holds the commitment value) and non-inclusion
 /// ({AtomicInteropProof.verifyTimeoutAbsence}; `leaf` is the low-nullifier leaf bracketing the absent
 /// value). Two authentication layers: `settlementProof` proves `chainImtRoot` is the batch's
 /// begin/end IMT leaf of the chain batch root against an imported interop root, and `imtProof` proves
@@ -102,7 +102,7 @@ bytes1 constant ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY = 0x01;
 /// inserts one participation value, all in time. See {protocol-docs/atomicity/acceptance.md}.
 bytes1 constant ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED = 0x02;
 
-/// @dev The maximum number of legs in an atomic flow. Committing a leg is cheap (one IMT insert), but
+/// @dev The maximum number of legs in an atomic flow. Committing a leg is cheap (at most one IMT insert), but
 /// finalizing ANY leg requires verifying one full inclusion proof — a settlement-layer Merkle proof
 /// plus an IMT membership proof — per commitment of the flow, i.e. one per leg, or one per participating
 /// chain (at most two per leg) for an accepted flow ({AtomicFlowManager.requireFlowFinalized}), so

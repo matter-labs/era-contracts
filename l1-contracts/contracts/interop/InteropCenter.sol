@@ -600,8 +600,8 @@ contract InteropCenter is
             _callCount: callStartersLength
         });
 
-        // Hash the bundle and dispatch it. For an L2->L2 bundle this appends the commit value to the interop
-        // IMT via the AtomicFlowManager (atomic-only); for an L2->L1 withdrawal it publishes the bundle to L1.
+        // Hash the bundle and dispatch it. For an L2->L2 bundle this commits the leg in the AtomicFlowManager
+        // (atomic-only); for an L2->L1 withdrawal it publishes the bundle to L1.
         // The atomic send metadata travels out-of-band (`_atomicSend`), not embedded in the bundle, so
         // `bundleHash` does not depend on `flowId` (a circular dependency). `msgHash` is the L2->L1 message
         // hash for a withdrawal, or `bytes32(0)` for an atomic L2->L2 bundle.
@@ -712,8 +712,8 @@ contract InteropCenter is
 
     /// @notice Handles base-token value collection for the bundle.
     /// @notice Hashes the bundle and dispatches it along one of two paths, keyed on the destination:
-    /// - **L2->L2 interop (atomic):** the bundle's commit value is appended to the interop IMT via the
-    ///   {AtomicFlowManager} and is NOT published to L1 — source-side funds were already collected earlier in
+    /// - **L2->L2 interop (atomic):** the bundle is committed as a leg in the {AtomicFlowManager} and is
+    ///   NOT published to L1 — source-side funds were already collected earlier in
     ///   the send (`initiateIndirectCall` for indirect asset-transfer calls, `_ensureCorrectTotalValue` for a
     ///   direct call's value; a fund-free direct call collects nothing), and the destination executes it via
     ///   {L2InteropHandler.executeAtomicBundle}.
@@ -744,8 +744,8 @@ contract InteropCenter is
         }
 
         // L2->L2 interop: atomic-only (`_sendBundle` already guaranteed `isAtomic` for a non-L1 destination
-        // and rejected atomic-to-L1). Append the leg's commit value to the interop IMT. The AtomicFlowManager
-        // recomputes `flowId` from the out-of-band preimage and requires `bundleHash` to be one of its legs.
+        // and rejected atomic-to-L1). Commit the leg. The AtomicFlowManager recomputes `flowId` from the
+        // out-of-band preimage and requires `bundleHash` to be one of its legs.
         IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).append({
             _bundleHash: bundleHash,
             _destinationChainId: _bundle.destinationChainId,

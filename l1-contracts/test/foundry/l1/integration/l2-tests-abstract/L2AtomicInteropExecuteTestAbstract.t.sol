@@ -440,7 +440,7 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
     // `acceptAtomicBundle`, the destination's (leaf 2); each finality proof binds its leaf to one chain via
     // its `sourceChainId`.
 
-    uint256 internal constant ACCEPT_LEAF_INDEX = 2;
+    uint256 internal constant DESTINATION_PARTICIPATION_LEAF_INDEX = 2;
 
     function _participationValue(uint256 _chainId) internal view returns (uint256) {
         return uint256(keccak256(abi.encode(ATOMIC_PARTICIPATION_LEAF_TAG, ectx.flowId, _chainId)));
@@ -511,7 +511,7 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         vm.expectEmit(true, true, true, true, L2_ATOMIC_FLOW_MANAGER_ADDR);
         emit IAtomicFlowManager.FlowAccepted(ectx.flowId, ectx.bundleHash);
         vm.expectEmit(true, true, true, true, L2_ATOMIC_FLOW_MANAGER_ADDR);
-        emit IAtomicFlowManager.FlowParticipated(ectx.flowId, DEADLINE, ACCEPT_LEAF_INDEX);
+        emit IAtomicFlowManager.FlowParticipated(ectx.flowId, DEADLINE, DESTINATION_PARTICIPATION_LEAF_INDEX);
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).acceptAtomicBundle(ectxBundleBytes, ectxPreimage, 0);
 
         L2InteropHandler handler = L2InteropHandler(L2_INTEROP_HANDLER_ADDR);
@@ -525,13 +525,16 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
             "the send inserted the source's participation value"
         );
         assertEq(
-            L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafAt(ACCEPT_LEAF_INDEX).value,
+            L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafAt(DESTINATION_PARTICIPATION_LEAF_INDEX).value,
             _participationValue(destinationChainId),
             "participation value in the destination's IMT"
         );
         assertEq(uint256(handler.bundleStatus(ectx.bundleHash)), uint256(BundleStatus.Unreceived), "not executed yet");
 
-        AtomicFinalityProof memory finality = _acceptedSingleLegFinality(sourceChainId, ACCEPT_LEAF_INDEX);
+        AtomicFinalityProof memory finality = _acceptedSingleLegFinality(
+            sourceChainId,
+            DESTINATION_PARTICIPATION_LEAF_INDEX
+        );
         uint256 receiverBalanceBefore = IERC20(ectx.l2Token).balanceOf(_receiver());
         handler.executeAtomicBundle(ectxBundleBytes, finality);
 
@@ -581,7 +584,10 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         vm.chainId(destinationChainId);
         L2InteropHandler handler = L2InteropHandler(L2_INTEROP_HANDLER_ADDR);
         handler.acceptAtomicBundle(ectxBundleBytes, ectxPreimage, 0);
-        handler.executeAtomicBundle(ectxBundleBytes, _acceptedSingleLegFinality(sourceChainId, ACCEPT_LEAF_INDEX));
+        handler.executeAtomicBundle(
+            ectxBundleBytes,
+            _acceptedSingleLegFinality(sourceChainId, DESTINATION_PARTICIPATION_LEAF_INDEX)
+        );
 
         vm.expectRevert(abi.encodeWithSelector(BundleAlreadyProcessed.selector, ectx.bundleHash));
         handler.acceptAtomicBundle(ectxBundleBytes, ectxPreimage, 0);

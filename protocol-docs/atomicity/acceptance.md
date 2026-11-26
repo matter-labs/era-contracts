@@ -63,8 +63,9 @@ On the source, `append` checks that the leg's declared destination is the bundle
 send instead of producing a flow that can only time out. `append` records the leg without a leaf of its own and
 inserts the chain's participation value if this was its last local step.
 
-`lowNullifierIndex` is used only by the call that inserts the participation value, so the SDK computes it for that
-value when it builds the chain's last step.
+`lowNullifierIndex` is used only by the call that inserts the participation value. Anyone can accept a leg, so
+any of a chain's steps can turn out to be its last: callers pass the hint for the chain's participation value on
+every step of an accepted flow. `0` always works, but walks the IMT's linked list from its start.
 
 The bundle's `executionAddress` restricts who can execute it. Anyone can accept it. Acceptance leaves the bundle
 `Unreceived`; once the whole flow is proven, the bundle can be verified or executed.

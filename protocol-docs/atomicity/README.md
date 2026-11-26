@@ -10,8 +10,8 @@ path (`InteropCenter.sendBundle`/`sendMessage` -> `InteropHandler.executeAtomicB
 fact the _only_ L2->L2 path: the `atomicBundle` attribute is mandatory on every L2->L2 send, since
 L1-published (non-atomic) L2->L2 interop was removed; the only non-atomic send left is an L2->L1
 withdrawal (see {protocol-docs/interop.md#atomic-bundles}). The only addition to that path is an
-**Indexed Merkle Tree (IMT)** per chain that records each leg's commitment, plus per-leg
-**IMT proofs** authenticated against the regular **interop-root channel**. There is no extra L1
+**Indexed Merkle Tree (IMT)** per chain that records the flows' commitments, plus
+**IMT proofs** of them authenticated against the regular **interop-root channel**. There is no extra L1
 contract, no global-root registry, and no L2->L1 finality message — finality is proven, not dispatched.
 (Each inserted IMT leaf _is_ mirrored into an L2->L1 log, but purely so the tree stays reconstructible
 from L1 data; nothing reads it on L1. See {protocol-docs/atomicity/security.md#data-availability}.)

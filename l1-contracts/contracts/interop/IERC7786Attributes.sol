@@ -25,11 +25,13 @@ interface IERC7786Attributes {
     function useFixedFee(bool _useFixed) external pure;
 
     /// @notice Marks a bundle as an atomic interop leg (bundle-level attribute): the InteropCenter
-    ///      appends the bundle's commit value to the interop IMT instead of publishing it to L1.
+    ///      commits it in the AtomicFlowManager instead of publishing it to L1.
     ///      See {protocol-docs/interop.md#atomic-bundles} and {protocol-docs/atomicity/flow.md}.
     /// @param _flowPreimage The full `flowId` preimage; the AtomicFlowManager recomputes `flowId` and
     ///      requires this bundle's hash to be one of its legs, else the send reverts.
-    /// @param _lowNullifierIndex The low-nullifier slot for this leg's commit value in the IMT.
+    /// @param _lowNullifierIndex The low-nullifier slot in the IMT for the value this send inserts: the leg's
+    ///      commit value, or this chain's participation value for an accepted flow
+    ///      ({protocol-docs/atomicity/acceptance.md#accepting-a-leg}).
     function atomicBundle(AtomicFlowPreimage calldata _flowPreimage, uint256 _lowNullifierIndex) external pure;
 
     /// @notice Specifies a user-provided salt for the interop bundle.

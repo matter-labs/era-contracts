@@ -26,17 +26,17 @@ interface IL2InteropHandler is IInteropHandlerBase {
         uint256 _lowNullifierIndex
     ) external;
 
-    /// @notice Executes a full atomic interop bundle, gated by per-leg IMT inclusion proofs.
+    /// @notice Executes a full atomic interop bundle, gated by IMT inclusion proofs of the flow's commitments.
     /// @dev Named distinctly from {L1InteropHandler.executeBundle} (which takes a `MessageInclusionProof`) so
     /// the atomic vs L1-message-inclusion path is obvious at the call site.
     /// @param _bundle ABI-encoded InteropBundle to execute.
-    /// @param _finality The flow definition (`flowId`, legs, deadline) + one IMT inclusion proof per leg.
+    /// @param _finality The flow definition (`flowId`, legs, deadline) + one IMT inclusion proof per commitment.
     function executeAtomicBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) external;
 
     /// @notice Verifies receipt of an atomic bundle without executing its calls (enables verify->unbundle).
     /// @dev Named distinctly from {L1InteropHandler.verifyBundle} (which takes a `MessageInclusionProof`),
     /// matching {executeAtomicBundle}.
     /// @param _bundle ABI-encoded InteropBundle to verify.
-    /// @param _finality The flow definition + one IMT inclusion proof per leg.
+    /// @param _finality The flow definition + one IMT inclusion proof per commitment.
     function verifyAtomicBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) external;
 }

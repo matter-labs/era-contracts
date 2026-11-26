@@ -95,10 +95,10 @@ imported) and `slChainId == settlementLayerChainId`, then a non-inclusion (low-n
   producible for a source chain that **halts** and never settles a post-deadline batch; the required
   "last batch" always exists (see {protocol-docs/atomicity/security.md#timeout-protocol-preconditions}).
 
-The absence proof is bound to the missing leg's declared source chain by the caller
-(`authorizeRefund` checks `sourceChainId == legChainIds[i]`). This binding is essential: a
-`commitValue` is trivially absent from _any other_ chain's tree, so an unbound absence proof would let a
-finalized flow be refunded too — a double-mint. Non-inclusion is not self-binding the way inclusion is,
+The absence proof is bound by the caller to the chain `legChainIds[i]` names: the missing leg's
+source, or any participating chain of an accepted flow (`authorizeRefund` checks
+`sourceChainId == legChainIds[i]`). This binding is essential: a commitment value is trivially absent
+from _any other_ chain's tree, so an unbound absence proof would let a finalized flow be refunded too — a double-mint. Non-inclusion is not self-binding the way inclusion is,
 which is exactly why the source chain must be checked explicitly here.
 
 ## Soundness
@@ -148,6 +148,6 @@ manager-side `Manager*` errors (see {protocol-docs/atomicity/flow.md#the-atomicf
   themselves.
 
 The one exception is `ProofSourceChainMismatch`, raised by the **caller** rather than the library:
-`AtomicFlowManager` checks each proof's `sourceChainId` against the leg's declared
-`legChainIds[i]` — defense-in-depth on the finality path, load-bearing on the refund path (see
-[Timeout](#timeout)).
+`AtomicFlowManager` checks each proof's `sourceChainId` against its commitment's chain
+(`legChainIds[i]` in a source-only flow, the i-th participating chain in an accepted flow) —
+defense-in-depth on the finality path, load-bearing on the refund path (see [Timeout](#timeout)).
