@@ -910,6 +910,22 @@
   },
   {
     "type": "error",
+    "name": "ManagerLegFromChainToItself",
+    "inputs": [
+      {
+        "name": "legIndex",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "ManagerLegNotRevertable",
     "inputs": [
       {

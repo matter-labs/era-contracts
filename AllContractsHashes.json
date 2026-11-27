@@ -50,10 +50,10 @@
   {
     "contractName": "l1-contracts/AtomicFlowManager",
     "evmBytecodePath": "/l1-contracts/out/AtomicFlowManager.sol/AtomicFlowManager.json",
-    "evmBytecodeHash": "0x6687bd064eb8aa3b445e45e26928eae4c5bd180dc0dff88af090d41410a63768",
-    "evmDeployedBytecodeHash": "0x769422dd7b496d660957a7a1ed2856bb9b6490ff44b7345870edccc848b1fcf8",
-    "evmDeployedBytecodeBlakeHash": "0xbb8905a31afda264d374ce1338bcdf43344db1b96fd2d75c123c0d09acde2131",
-    "evmDeployedBytecodeLength": 15042
+    "evmBytecodeHash": "0x70d805031c4605310846ca005710d23bc156a75c18ccbac1ff2430396d208bd4",
+    "evmDeployedBytecodeHash": "0xb6642631e5349c86bc694bdc2d88e5265c9770296fd067a44b0dbfd190912d53",
+    "evmDeployedBytecodeBlakeHash": "0x0ca3814ab7da229f2a384547cdb0d3a760e302baa5d75bdb7fa3045246c1f9bc",
+    "evmDeployedBytecodeLength": 15212
   },
   {
     "contractName": "l1-contracts/AtomicInteropProof",
