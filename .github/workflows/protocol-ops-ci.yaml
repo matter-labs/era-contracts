@@ -1,0 +1,21 @@
+name: protocol-ops CI
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  protocol-ops-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.91.1
+
+      - name: Run tests
+        run: cargo test
+        working-directory: protocol-ops

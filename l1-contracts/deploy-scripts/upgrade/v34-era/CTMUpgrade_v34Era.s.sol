@@ -7,16 +7,12 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Call} from "contracts/governance/Common.sol";
-import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IEraMultiProofVerifier} from "contracts/state-transition/chain-interfaces/IEraMultiProofVerifier.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {ProposedUpgrade} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
-import {Bytes} from "contracts/vendor/Bytes.sol";
 
 import {Utils} from "../../utils/Utils.sol";
 import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
@@ -26,9 +22,9 @@ import {UpgradeHelperLib} from "../default-upgrade/UpgradeHelperLib.sol";
 import {UpgradeUtils} from "../default-upgrade/UpgradeUtils.sol";
 import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 
-/// @notice v34 Era: moves an Era CTM from v0.33.0 to v0.34.0. From then on every batch needs a Boojum and an
-/// Airbender proof; the release also ships the force-fail bootloader, the 15M user L1->L2 gas cap and an EVM
-/// emulator fix.
+/// @notice v34 Era: moves an Era CTM from v0.33.0 to the v34 genesis's version (v0.34.1). From then on every batch
+/// needs a Boojum and an Airbender proof; the release also ships the force-fail bootloader, the 15M user L1->L2 gas
+/// cap and an EVM emulator fix.
 /// @dev Initialized by `initializeWithArgs` from the env's permanent values; the rest is introspected from the CTM
 /// or read from the v34 genesis. `prepareCTMUpgrade` deploys, through CREATE2 with the input's salt, what
 /// `deployNewCTMContracts` lists below plus the six facets and `DiamondInit`. Output and test calls are the base's.
@@ -79,7 +75,7 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
     function _checkLiveState() internal view {
         IChainTypeManager ctm = IChainTypeManager(newConfig.ctm);
         require(!ctm.isZKsyncOS(), "v34: not an Era CTM");
-        require(!UpgradeHelperLib.isPatchUpgrade(getNewProtocolVersion()), "v34: must be a minor upgrade");
+        // A minor upgrade whatever the new patch: the L2 upgrade tx's nonce is the minor.
         require(
             UpgradeHelperLib.getProtocolUpgradeNonce(getNewProtocolVersion()) ==
                 UpgradeHelperLib.getProtocolUpgradeNonce(getOldProtocolVersion()) + 1,
@@ -167,40 +163,13 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
 
     // ======================== Output ========================
 
-    /// @dev What the base `saveOutput` leaves out: the Airbender verifier, and the keys only `rehearse.sh` reads.
+    /// @dev What the base `saveOutput` leaves out: the Airbender verifier, and the chain creation params v34.1 reads.
     function saveOutputVersionSpecific() internal override {
         string memory path = upgradeConfig.outputPath;
         vm.writeToml(
             vm.toString(ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk),
             path,
             ".state_transition.airbender_verifier_addr"
-        );
-
-        // For rehearse.sh; they go with it.
-        vm.writeToml(
-            vm.toString(ctmAddresses.stateTransition.proxies.serverNotifier),
-            path,
-            ".deployed_addresses.server_notifier_proxy_addr"
-        );
-        (address factory, bytes32 salt) = getCreate2FactoryParams();
-        vm.serializeAddress("contracts", "create2_factory_addr", factory);
-        vm.writeToml(vm.serializeBytes32("contracts", "create2_factory_salt", salt), path, ".contracts");
-        bytes memory upgradeCut = newlyGeneratedData.upgradeCutData;
-        L2CanonicalTransaction memory l2Tx = abi
-            .decode(Bytes.slice(abi.decode(upgradeCut, (Diamond.DiamondCutData)).initCalldata, 4), (ProposedUpgrade))
-            .l2ProtocolUpgradeTx;
-        vm.writeToml(vm.toString(keccak256(abi.encode(l2Tx))), path, ".contracts_config.l2_upgrade_tx_hash");
-        bytes32[] memory deps = UpgradeHelperLib.factoryDepHashes(l2Tx);
-        string memory depsJson = "[";
-        for (uint256 i = 0; i < deps.length; ++i) {
-            depsJson = string.concat(depsJson, i == 0 ? "" : ",", '"', vm.toString(deps[i]), '"');
-        }
-        vm.writeToml(string.concat(depsJson, "]"), path, ".contracts_config.l2_upgrade_tx_factory_deps");
-        vm.writeToml(vm.toString(keccak256(upgradeCut)), path, ".contracts_config.upgrade_cut_hash");
-        vm.writeToml(
-            vm.toString(keccak256(newlyGeneratedData.diamondCutData)),
-            path,
-            ".contracts_config.new_initial_cut_hash"
         );
         vm.writeToml(
             vm.toString(abi.encode(getChainCreationParams(ctmAddresses.stateTransition))),

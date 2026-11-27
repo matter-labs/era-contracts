@@ -1,0 +1,11 @@
+# v0.34.1 Era patch of stage's Era CTM: input for deploy-scripts/upgrade/v34-era/CTMUpgrade_v34_1Era.s.sol.
+# The CTM comes from permanent-values/stage.toml; the new keys from configs/genesis/era/latest.json.
+testnet_verifier = true              # the v0.34.0 verifier's IS_TESTNET_VERIFIER()
+old_protocol_version = 146028888064  # v0.34.0
+new_protocol_version = 146028888065  # v0.34.1
+# Fresh 32 bytes; differs from testnet3's (same chain) and from every earlier salt.
+create2_factory_salt = "0x75cfff6b922ba50d73bd529f1f565199a15edaa795f57391e9b038de22665943"
+chain_ids = [499]
+# The CTM's current creation params, from v0.34.0's committed output; checked against initialCutHash and
+# initialForceDeploymentHash.
+chain_creation_params_toml = "/upgrade-envs/v0.34.0-era/output/stage/ecosystem.toml"

@@ -2,7 +2,7 @@
   "protocol_semantic_version": {
     "major": 0,
     "minor": 34,
-    "patch": 0
+    "patch": 1
   },
   "genesis_root": "0xabe05c1be8b191d9876b1b93ff02a8736856c72033cb27a7b50892c78a254ce4",
   "genesis_rollup_leaf_index": 102,
@@ -12,8 +12,8 @@
   "default_aa_hash": "0x010005d9ae0fb8ab4bc73a1b9934c344139a2ea02894394fe79633cdd0463f29",
   "evm_emulator_hash": "0x01000c21fdf0cd6c3ef0469a9f5f6e1ef9dbebbbeefef82551536da52dc83252",
   "prover": {
-    "recursion_scheduler_level_vk_hash": "0xbaaa46d644f7034d609eea327e818bd9a93a3c0fdd60e887d233da8a35c4f8ae",
-    "fflonk_snark_wrapper_vk_hash": "0xd89b62ac599b15d9dc47860c8ebca5964c99e7b177e9b8ea38a0c13714dc32bb",
-    "airbender_snark_wrapper_vk_hash": "0xe1ea220140d900b65607e36d4254ccaffca7bc8dbd9c82ceaee8029b323edd1a"
+    "recursion_scheduler_level_vk_hash": "0x3a253a09bfc88b33995343187902b2718281457dfb65a11f1e1d274e131f21f4",
+    "fflonk_snark_wrapper_vk_hash": "0x1249034b17ca9e88509ad078b8e7b507a6643c134adaf0770f4d1d023e3baff0",
+    "airbender_snark_wrapper_vk_hash": "0x010341d99e6160d17066647958842379db9a01ad25507692d7a93595d42a470f"
   }
 }
