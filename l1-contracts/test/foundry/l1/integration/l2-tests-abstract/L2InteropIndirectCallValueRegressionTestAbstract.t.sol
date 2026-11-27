@@ -10,8 +10,10 @@ import {MsgValueMismatch, ZeroAddress} from "contracts/common/L1ContractErrors.s
 import {
     InteroperableAddressChainReferenceNotEmpty,
     IndirectCallCannotCarryValue,
-    IndirectCallOnlyToAssetRouter
+    IndirectCallOnlyToAssetRouter,
+    InteropHandlerCallCannotCarryValue
 } from "contracts/interop/InteropErrors.sol";
+import {L2_INTEROP_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {
     L2_BRIDGEHUB_ADDR,
@@ -162,6 +164,24 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
 
         vm.deal(address(this), interopCallValue);
         vm.expectRevert(abi.encodeWithSelector(IndirectCallCannotCarryValue.selector, interopCallValue));
+        _send(calls, interopCallValue);
+    }
+
+    /// @notice A call to the destination's interop handler (a rescue call) consumes no value and the handler
+    /// rejects value, so such a call could never execute: the send is refused instead of burning the value.
+    function test_regression_interopHandlerCallWithValueReverts() public {
+        uint256 interopCallValue = 100;
+        bytes[] memory callAttributes = new bytes[](1);
+        callAttributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (interopCallValue));
+        InteropCallStarter[] memory calls = new InteropCallStarter[](1);
+        calls[0] = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(L2_INTEROP_HANDLER_ADDR),
+            data: hex"",
+            callAttributes: callAttributes
+        });
+
+        vm.deal(address(this), interopCallValue);
+        vm.expectRevert(abi.encodeWithSelector(InteropHandlerCallCannotCarryValue.selector, interopCallValue));
         _send(calls, interopCallValue);
     }
 

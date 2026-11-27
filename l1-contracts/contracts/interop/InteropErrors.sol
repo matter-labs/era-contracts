@@ -43,6 +43,8 @@ error InteropCallToL1NotToAssetRouter(address target);
 error InteroperableAddressChainReferenceNotEmpty(bytes interoperableAddress);
 // 0x884f49ba
 error InteroperableAddressNotEmpty(bytes interoperableAddress);
+// 0xaca31044
+error InteropHandlerCallCannotCarryValue(uint256 value);
 // 0x290dc1c0
 error InteropPreviewHash(bytes32 bundleHash);
 // 0x2d48e8cf
