@@ -42,8 +42,9 @@ Operator runs the node in the normal mode.
 
 ## Criteria to activate priority mode
 
-Priority Mode is available only after the chain admin irreversibly opts in through
-`permanentlyAllowPriorityMode`. Opt-in is restricted to ZKsync OS chains settling on L1 and requires
+Priority Mode is available only after governance (the Bridgehub owner) irreversibly opts the chain in
+through `permanentlyAllowPriorityMode`; the chain admin, the actor Priority Mode constrains, cannot.
+Opt-in is restricted to ZKsync OS chains settling on L1 and requires
 at least one pending priority operation with a recorded request timestamp. The chain must also be a
 permanent rollup before activation.
 
@@ -71,6 +72,15 @@ From now, not only the whitelisted operator can commit/verify/execute batches. I
 
 1. Everyone can commit/verify/execute batches in one function though **`PermissionlessValidator`** smart contract.
 2. Only priority transactions can be executed in the batch.
+
+### Chain configuration in Priority Mode
+
+A permissionless settler proves a batch against the chain config hash ({protocol-docs/chain-config.md}) and
+the chain's proof mode, and settles it through the chain's DA pair. If the admin could change any of these
+between the proof and the settlement, it could make every prepared settlement revert and keep Priority Mode
+from processing anything. So while Priority Mode is active, the chain config setters and `setDAValidatorPair`
+revert with `OnlyNormalMode`, and only the Bridgehub owner can change a proof system's status
+(`setProofSystemStatus`).
 
 ### PermissionlessValidator
 

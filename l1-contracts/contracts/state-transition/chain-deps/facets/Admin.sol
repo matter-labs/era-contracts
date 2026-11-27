@@ -170,7 +170,7 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     }
 
     /// @inheritdoc IAdmin
-    function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external onlyAdmin onlySettlementLayer {
+    function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external onlyAdmin onlySettlementLayer notPriorityMode {
         // The cap may only be raised above Ethereum's EIP-7825 single-tx gas limit, never below.
         if (_newMaxTxGasLimit < ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT) {
             revert ZKsyncOSMaxTxGasLimitTooLow();
@@ -187,7 +187,7 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     }
 
     /// @inheritdoc IAdmin
-    function setZKsyncOSL1TxFiltering(bool _enabled) external onlyAdmin onlySettlementLayer {
+    function setZKsyncOSL1TxFiltering(bool _enabled) external onlyAdmin onlySettlementLayer notPriorityMode {
         if (_enabled && s.priorityModeInfo.canBeActivated) {
             revert NotCompatibleWithPriorityMode();
         }
@@ -199,7 +199,7 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     }
 
     /// @inheritdoc IAdmin
-    function setZKsyncOSLargeContractsEnabled(bool _enabled) external onlyAdmin onlySettlementLayer {
+    function setZKsyncOSLargeContractsEnabled(bool _enabled) external onlyAdmin onlySettlementLayer notPriorityMode {
         _enforceNoUnverifiedBatchesForChainConfigUpdate();
 
         bool oldEnabled = s.zksyncOSLargeContractsEnabled;
@@ -381,7 +381,10 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     }
 
     /// @inheritdoc IAdmin
-    function setDAValidatorPair(address _l1DAValidator, L2DACommitmentScheme _l2DACommitmentScheme) external onlyAdmin {
+    function setDAValidatorPair(
+        address _l1DAValidator,
+        L2DACommitmentScheme _l2DACommitmentScheme
+    ) external onlyAdmin notPriorityMode {
         if (_l1DAValidator == address(0)) {
             revert L1DAValidatorAddressIsZero();
         }
@@ -398,7 +401,7 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     }
 
     /// @inheritdoc IAdmin
-    function setPubdataContent(PubdataContent _pubdataContent) external onlyAdmin {
+    function setPubdataContent(PubdataContent _pubdataContent) external onlyAdmin notPriorityMode {
         // A permanent rollup is locked to `FULL_PUBDATA` — its pubdata content can never be changed (in particular it
         // can never be relaxed to `LOGS_ONLY`), mirroring how the permanent-rollup flag itself is one-way.
         if (s.isPermanentRollup) {
@@ -411,7 +414,11 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
 
     /// @inheritdoc IAdmin
     function setProofSystemStatus(ProofSystem _proofSystem, bool _enabled) external {
-        address authorized = !_enabled && s.secondProofSystemRequired ? IOwnable(s.bridgehub).owner() : s.admin;
+        // In Priority Mode the proof mode is part of what a permissionless settler proves against, so only
+        // governance may change it there. See {protocol-docs/system/contracts/chain_management/stage1.md}.
+        address authorized = s.priorityModeInfo.activated || (!_enabled && s.secondProofSystemRequired)
+            ? IOwnable(s.bridgehub).owner()
+            : s.admin;
         if (msg.sender != authorized) {
             revert Unauthorized(msg.sender);
         }
@@ -476,7 +483,11 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     }
 
     /// @inheritdoc IAdmin
-    function permanentlyAllowPriorityMode() external onlyAdmin onlySettlementLayer onlyL1 {
+    function permanentlyAllowPriorityMode() external onlySettlementLayer onlyL1 {
+        // Governance opts a chain in. See {protocol-docs/system/contracts/chain_management/stage1.md}.
+        if (msg.sender != IOwnable(s.bridgehub).owner()) {
+            revert Unauthorized(msg.sender);
+        }
         if (s.priorityModeInfo.canBeActivated) {
             revert PriorityModeAlreadyAllowed();
         }

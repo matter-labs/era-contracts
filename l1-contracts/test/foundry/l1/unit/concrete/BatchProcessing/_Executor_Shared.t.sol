@@ -47,6 +47,7 @@ import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {MessageRootBase} from "contracts/core/message-root/MessageRootBase.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 import {IBridgehubBase, L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
@@ -62,6 +63,8 @@ bytes constant POINT_EVALUATION_PRECOMPILE_RESULT = hex"000000000000000000000000
 
 contract ExecutorTest is UtilsCallMockerTest {
     address internal owner;
+    /// @dev The Bridgehub owner (governance): the only caller of `permanentlyAllowPriorityMode`.
+    address internal bridgehubOwner;
     address internal validator;
     address internal randomSigner;
     address internal l1DAValidator;
@@ -223,6 +226,9 @@ contract ExecutorTest is UtilsCallMockerTest {
         randomSigner = makeAddr("randomSigner");
         dummyBridgehub = new DummyBridgehub();
         vm.mockCall(address(dummyBridgehub), abi.encodeWithSelector(IL1Bridgehub.L1_CHAIN_ID.selector), abi.encode(1));
+        // `DummyBridgehub` is not ownable; the Admin facet reads its owner for governance-only calls.
+        bridgehubOwner = makeAddr("bridgehubOwner");
+        vm.mockCall(address(dummyBridgehub), abi.encodeCall(IOwnable.owner, ()), abi.encode(bridgehubOwner));
         uint256[] memory allZKChainChainIDsZero = new uint256[](0);
         vm.mockCall(
             address(dummyBridgehub),

@@ -129,6 +129,30 @@ contract PermanentlyRequireSecondProofSystemTest is AdminTest {
         assertEq(utilsFacet.util_getDisabledProofSystems(), 0, "admin re-enabled ZiSK");
     }
 
+    /// @dev The proof mode is part of what a permissionless settler proves against, so in Priority Mode only
+    /// governance changes it, in both directions.
+    /// See {protocol-docs/system/contracts/chain_management/stage1.md#chain-configuration-in-priority-mode}.
+    function test_setProofSystemStatus_inPriorityMode_onlyGovernance() public {
+        utilsFacet.util_setPriorityModeActivated(true);
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, admin));
+        adminFacet.setProofSystemStatus(ProofSystem.Zisk, false);
+        assertEq(utilsFacet.util_getDisabledProofSystems(), 0, "the chain admin cannot disable ZiSK");
+
+        vm.prank(governance);
+        adminFacet.setProofSystemStatus(ProofSystem.Zisk, false);
+        assertEq(utilsFacet.util_getDisabledProofSystems(), ZISK_DISABLED, "governance disabled ZiSK");
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, admin));
+        adminFacet.setProofSystemStatus(ProofSystem.Zisk, true);
+
+        vm.prank(governance);
+        adminFacet.setProofSystemStatus(ProofSystem.Zisk, true);
+        assertEq(utilsFacet.util_getDisabledProofSystems(), 0, "governance re-enabled ZiSK");
+    }
+
     // add this to be excluded from coverage report
     function test() internal virtual override {}
 }

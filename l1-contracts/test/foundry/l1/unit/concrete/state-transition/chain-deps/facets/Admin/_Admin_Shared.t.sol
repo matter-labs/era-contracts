@@ -12,12 +12,15 @@ import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsy
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 contract AdminTest is UtilsCallMockerTest {
     IAdmin internal adminFacet;
     UtilsFacet internal utilsFacet;
     address internal testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
     DummyBridgehub internal dummyBridgehub;
+    /// @dev The Bridgehub owner (governance): the only caller of `permanentlyAllowPriorityMode`.
+    address internal bridgehubOwner;
     address internal adminFacetImpl;
     address internal utilsFacetImpl;
 
@@ -70,6 +73,9 @@ contract AdminTest is UtilsCallMockerTest {
         utilsFacetImpl = address(new UtilsFacet());
 
         dummyBridgehub = new DummyBridgehub();
+        // `DummyBridgehub` is not ownable; the Admin facet reads its owner for governance-only calls.
+        bridgehubOwner = makeAddr("bridgehubOwner");
+        vm.mockCall(address(dummyBridgehub), abi.encodeCall(IOwnable.owner, ()), abi.encode(bridgehubOwner));
         mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), bytes32(0));
         mockChainTypeManagerVerifier(testnetVerifier);
         address diamondProxy = Utils.makeDiamondProxy(diamondRouting(), address(dummyBridgehub));

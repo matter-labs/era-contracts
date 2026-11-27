@@ -25,10 +25,21 @@ contract PriorityModeAdminTest is AdminTest {
         utilsFacet.util_setPriorityOpsRequestTimestamp(0, block.timestamp);
     }
 
-    function test_revertWhen_permanentlyAllowPriorityMode_noPriorityTxs() public {
-        address admin = utilsFacet.util_getAdmin();
+    /// @dev Governance opts a chain in, never its admin.
+    /// See {protocol-docs/system/contracts/chain_management/stage1.md#criteria-to-activate-priority-mode}.
+    function test_revertWhen_permanentlyAllowPriorityMode_calledByChainAdmin() public {
+        _fakePriorityTx();
+        address chainAdmin = utilsFacet.util_getAdmin();
 
-        vm.prank(admin);
+        vm.prank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, chainAdmin));
+        adminFacet.permanentlyAllowPriorityMode();
+
+        assertFalse(utilsFacet.util_getPriorityModeCanBeActivated());
+    }
+
+    function test_revertWhen_permanentlyAllowPriorityMode_noPriorityTxs() public {
+        vm.prank(bridgehubOwner);
         vm.expectRevert(abi.encodeWithSelector(PriorityOpsRequestTimestampMissing.selector, 0));
         adminFacet.permanentlyAllowPriorityMode();
     }
@@ -40,9 +51,8 @@ contract PriorityModeAdminTest is AdminTest {
         _fakePriorityTx();
         utilsFacet.util_setBaseTokenGasPriceMultiplierNominator(0);
         utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(0);
-        address admin = utilsFacet.util_getAdmin();
 
-        vm.prank(admin);
+        vm.prank(bridgehubOwner);
         vm.expectRevert(NotCompatibleWithPriorityMode.selector);
         adminFacet.permanentlyAllowPriorityMode();
 
@@ -53,9 +63,8 @@ contract PriorityModeAdminTest is AdminTest {
     function test_permanentlyAllowPriorityMode_zeroNominator() public {
         _fakePriorityTx();
         utilsFacet.util_setBaseTokenGasPriceMultiplierNominator(0);
-        address admin = utilsFacet.util_getAdmin();
 
-        vm.prank(admin);
+        vm.prank(bridgehubOwner);
         adminFacet.permanentlyAllowPriorityMode();
 
         assertTrue(utilsFacet.util_getPriorityModeCanBeActivated());
@@ -63,12 +72,11 @@ contract PriorityModeAdminTest is AdminTest {
 
     function test_revertWhen_permanentlyAllowPriorityMode_calledTwice() public {
         _fakePriorityTx();
-        address admin = utilsFacet.util_getAdmin();
 
-        vm.prank(admin);
+        vm.prank(bridgehubOwner);
         adminFacet.permanentlyAllowPriorityMode();
 
-        vm.prank(admin);
+        vm.prank(bridgehubOwner);
         vm.expectRevert(PriorityModeAlreadyAllowed.selector);
         adminFacet.permanentlyAllowPriorityMode();
     }
@@ -88,11 +96,10 @@ contract PriorityModeAdminTest is AdminTest {
 
     function test_setPriorityModeTransactionFilterer_updatesTransactionFiltererWhenAllowed() public {
         _fakePriorityTx();
-        address admin = utilsFacet.util_getAdmin();
         address chainTypeManager = makeAddr("chainTypeManager");
         utilsFacet.util_setChainTypeManager(chainTypeManager);
 
-        vm.prank(admin);
+        vm.prank(bridgehubOwner);
         adminFacet.permanentlyAllowPriorityMode();
 
         address filterer = makeAddr("priorityModeFilterer");
@@ -106,7 +113,6 @@ contract PriorityModeAdminTest is AdminTest {
 
     function test_permanentlyAllowPriorityMode_usesPriorityModeFilterer() public {
         _fakePriorityTx();
-        address admin = utilsFacet.util_getAdmin();
         address chainTypeManager = makeAddr("chainTypeManager");
         utilsFacet.util_setChainTypeManager(chainTypeManager);
 
@@ -114,7 +120,7 @@ contract PriorityModeAdminTest is AdminTest {
         vm.prank(chainTypeManager);
         adminFacet.setPriorityModeTransactionFilterer(filterer);
 
-        vm.prank(admin);
+        vm.prank(bridgehubOwner);
         adminFacet.permanentlyAllowPriorityMode();
 
         assertEq(utilsFacet.util_getPriorityModeTransactionFilterer(), filterer);
