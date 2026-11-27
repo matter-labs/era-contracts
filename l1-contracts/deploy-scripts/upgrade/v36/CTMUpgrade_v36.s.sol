@@ -100,7 +100,9 @@ contract CTMUpgrade_v36 is DefaultCTMUpgrade {
         if (UpgradeHelperLib.isPatchEdge(getOldProtocolVersion(), getNewProtocolVersion())) {
             return members;
         }
-        members = new string[](1);
+        members = new string[](2);
         members[0] = "AdminFacet";
+        // Genesis records the base token's own decimals.
+        members[1] = "L1GenesisUpgrade";
     }
 }

@@ -45,6 +45,15 @@ import {RegistryPostState} from "../unit/concrete/Upgrades/registry/RegistryPost
 ///         objects the prepare deployed. Everything this file tests — the declaration, the objects, the
 ///         version and release invariants — runs unmocked.
 abstract contract RecurringCTMUpgradeForTests is DefaultCTMUpgrade {
+    /// @dev The fixture's release edge is L1-only and keeps the live genesis upgrade (see `CTMUpgradeForLocalTest`),
+    ///      so a recurring edge over it keeps that one too rather than reading it as an undeclared change.
+    function _canReuseReleaseMember(string memory _name, address _live) internal virtual override returns (bool) {
+        if (compareStrings(_name, "L1GenesisUpgrade")) {
+            return true;
+        }
+        return super._canReuseReleaseMember(_name, _live);
+    }
+
     function getL2BytecodeInfoTable() internal view override returns (bytes[] memory) {
         return LiveL2Table.table(newConfig.ctm);
     }

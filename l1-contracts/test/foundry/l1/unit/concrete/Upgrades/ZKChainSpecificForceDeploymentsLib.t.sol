@@ -12,8 +12,8 @@ import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.
 
 /// @dev The library is `internal`; this harness is the only way to call it from a test.
 contract ZKChainSpecificForceDeploymentsLibHarness {
-    function build(address _bridgehub, uint256 _chainId, bool _isGenesis) external view returns (bytes memory) {
-        return ZKChainSpecificForceDeploymentsLib.build(_bridgehub, _chainId, _isGenesis);
+    function build(address _bridgehub, uint256 _chainId) external view returns (bytes memory) {
+        return ZKChainSpecificForceDeploymentsLib.build(_bridgehub, _chainId);
     }
 }
 
@@ -134,26 +134,22 @@ contract ZKChainSpecificForceDeploymentsLibTest is Test {
         );
     }
 
-    function _build(bool _isGenesis) internal view returns (ZKChainSpecificForceDeploymentsData memory) {
-        return abi.decode(lib.build(bridgehubMock, CHAIN_ID, _isGenesis), (ZKChainSpecificForceDeploymentsData));
+    function _build() internal view returns (ZKChainSpecificForceDeploymentsData memory) {
+        return abi.decode(lib.build(bridgehubMock, CHAIN_ID), (ZKChainSpecificForceDeploymentsData));
     }
 
-    /// @dev The metadata on both paths, which differ only in `decimals`.
-    function _assertMetadata(string memory _name, string memory _symbol, uint256 _upgradeDecimals) internal view {
-        ZKChainSpecificForceDeploymentsData memory genesisData = _build(true);
-        ZKChainSpecificForceDeploymentsData memory upgradeData = _build(false);
-        assertEq(genesisData.baseTokenMetadata.name, _name, "genesis name");
-        assertEq(genesisData.baseTokenMetadata.symbol, _symbol, "genesis symbol");
-        assertEq(genesisData.baseTokenMetadata.decimals, 18, "genesis decimals");
-        assertEq(upgradeData.baseTokenMetadata.name, _name, "upgrade name");
-        assertEq(upgradeData.baseTokenMetadata.symbol, _symbol, "upgrade symbol");
-        assertEq(upgradeData.baseTokenMetadata.decimals, _upgradeDecimals, "upgrade decimals");
+    /// @dev The metadata genesis and upgrades both record.
+    function _assertMetadata(string memory _name, string memory _symbol, uint256 _decimals) internal view {
+        ZKChainSpecificForceDeploymentsData memory chainData = _build();
+        assertEq(chainData.baseTokenMetadata.name, _name, "name");
+        assertEq(chainData.baseTokenMetadata.symbol, _symbol, "symbol");
+        assertEq(chainData.baseTokenMetadata.decimals, _decimals, "decimals");
     }
 
     // ─────────────────────────── metadata ───────────────────────────
 
     function test_ethBaseTokenUsesTheHardcodedEtherMetadata() public view {
-        ZKChainSpecificForceDeploymentsData memory chainData = _build(false);
+        ZKChainSpecificForceDeploymentsData memory chainData = _build();
 
         assertEq(chainData.baseTokenBridgingData.assetId, BASE_TOKEN_ASSET_ID);
         assertEq(chainData.baseTokenBridgingData.originChainId, block.chainid);
@@ -169,10 +165,10 @@ contract ZKChainSpecificForceDeploymentsLibTest is Test {
         MockERC20TokenWithMetadata token = new MockERC20TokenWithMetadata("Test Token", "TTK", 6);
         _setBaseToken(address(token), address(token));
 
-        ZKChainSpecificForceDeploymentsData memory chainData = _build(false);
+        ZKChainSpecificForceDeploymentsData memory chainData = _build();
 
         assertEq(chainData.baseTokenL1Address, address(token));
-        // The token's own 6 on an upgrade; genesis records 18.
+        // The token's own 6, recorded at genesis as on an upgrade.
         _assertMetadata("Test Token", "TTK", 6);
     }
 
@@ -182,12 +178,12 @@ contract ZKChainSpecificForceDeploymentsLibTest is Test {
         MockERC20TokenWithoutMetadata token = new MockERC20TokenWithoutMetadata();
         _setBaseToken(address(token), address(token));
 
-        assertEq(_build(false).baseTokenL1Address, address(token));
+        assertEq(_build().baseTokenL1Address, address(token));
         _assertMetadata("Base Token", "BT", 18);
     }
 
     /// @dev A `bytes32`-returning (Maker-style) token is treated as having no string metadata; its
-    ///      conforming `decimals()` is still read on an upgrade.
+    ///      conforming `decimals()` is still read.
     function test_baseTokenReturningBytes32MetadataFallsBackToTheDefaults() public {
         MockERC20TokenWithBytes32Metadata token = new MockERC20TokenWithBytes32Metadata(
             bytes32("Maker"),
@@ -195,7 +191,7 @@ contract ZKChainSpecificForceDeploymentsLibTest is Test {
         );
         _setBaseToken(address(token), address(token));
 
-        assertEq(_build(false).baseTokenL1Address, address(token));
+        assertEq(_build().baseTokenL1Address, address(token));
         _assertMetadata("Base Token", "BT", 6);
     }
 
@@ -223,7 +219,7 @@ contract ZKChainSpecificForceDeploymentsLibTest is Test {
             abi.encode(ORIGIN_CHAIN_ID)
         );
 
-        ZKChainSpecificForceDeploymentsData memory chainData = _build(false);
+        ZKChainSpecificForceDeploymentsData memory chainData = _build();
 
         assertEq(chainData.baseTokenL1Address, address(localToken), "the local representation is recorded");
         assertEq(chainData.baseTokenMetadata.name, "Bridged Token", "the metadata comes from that same token");
@@ -241,6 +237,6 @@ contract ZKChainSpecificForceDeploymentsLibTest is Test {
         uint256 unknownChainId = 999;
 
         vm.expectRevert();
-        lib.build(bridgehubMock, unknownChainId, false);
+        lib.build(bridgehubMock, unknownChainId);
     }
 }

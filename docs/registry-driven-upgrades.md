@@ -700,10 +700,9 @@ forwards only `(admin, protocolVersion)`; the destination CTM rebuilds the genes
 (`bridgehub.baseToken(chainId)`). `L2NativeTokenVault.updateL2` rewrites the base token's metadata on
 every upgrade, so the builder reads it tolerantly: a strict read would leave a chain whose base
 token serves no usable metadata unable to upgrade. A `name()` or `symbol()` that reverts or answers a
-`bytes32` becomes "Base Token" / "BT". `decimals` is 18 at genesis and the token's own `decimals()`
-on an upgrade (18 when that call reverts or does not answer one ABI word), as before the registry
-model, so a chain on a base token without 18 decimals holds 18 in its L2 vault until its first
-upgrade.
+`bytes32` becomes "Base Token" / "BT". `decimals` is the token's own `decimals()`, at genesis as on
+an upgrade (18 when that call reverts or does not answer one ABI word): interop carries the vault's
+value to the base token's bridged copies on other chains, which keep the first value they receive.
 
 ## Flow: upgrading
 

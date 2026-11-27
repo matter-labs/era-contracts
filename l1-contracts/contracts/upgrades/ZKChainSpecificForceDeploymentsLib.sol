@@ -23,9 +23,7 @@ import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 library ZKChainSpecificForceDeploymentsLib {
     /// @param _bridgehub The ecosystem's Bridgehub.
     /// @param _chainId The chain whose base-token data is read.
-    /// @param _isGenesis Whether the data is for the chain's genesis transaction rather than an
-    ///        upgrade's; only the base token's decimals differ (see {_baseTokenMetadata}).
-    function build(address _bridgehub, uint256 _chainId, bool _isGenesis) internal view returns (bytes memory) {
+    function build(address _bridgehub, uint256 _chainId) internal view returns (bytes memory) {
         IBridgehubBase bridgehub = IBridgehubBase(_bridgehub);
         // The base token AS IT EXISTS ON THIS LAYER: `baseToken` resolves the asset id through its
         // registered asset handler, so a token bridged in from elsewhere resolves to its local
@@ -45,7 +43,7 @@ library ZKChainSpecificForceDeploymentsLib {
                     // (`IL2WrappedBaseToken.initializeV3`, through `L2GenesisForceDeploymentsHelper`)
                     // stores it beside the metadata below, so the two must name one token.
                     baseTokenL1Address: baseTokenAddress,
-                    baseTokenMetadata: _baseTokenMetadata(baseTokenAddress, _isGenesis),
+                    baseTokenMetadata: _baseTokenMetadata(baseTokenAddress),
                     baseTokenBridgingData: TokenBridgingData({
                         assetId: baseTokenAssetId,
                         originChainId: nativeTokenVault.originChainId(baseTokenAssetId),
@@ -61,15 +59,8 @@ library ZKChainSpecificForceDeploymentsLib {
     ///      same values are recomposed on every later upgrade (`L2NativeTokenVault.updateL2`
     ///      rewrites them), so a strict read would make such a chain upgradeable only by first
     ///      changing its base token.
-    /// @dev `decimals` is 18 at genesis and the token's own on an upgrade, as before the registry
-    ///      model, so a chain on a non-18-decimals base token holds 18 in its L2 vault until its
-    ///      first upgrade.
     /// @param _baseTokenAddress The base token as it exists on this layer.
-    /// @param _isGenesis Whether the metadata is for the chain's genesis transaction.
-    function _baseTokenMetadata(
-        address _baseTokenAddress,
-        bool _isGenesis
-    ) private view returns (TokenMetadata memory tokenData) {
+    function _baseTokenMetadata(address _baseTokenAddress) private view returns (TokenMetadata memory tokenData) {
         if (_baseTokenAddress == ETH_TOKEN_ADDRESS) {
             return TokenMetadata({name: string("Ether"), symbol: string("ETH"), decimals: 18});
         }
@@ -87,7 +78,7 @@ library ZKChainSpecificForceDeploymentsLib {
         // "BT" is an acronym for "Base Token"
         tokenData.symbol = success ? stringResult : string("BT");
 
-        tokenData.decimals = _isGenesis ? 18 : _safeCallTokenDecimals(_baseTokenAddress);
+        tokenData.decimals = _safeCallTokenDecimals(_baseTokenAddress);
     }
 
     /// @notice Calls a token's metadata method.

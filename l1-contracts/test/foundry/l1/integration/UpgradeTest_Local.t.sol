@@ -50,6 +50,11 @@ contract CTMUpgradeForLocalTest is CTMUpgrade_v36 {
 
     function _canReuseReleaseMember(string memory _name, address _live) internal override returns (bool) {
         reuseCheckedMembers.push(_name);
+        // The genesis upgrade counts as L2 state (`CTMTransition._requireL2StateKept`), and this fixture's edge has
+        // no L2 side, so it keeps the live one even though v36 changes it.
+        if (compareStrings(_name, "L1GenesisUpgrade")) {
+            return true;
+        }
         return super._canReuseReleaseMember(_name, _live);
     }
 

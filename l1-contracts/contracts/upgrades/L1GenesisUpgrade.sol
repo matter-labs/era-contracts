@@ -86,7 +86,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
                 _chainId,
                 address(IBridgehubBase(_bridgehub).l1CtmDeployer()),
                 _release.fixedForceDeploymentsData(),
-                ZKChainSpecificForceDeploymentsLib.build({_bridgehub: _bridgehub, _chainId: _chainId, _isGenesis: true})
+                ZKChainSpecificForceDeploymentsLib.build({_bridgehub: _bridgehub, _chainId: _chainId})
             )
         );
         // Genesis installs its L2 contract set through a plain `upgrade` delegate call rather than
