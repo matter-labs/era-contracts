@@ -5,6 +5,8 @@ import {AtomicInteropProofBuilder} from "./AtomicInteropProofBuilder.sol";
 import {AtomicFlowFixtures} from "./AtomicFlowFixtures.sol";
 
 import {ImtProof, ATOMIC_COMMIT_LEAF_TAG} from "contracts/atomic-interop/IAtomicInterop.sol";
+import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
+import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {L2_MESSAGE_VERIFICATION} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {
@@ -254,6 +256,43 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// means the value was never committed in time.
     function test_verifyTimeoutAbsence_lateBatch_happy() public {
         ImtProof memory absence = _realTimeoutBeginProof(SOURCE_CHAIN_ID, absentValue, uint256(DEADLINE) + 1);
+        _expectRootAuthentication(absence, ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX);
+        proofLib.verifyTimeoutAbsence(absence, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
+    }
+
+    /// @dev The batch whose genesis or upgrade transaction seeds the commitment tree snapshots its begin root
+    /// as `bytes32(0)`. That unseeded tree holds no value, so absence is proven against the seeded empty tree.
+    /// See {protocol-docs/atomicity/proofs.md#unseeded-tree-snapshot}.
+    function test_verifyTimeoutAbsence_unseededBeginSnapshot() public {
+        L2InteropCommitmentTree emptyTree = new L2InteropCommitmentTree();
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        emptyTree.initL2();
+        assertEq(emptyTree.root(), ChainBatchRootTree.EMPTY_IMT_ROOT, "a freshly seeded tree has the empty root");
+
+        (bytes32[] memory settlementProof, bytes32 aggregatedRoot) = _settlementProof({
+            _sourceChainId: SOURCE_CHAIN_ID,
+            _batchNumber: BATCH_N,
+            _imtRoot: bytes32(0),
+            _imtRootLeafIndex: ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX,
+            _otherImtRoot: OTHER_IMT_ROOT,
+            _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
+            _slBlock: SL_BLOCK,
+            _l1Timestamp: uint256(DEADLINE) + 1,
+            _batchLeafProofMask: 0,
+            _batchLeafSiblings: new bytes32[](0)
+        });
+        _importRoot(aggregatedRoot);
+        ImtProof memory absence = ImtProof({
+            sourceChainId: SOURCE_CHAIN_ID,
+            batchNumber: BATCH_N,
+            chainImtRoot: bytes32(0),
+            provesAgainstBeginRoot: true,
+            settlementProof: settlementProof,
+            leaf: emptyTree.leafAt(0),
+            imtLeafIndex: 0,
+            imtProof: emptyTree.merklePath(0)
+        });
+
         _expectRootAuthentication(absence, ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX);
         proofLib.verifyTimeoutAbsence(absence, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }

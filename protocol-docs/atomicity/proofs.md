@@ -95,6 +95,15 @@ imported) and `slChainId == settlementLayerChainId`, then a non-inclusion (low-n
   producible for a source chain that **halts** and never settles a post-deadline batch; the required
   "last batch" always exists (see {protocol-docs/atomicity/security.md#timeout-protocol-preconditions}).
 
+### Unseeded tree snapshot
+
+`L2InteropCommitmentTree` is seeded by `initL2` inside the genesis or upgrade transaction, so the batch
+carrying that transaction snapshots its begin root as `bytes32(0)`. `verifyTimeoutAbsence` proves absence
+from an authenticated zero snapshot against `EMPTY_IMT_ROOT`: the unseeded tree holds no value, exactly like
+the freshly seeded one that L1 assumes for batch 0 (`ChainBatchRootTree.genesisChainBatchRoot`). Without
+this, a leg whose deadline falls before that batch is settled has no timeout proof at all: the begin root
+is zero, and every later snapshot already contains the leg.
+
 The absence proof is bound to the missing leg's declared source chain by the caller
 (`authorizeRefund` checks `sourceChainId == legSourceChainIds[i]`). This binding is essential: a
 `commitValue` is trivially absent from _any other_ chain's tree, so an unbound absence proof would let a

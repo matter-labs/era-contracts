@@ -113,8 +113,13 @@ library AtomicInteropProof {
             _verifyLastBatchInRoot(MessageHashing.readAggregationHopPath(_absence.settlementProof));
         }
 
+        // The tree is unseeded (snapshot `bytes32(0)`) at the begin of the batch that seeds it; it holds no value,
+        // like the seeded empty tree. See {protocol-docs/atomicity/proofs.md#unseeded-tree-snapshot}.
+        bytes32 imtRoot = _absence.chainImtRoot == bytes32(0)
+            ? ChainBatchRootTree.EMPTY_IMT_ROOT
+            : _absence.chainImtRoot;
         bool absent = IndexedMerkleTree.verifyNonInclusion({
-            _root: _absence.chainImtRoot,
+            _root: imtRoot,
             _value: _commitValue,
             _lowLeaf: _absence.leaf,
             _lowLeafIndex: _absence.imtLeafIndex,
