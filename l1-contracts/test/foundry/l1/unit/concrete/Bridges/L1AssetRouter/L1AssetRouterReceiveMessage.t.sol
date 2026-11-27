@@ -146,4 +146,26 @@ contract L1AssetRouterReceiveMessageTest is Test {
         vm.expectRevert(MockRevertingAssetHandler.HandlerReverted.selector);
         router.receiveMessage(bytes32(0), sender, payload);
     }
+
+    /// @notice Pausing the router halts withdrawal finalization for every asset handler, not only for those with a
+    /// pause of their own: `finalizeDeposit` is `whenNotPaused` like the deposit entry points.
+    function test_finalizeDeposit_RevertWhen_RouterPaused() public {
+        MockRevertingAssetHandler ntv = new MockRevertingAssetHandler();
+        vm.prank(owner);
+        router.setNativeTokenVault(INativeTokenVaultBase(address(ntv)));
+        vm.prank(owner);
+        router.pause();
+
+        bytes memory payload = abi.encodeCall(
+            AssetRouterBase.finalizeDeposit,
+            (SOURCE_CHAIN_ID, router.ETH_TOKEN_ASSET_ID(), hex"")
+        );
+        bytes memory sender = InteroperableAddress.formatEvmV1(SOURCE_CHAIN_ID, L2_ASSET_ROUTER_ADDR);
+
+        // The asset handler is never reached.
+        vm.expectCall(address(ntv), abi.encodeWithSelector(MockRevertingAssetHandler.bridgeMint.selector), 0);
+        vm.prank(interopHandler);
+        vm.expectRevert("Pausable: paused");
+        router.receiveMessage(bytes32(0), sender, payload);
+    }
 }
