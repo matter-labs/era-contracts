@@ -24,7 +24,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
 
     function test_revertWhen_activatePriorityMode_notPermanentRollup() public {
         _requestPriorityOp();
-        vm.prank(owner);
+        vm.prank(bridgehubOwner);
         admin.permanentlyAllowPriorityMode();
 
         vm.expectRevert(PriorityModeRequiresPermanentRollup.selector);
@@ -35,7 +35,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
         vm.prank(owner);
         admin.makePermanentRollup();
 
-        vm.prank(owner);
+        vm.prank(bridgehubOwner);
         vm.expectRevert(abi.encodeWithSelector(PriorityOpsRequestTimestampMissing.selector, 0));
         admin.permanentlyAllowPriorityMode();
     }
@@ -50,7 +50,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
         migrator.pauseDepositsBeforeInitiatingMigration();
         assertEq(utilsFacet.util_getPausedDepositsTimestamp(), block.timestamp);
 
-        vm.prank(owner);
+        vm.prank(bridgehubOwner);
         vm.expectRevert(NotCompatibleWithPriorityMode.selector);
         admin.permanentlyAllowPriorityMode();
 
@@ -74,7 +74,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
 
         vm.expectEmit(true, true, true, true, address(admin));
         emit IAdmin.PriorityModeAllowed();
-        vm.prank(owner);
+        vm.prank(bridgehubOwner);
         admin.permanentlyAllowPriorityMode();
         assertTrue(utilsFacet.util_getPriorityModeCanBeActivated());
 
@@ -91,7 +91,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
         vm.warp(100);
         uint256 requestTimestamp = _requestPriorityOp();
 
-        vm.prank(owner);
+        vm.prank(bridgehubOwner);
         admin.permanentlyAllowPriorityMode();
 
         uint256 earliest = requestTimestamp + PRIORITY_EXPIRATION;
@@ -158,7 +158,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
         vm.prank(owner);
         admin.makePermanentRollup();
         _requestPriorityOp();
-        vm.prank(owner);
+        vm.prank(bridgehubOwner);
         admin.permanentlyAllowPriorityMode();
         vm.warp(block.timestamp + PRIORITY_EXPIRATION + 1);
         admin.activatePriorityMode();

@@ -38,7 +38,7 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
                 refundRecipient: prioritySender
             })
         );
-        vm.prank(owner);
+        vm.prank(bridgehubOwner);
         admin.permanentlyAllowPriorityMode();
         vm.warp(block.timestamp + PRIORITY_EXPIRATION + 1);
         admin.activatePriorityMode();

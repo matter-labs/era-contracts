@@ -27,7 +27,8 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {
     L2_BOOTLOADER_ADDRESS,
     L2_ATOMIC_FLOW_MANAGER_ADDR,
-    L2_INTEROP_ATTRIBUTE_PARSER_ADDR
+    L2_INTEROP_ATTRIBUTE_PARSER_ADDR,
+    L2_INTEROP_HANDLER_ADDR
 } from "../common/l2-helpers/L2ContractAddresses.sol";
 import {
     BUNDLE_IDENTIFIER,
@@ -55,6 +56,7 @@ import {
     IndirectCallValueMismatch,
     InteropBundleSaltAlreadyUsed,
     InteropCallToL1NotToAssetRouter,
+    InteropHandlerCallCannotCarryValue,
     InteroperableAddressChainReferenceNotEmpty,
     InteroperableAddressNotEmpty,
     FeeWithdrawalFailed,
@@ -681,6 +683,14 @@ contract InteropCenter is
                 require(
                     _callStarters[i].callAttributes.interopCallValue == 0,
                     IndirectCallCannotCarryValue(_callStarters[i].callAttributes.interopCallValue)
+                );
+            }
+            // A call to the destination's interop handler (a rescue call) consumes no value, and the handler rejects
+            // value, so such a call could never execute.
+            if (_callStarters[i].to == L2_INTEROP_HANDLER_ADDR) {
+                require(
+                    _callStarters[i].callAttributes.interopCallValue == 0,
+                    InteropHandlerCallCannotCarryValue(_callStarters[i].callAttributes.interopCallValue)
                 );
             }
             InteropCall memory interopCall = _processCallStarter(_callStarters[i], _destinationChainId);

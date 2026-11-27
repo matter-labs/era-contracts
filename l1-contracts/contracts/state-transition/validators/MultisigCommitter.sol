@@ -11,7 +11,8 @@ import {
     ChainRequiresValidatorsSignaturesForCommit,
     SignaturesLengthMismatch,
     NotEnoughSigners,
-    InvalidThreshold
+    InvalidThreshold,
+    ProxyAlreadyInitialized
 } from "../../common/L1ContractErrors.sol";
 import {ICommitter} from "../chain-interfaces/ICommitter.sol";
 import {ValidatorTimelock} from "./ValidatorTimelock.sol";
@@ -55,11 +56,25 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
         _disableInitializers();
     }
 
+    /// @dev Must be listed before `reinitializer`, which raises the version before the body runs.
+    modifier onlyNeverInitialized() {
+        uint8 initializedVersion = _getInitializedVersion();
+        if (initializedVersion != 0) {
+            revert ProxyAlreadyInitialized(initializedVersion);
+        }
+        _;
+    }
+
     /// @notice The initializer for the proxy of the contract. For compatibility with the mainnet deployment
     /// we initialize to the second version.
+    /// @dev Only for a proxy that was never initialized: one that already ran `ValidatorTimelock.initialize`
+    /// (version 1) keeps its owner and moves to version 2 through `reinitializeV2`.
     /// @param _initialOwner The initial owner address
     /// @param _initialExecutionDelay The initial execution delay
-    function initializeV2(address _initialOwner, uint32 _initialExecutionDelay) external reinitializer(2) {
+    function initializeV2(
+        address _initialOwner,
+        uint32 _initialExecutionDelay
+    ) external onlyNeverInitialized reinitializer(2) {
         _validatorTimelockInit(_initialOwner, _initialExecutionDelay);
         __EIP712_init("MultisigCommitter", "1");
     }

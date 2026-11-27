@@ -9,6 +9,7 @@ import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.s
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {
     NotCompatibleWithPriorityMode,
+    OnlyNormalMode,
     Unauthorized,
     ZKsyncOSChainConfigUpdateWithUnverifiedBatches
 } from "contracts/common/L1ContractErrors.sol";
@@ -75,21 +76,26 @@ contract L1TxFilteringTest is ChainConfigTest {
         emit IAdmin.PriorityModeActivated();
         admin.activatePriorityMode();
 
+        // The chain config is frozen in Priority Mode, so the setter refuses before looking at the value.
+        // See {protocol-docs/system/contracts/chain_management/stage1.md#chain-configuration-in-priority-mode}.
         vm.prank(getters.getAdmin());
-        vm.expectRevert(NotCompatibleWithPriorityMode.selector);
+        vm.expectRevert(OnlyNormalMode.selector);
         admin.setZKsyncOSL1TxFiltering(true);
+
+        vm.prank(getters.getAdmin());
+        vm.expectRevert(OnlyNormalMode.selector);
+        admin.setZKsyncOSL1TxFiltering(false);
 
         assertFalse(getters.isZKsyncOSL1TxFilteringEnabled());
         assertTrue(utilsFacet.util_getPriorityModeCanBeActivated());
         assertTrue(utilsFacet.util_getPriorityModeActivated());
-        _setFiltering(false);
     }
 
     function test_priorityModeCannotBeAllowedWhileFilteringEnabled() public {
         _setFiltering(true);
         _requestPriorityOp();
 
-        vm.prank(getters.getAdmin());
+        vm.prank(bridgehubOwner);
         vm.expectRevert(NotCompatibleWithPriorityMode.selector);
         admin.permanentlyAllowPriorityMode();
 
@@ -180,7 +186,7 @@ contract L1TxFilteringTest is ChainConfigTest {
     function _allowPriorityMode() internal {
         vm.expectEmit(true, true, true, true, address(admin));
         emit IAdmin.PriorityModeAllowed();
-        vm.prank(getters.getAdmin());
+        vm.prank(bridgehubOwner);
         admin.permanentlyAllowPriorityMode();
 
         assertTrue(utilsFacet.util_getPriorityModeCanBeActivated());

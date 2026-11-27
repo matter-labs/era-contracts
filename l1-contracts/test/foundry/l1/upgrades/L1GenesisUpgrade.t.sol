@@ -158,15 +158,11 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
 
     /// @dev The refactoring must be observably a no-op: the transaction is byte-identical to what
     ///      the pre-refactor struct literal and metadata probe produced for the same inputs (see
-    ///      {LegacyGenesisComposition}).
+    ///      {LegacyGenesisComposition}). Only for base tokens with 18 decimals: the retired composition
+    ///      recorded 18 for every token, and genesis now records the token's own decimals.
     function test_genesisUpgradeTx_isByteIdenticalToTheRetiredComposition() public view {
-        uint256[4] memory chainIds = [ETH_CHAIN_ID, ERC20_CHAIN_ID, NO_METADATA_CHAIN_ID, BYTES32_METADATA_CHAIN_ID];
-        bytes32[4] memory assetIds = [
-            ETH_BASE_TOKEN_ASSET_ID,
-            ERC20_BASE_TOKEN_ASSET_ID,
-            NO_METADATA_BASE_TOKEN_ASSET_ID,
-            BYTES32_METADATA_BASE_TOKEN_ASSET_ID
-        ];
+        uint256[2] memory chainIds = [ETH_CHAIN_ID, NO_METADATA_CHAIN_ID];
+        bytes32[2] memory assetIds = [ETH_BASE_TOKEN_ASSET_ID, NO_METADATA_BASE_TOKEN_ASSET_ID];
         for (uint256 i = 0; i < chainIds.length; ++i) {
             L2CanonicalTransaction memory legacyTx = LegacyGenesisComposition.genesisUpgradeTx({
                 _bridgehub: mockBridgehub,
@@ -269,10 +265,10 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         assertEq(genesisChainId, ERC20_CHAIN_ID, "the genesis call names the chain it is composed for");
         assertEq(genesisDeployer, upgradeDeployer, "the CTM deployment tracker must match");
         assertEq(genesisFixed, upgradeFixed, "the release's pinned force-deployments must match");
-        // The per-chain data match except in the base token's decimals: genesis records 18, an
-        // upgrade the token's own (6 here).
-        assertEq(genesisPerChain, _expectedPerChainData(ERC20_CHAIN_ID, true), "the genesis per-chain data");
-        assertEq(upgradePerChain, _expectedPerChainData(ERC20_CHAIN_ID, false), "the upgrade per-chain data");
+        // The per-chain data match, the base token's own decimals (6 here) included: interop carries the
+        // genesis value to the token's bridged copies on other chains.
+        assertEq(genesisPerChain, upgradePerChain, "the per-chain data must match");
+        assertEq(genesisPerChain, _expectedPerChainData(ERC20_CHAIN_ID), "the per-chain data");
         assertEq(genesisFixed, _fixedForceDeploymentsData(), "and it is the release's own blob");
     }
 
@@ -291,8 +287,8 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     }
 
     /// @dev The genesis path and the upgrade path both compose for `_chainId`, and both land on the
-    ///      default name and symbol — which is what keeps the chain's L2 base-token metadata stable
-    ///      across the upgrade that rewrites it. Decimals follow each path's own rule.
+    ///      default name and symbol and on the same decimals — which is what keeps the chain's L2
+    ///      base-token metadata stable across the upgrade that rewrites it.
     function _assertTolerated(uint256 _chainId, address _token) internal view {
         ZKChainSpecificForceDeploymentsData memory genesisData = _genesisPerChainData(_composedGenesisTx(_chainId));
         ZKChainSpecificForceDeploymentsData memory upgradeData = abi.decode(
@@ -303,11 +299,15 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         assertEq(genesisData.baseTokenL1Address, _token, "the token is recorded even without metadata");
         assertEq(genesisData.baseTokenMetadata.name, DEFAULT_BASE_TOKEN_NAME, "wrong default name");
         assertEq(genesisData.baseTokenMetadata.symbol, DEFAULT_BASE_TOKEN_SYMBOL, "wrong default symbol");
-        assertEq(genesisData.baseTokenMetadata.decimals, GENESIS_DECIMALS, "wrong genesis decimals");
         assertEq(upgradeData.baseTokenMetadata.name, DEFAULT_BASE_TOKEN_NAME, "wrong default name on an upgrade");
         assertEq(upgradeData.baseTokenMetadata.symbol, DEFAULT_BASE_TOKEN_SYMBOL, "wrong default symbol on an upgrade");
-        assertEq(abi.encode(genesisData), _expectedPerChainData(_chainId, true), "the genesis data");
-        assertEq(abi.encode(upgradeData), _expectedPerChainData(_chainId, false), "the upgrade data");
+        assertEq(
+            genesisData.baseTokenMetadata.decimals,
+            upgradeData.baseTokenMetadata.decimals,
+            "genesis and an upgrade record the same decimals"
+        );
+        assertEq(abi.encode(genesisData), _expectedPerChainData(_chainId), "the genesis data");
+        assertEq(abi.encode(upgradeData), _expectedPerChainData(_chainId), "the upgrade data");
     }
 
     // ─────────────────────────── genesis-only execution rules ───────────────────────────

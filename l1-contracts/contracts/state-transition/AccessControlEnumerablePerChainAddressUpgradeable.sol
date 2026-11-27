@@ -149,6 +149,8 @@ abstract contract AccessControlEnumerablePerChainAddressUpgradeable {
     }
 
     /// @notice Sets a new admin role for `_role` on `_chainAddress`.
+    /// @dev Only the chain admin (`DEFAULT_ADMIN_ROLE`): a holder of a delegated admin role may grant and revoke
+    /// `_role`, but must not be able to make `_role` its own admin and lock the chain admin out of it.
     /// @param _chainAddress The chain address.
     /// @param _role The role being configured.
     /// @param _adminRole The role that will act as admin for `_role`.
@@ -156,7 +158,7 @@ abstract contract AccessControlEnumerablePerChainAddressUpgradeable {
         address _chainAddress,
         bytes32 _role,
         bytes32 _adminRole
-    ) public onlyRole(_chainAddress, getRoleAdmin(_chainAddress, _role)) {
+    ) public onlyRole(_chainAddress, DEFAULT_ADMIN_ROLE) {
         if (_role == DEFAULT_ADMIN_ROLE) {
             revert DefaultAdminTransferNotAllowed();
         }

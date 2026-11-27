@@ -25,7 +25,11 @@ import {IL1ChainAssetHandler} from "./IL1ChainAssetHandler.sol";
 import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {L2_CHAIN_ASSET_HANDLER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL2ChainAssetHandler} from "./IL2ChainAssetHandler.sol";
-import {ChainNotReadyForMigration, ZKChainNotRegistered} from "../bridgehub/L1BridgehubErrors.sol";
+import {
+    ChainNotReadyForMigration,
+    IncorrectChainAssetId,
+    ZKChainNotRegistered
+} from "../bridgehub/L1BridgehubErrors.sol";
 import {CTMNotRegistered} from "../../common/L1ContractErrors.sol";
 import {
     MigrationIntervalNotSet,
@@ -135,6 +139,10 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     ) external payable requireZeroValue(msg.value) onlyAssetRouter {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
         uint256 chainId = bridgehubBurnData.chainId;
+        // As in `bridgeBurn`: the asset router dispatches by `_assetId`, and the owner of another asset can point
+        // that asset's handler here, so the chain named in `_data` must be the one whose CTM asset this is.
+        bytes32 ctmAssetId = IBridgehubBase(_getBridgehub()).ctmAssetIdFromChainId(chainId);
+        require(_assetId == ctmAssetId, IncorrectChainAssetId(_assetId, ctmAssetId));
 
         // Note: _chainId is the settlement layer chain (e.g. gateway) where the migration tx was proven,
         // while bridgehubBurnData.chainId is the chain being migrated. These are intentionally different.

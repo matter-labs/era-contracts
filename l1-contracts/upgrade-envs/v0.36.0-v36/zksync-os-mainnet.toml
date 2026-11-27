@@ -1,0 +1,15 @@
+# Upgrade input for the zksync-os-mainnet environment on the v36 release. See protocol-ops/README.md "Environment inputs".
+
+# `bridgehub.owner()`, the signer of the governance bundle.
+owner_address = "0x3d67838307eedEF76026b84170737254A5FaA438"
+
+[contracts]
+# Rotated every release: CREATE2 returns the previously deployed contract if a salt is reused.
+create2_factory_salt = "0x4d4f18ea6c7a9fe45f8cbc47f350322da45ae0b6930c372ee487fe86a75fa2b4"
+# Rotated every release: the legacy `Governance` refuses to schedule an operation id twice.
+legacy_gov_salt = "0x8aae687dee94c6f09b03f4ef54c93a826d1e943de32e1dd167029ae96bf5647f"
+
+# Per-CTM CREATE2 salts, keyed by CTM proxy: two CTM prepares deploying a contract with env-wide
+# constructor args need distinct salts.
+[create2_factory_salts]
+"0xF9Fc08eaA6dAD8DDE886F3B174a019c9ac56B2Ef" = "0xb83334c7ac3bdc885b433330a2e42de3dddfabeba16783ec55e2ccf3b71e8f98"

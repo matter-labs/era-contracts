@@ -541,6 +541,11 @@
   },
   {
     "type": "error",
+    "name": "NonEmptyMsgValue",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "PayloadTooShort",
     "inputs": []
   },

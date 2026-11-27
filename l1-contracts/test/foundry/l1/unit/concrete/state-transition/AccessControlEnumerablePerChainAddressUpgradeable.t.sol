@@ -193,6 +193,34 @@ contract AccessControlEnumerablePerChainAddressUpgradeableTest is Test {
         accessControl.setRoleAdmin(chainAddress1, role1, role2);
     }
 
+    /// @dev A holder of a delegated admin role manages the role it administers, but cannot make that role its own
+    ///      admin: the chain admin would lose the role for good.
+    function test_SetRoleAdminByDelegatedAdminReverts() public {
+        // The chain admin delegates the administration of role1 to holders of role2.
+        vm.startPrank(chainAddress1);
+        accessControl.setRoleAdmin(chainAddress1, role1, role2);
+        accessControl.grantRole(chainAddress1, role2, account1);
+        vm.stopPrank();
+
+        // The delegate manages role1...
+        vm.prank(account1);
+        accessControl.grantRole(chainAddress1, role1, account1);
+        assertTrue(accessControl.hasRole(chainAddress1, role1, account1));
+
+        // ...but cannot take its administration away from the chain admin.
+        vm.prank(account1);
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, chainAddress1, DEFAULT_ADMIN_ROLE, account1));
+        accessControl.setRoleAdmin(chainAddress1, role1, role1);
+        assertEq(accessControl.getRoleAdmin(chainAddress1, role1), role2);
+
+        // The chain admin can always take the role back.
+        vm.startPrank(chainAddress1);
+        accessControl.setRoleAdmin(chainAddress1, role1, DEFAULT_ADMIN_ROLE);
+        accessControl.revokeRole(chainAddress1, role1, account1);
+        vm.stopPrank();
+        assertFalse(accessControl.hasRole(chainAddress1, role1, account1));
+    }
+
     function test_RenounceRoleByNonHolderReverts() public {
         vm.prank(account2);
         vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, chainAddress1, role1, account2));

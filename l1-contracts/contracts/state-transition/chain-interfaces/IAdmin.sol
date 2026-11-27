@@ -67,6 +67,7 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     function setPriorityModeTransactionFilterer(address _priorityModeTransactionFilterer) external;
 
     /// @notice Allow Priority Mode to be activated on the chain (does not activate it).
+    /// @dev Callable only by the Bridgehub owner. See {protocol-docs/system/contracts/chain_management/stage1.md}.
     function permanentlyAllowPriorityMode() external;
 
     /// @notice Deactivate Priority Mode and return the chain to normal mode.
@@ -76,7 +77,7 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// to process priority transactions within the allotted time.
     /// @dev Priority Mode is an escape hatch mechanism in which anyone can settle batches (only with L1 -> L2 transactions).
     /// @dev Priority Mode can be activated if:
-    ///      1. The Chain Admin has explicitly enabled the Priority Mode feature.
+    ///      1. Governance has explicitly enabled the Priority Mode feature (`permanentlyAllowPriorityMode`).
     ///      2. A priority transaction has been outstanding for at least `PRIORITY_EXPIRATION` since it was requested.
     function activatePriorityMode() external;
 
@@ -120,8 +121,8 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     function setPubdataContent(PubdataContent _pubdataContent) external;
 
     /// @notice Enables or disables one proof system for a ZKsync OS chain.
-    /// @dev Callable by the chain admin, except that disabling on a chain that permanently requires its second proof
-    /// system is reserved for the Bridgehub owner.
+    /// @dev Callable by the chain admin, except that two cases are reserved for the Bridgehub owner: disabling on a
+    /// chain that permanently requires its second proof system, and any change while Priority Mode is active.
     /// See {protocol-docs/interop-gating.md#second-proof-system-requirement}.
     /// @param _proofSystem Proof system to configure; only ProofSystem.Zisk is supported on ZKsync OS.
     /// @param _enabled Whether the selected proof system is enabled.

@@ -15,8 +15,8 @@ upgrade-envs/
 ```
 
 `<release>` is the full release name (`v0.34.0-chain-config`); `<env>` is `stage`, `testnet`,
-`mainnet`, `local`, `foundry-upgrade` or `zksync-os-integration-test`. `protocol_ops --env <env>` reads
-`permanent-values/<env>.toml` together with `<release>/<env>.toml` of the current release, the one
+`mainnet` (the Era ecosystem), `zksync-os-mainnet`, `adi`, `local`, `foundry-upgrade` or
+`zksync-os-integration-test`. `protocol_ops --env <env>` reads `permanent-values/<env>.toml` together with `<release>/<env>.toml` of the current release, the one
 `v<major>.<minor>.<patch>-<name>` of the version in `configs/genesis/zksync-os/latest.json` (`yarn new-release`
 bumps it and creates the next release's directory), and writes to
 `<release>/output/<env>/`. Both files must exist for an environment: the tooling refuses to fall

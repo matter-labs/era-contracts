@@ -1,4 +1,8 @@
 l1_chain_id = 1
+# mainnet: the Era ecosystem (bridgehub 0x303a465B…), which also hosts the EraVM chains. The ZKsync OS
+# ecosystem on mainnet is `zksync-os-mainnet.toml`. The core prepare refuses this ecosystem while it hosts a
+# chain on an EraVM chain type manager or below v0.33.0
+# (`UpgradeSafetyChecks.requireCoreUpgradeTargetHasNoLegacyChains`).
 
 zk_token_asset_id = "0x83e2fbc0a739b3c765de4c2b4bf8072a71ea8fbb09c8cf579c71425d8bc8804a"
 

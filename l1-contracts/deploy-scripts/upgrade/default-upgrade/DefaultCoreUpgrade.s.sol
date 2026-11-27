@@ -32,7 +32,9 @@ import {CoreUpgradeParams} from "./UpgradeParams.sol";
 import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
 import {ExternalActionsLib} from "./ExternalActionsLib.sol";
 import {ReleaseMemberProbe} from "./ReleaseMemberProbe.sol";
+import {UpgradeSafetyChecks} from "./UpgradeSafetyChecks.sol";
 import {Utils} from "../../utils/Utils.sol";
+import {MAINNET_CHAIN_ID} from "contracts/common/Config.sol";
 
 /// @notice The ecosystem (core) side of a registry-driven upgrade prepare, run before the CTM
 ///         prepare: deploys every ecosystem implementation the version declares changed, reuses
@@ -95,6 +97,10 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     /// @notice Full default upgrade preparation flow
     function prepareEcosystemUpgrade() public virtual {
+        // Enforced on Ethereum mainnet only: testnets have been upgraded over older chains deliberately.
+        if (block.chainid == MAINNET_CHAIN_ID) {
+            UpgradeSafetyChecks.requireCoreUpgradeTargetHasNoLegacyChains(coreAddresses.bridgehub.proxies.bridgehub);
+        }
         deployNewEcosystemContractsL1();
         console.log("Ecosystem contracts are deployed!");
         deployEcosystemUpgradeObjects();

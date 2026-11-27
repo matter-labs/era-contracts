@@ -26,7 +26,8 @@ import {
     MessageInclusionProof
 } from "contracts/common/Messaging.sol";
 
-import {SlotOccupied} from "contracts/common/L1ContractErrors.sol";
+import {NonEmptyMsgValue, SlotOccupied} from "contracts/common/L1ContractErrors.sol";
+import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {
     BundleAlreadyProcessed,
     EmptyBundle,
@@ -222,6 +223,21 @@ contract L1InteropHandlerTest is Test {
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundle);
         vm.expectRevert(abi.encodeWithSelector(BundleAlreadyProcessed.selector, bundleHash));
         handler.executeBundle(bundle, proof);
+    }
+
+    /// @notice `receiveMessage` dispatches execute, verify or unbundle of another bundle. None of them uses value,
+    /// and the handler cannot pay value out again, so it refuses any.
+    function test_ReceiveMessage_RevertWhen_CarriesValue() public {
+        bytes memory sender = InteroperableAddress.formatEvmV1(SOURCE_CHAIN_ID, makeAddr("sender"));
+        vm.deal(address(handler), 1);
+
+        vm.prank(address(handler));
+        vm.expectRevert(NonEmptyMsgValue.selector);
+        handler.receiveMessage{value: 1}(
+            bytes32(0),
+            sender,
+            abi.encodePacked(IInteropHandlerBase.unbundleBundle.selector)
+        );
     }
 
     /// @notice L1 forbids base-token call value: the amount must ride inside the call payload, never as value.

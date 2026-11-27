@@ -98,10 +98,7 @@ abstract contract RegistryObjectsFixture is Test {
     string internal constant ERC20_NAME = "Local Token";
     string internal constant ERC20_SYMBOL = "LOC";
     uint256 internal constant ERC20_DECIMALS = 6;
-    /// @dev What genesis records for every base token; an upgrade records the token's own
-    ///      `decimals()` — see `ZKChainSpecificForceDeploymentsLib._baseTokenMetadata`.
-    uint256 internal constant GENESIS_DECIMALS = 18;
-    /// @dev What an upgrade records for a token that does not answer `decimals()`.
+    /// @dev What genesis and an upgrade record for a token that does not answer `decimals()`.
     uint256 internal constant DEFAULT_DECIMALS = 18;
 
     function _setUpRegistryObjects(bytes memory _fixedDelegateCalldata) internal {
@@ -327,14 +324,9 @@ abstract contract RegistryObjectsFixture is Test {
         transaction.factoryDeps = _plan.factoryDepHashes;
     }
 
-    /// @dev The `ZKChainSpecificForceDeploymentsData` of one of the fixture chains, as the default
-    ///      composer (the upgrade path) must read it off the mocked ecosystem.
+    /// @dev The `ZKChainSpecificForceDeploymentsData` of one of the fixture chains, as both genesis and the
+    ///      default composer (the upgrade path) must read it off the mocked ecosystem.
     function _expectedPerChainData(uint256 _chainId) internal view returns (bytes memory) {
-        return _expectedPerChainData(_chainId, false);
-    }
-
-    /// @dev The same for either path; they differ only in the base token's decimals.
-    function _expectedPerChainData(uint256 _chainId, bool _isGenesis) internal view returns (bytes memory) {
         // The recorded address is always the token's representation on THIS layer, which for the
         // ERC20 chain is a different contract from its origin token.
         address localToken;
@@ -357,11 +349,7 @@ abstract contract RegistryObjectsFixture is Test {
                 ERC20_ORIGIN_CHAIN_ID,
                 ERC20_BASE_TOKEN_ASSET_ID
             );
-            metadata = TokenMetadata({
-                name: ERC20_NAME,
-                symbol: ERC20_SYMBOL,
-                decimals: _isGenesis ? GENESIS_DECIMALS : ERC20_DECIMALS
-            });
+            metadata = TokenMetadata({name: ERC20_NAME, symbol: ERC20_SYMBOL, decimals: ERC20_DECIMALS});
         } else if (_chainId == NO_METADATA_CHAIN_ID) {
             (localToken, originToken, assetId) = (
                 address(noMetadataToken),
@@ -371,7 +359,7 @@ abstract contract RegistryObjectsFixture is Test {
             metadata = TokenMetadata({
                 name: DEFAULT_BASE_TOKEN_NAME,
                 symbol: DEFAULT_BASE_TOKEN_SYMBOL,
-                decimals: _isGenesis ? GENESIS_DECIMALS : DEFAULT_DECIMALS
+                decimals: DEFAULT_DECIMALS
             });
         } else {
             (localToken, originToken, assetId) = (
@@ -383,7 +371,7 @@ abstract contract RegistryObjectsFixture is Test {
             metadata = TokenMetadata({
                 name: DEFAULT_BASE_TOKEN_NAME,
                 symbol: DEFAULT_BASE_TOKEN_SYMBOL,
-                decimals: _isGenesis ? GENESIS_DECIMALS : ERC20_DECIMALS
+                decimals: ERC20_DECIMALS
             });
         }
         return

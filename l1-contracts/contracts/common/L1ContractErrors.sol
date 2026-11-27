@@ -368,6 +368,8 @@ error ProofTooShort();
 error ProtocolIdMismatch(uint256 expectedProtocolVersion, uint256 providedProtocolId);
 // 0x64f94ec2
 error ProtocolIdNotGreater();
+// 0xf6eda11e
+error ProxyAlreadyInitialized(uint8 version);
 // 0x896ad688
 error ProxyUpgradeDomainMismatch(uint8 expected, uint8 actual);
 // 0x8771630a

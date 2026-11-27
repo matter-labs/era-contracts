@@ -50,7 +50,7 @@ contract SetTransactionFiltererTest is AdminTest {
         utilsFacet.util_setBaseTokenGasPriceMultiplierNominator(1);
         utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
 
-        vm.prank(admin);
+        vm.prank(bridgehubOwner);
         adminFacet.permanentlyAllowPriorityMode();
 
         vm.prank(admin);

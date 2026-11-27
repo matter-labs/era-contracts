@@ -32,7 +32,7 @@ import {
     InvalidInteropCallVersion,
     ShadowAccountNotSupported
 } from "../InteropErrors.sol";
-import {InvalidSelector, PayloadTooShort, Unauthorized} from "../../common/L1ContractErrors.sol";
+import {InvalidSelector, NonEmptyMsgValue, PayloadTooShort, Unauthorized} from "../../common/L1ContractErrors.sol";
 
 /// @title InteropHandlerBase
 /// @author Matter Labs
@@ -192,6 +192,8 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
         bytes calldata payload
     ) external payable override returns (bytes4) {
         require(msg.sender == address(this), Unauthorized(msg.sender));
+        // None of the dispatched operations uses value, and the handler cannot pay it out again.
+        require(msg.value == 0, NonEmptyMsgValue());
 
         // Revert cleanly on a payload too short to carry a selector, instead of the slice-out-of-bounds panic.
         require(payload.length >= 4, PayloadTooShort());
