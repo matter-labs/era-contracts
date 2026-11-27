@@ -9,6 +9,11 @@
         "internalType": "bytes32"
       },
       {
+        "name": "_sourceChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
         "name": "_lowNullifierIndex",
         "type": "uint256",
         "internalType": "uint256"
@@ -40,6 +45,11 @@
           },
           {
             "name": "legChainIds",
+            "type": "uint256[]",
+            "internalType": "uint256[]"
+          },
+          {
+            "name": "legDestinationChainIds",
             "type": "uint256[]",
             "internalType": "uint256[]"
           }
@@ -97,6 +107,11 @@
             "name": "legChainIds",
             "type": "uint256[]",
             "internalType": "uint256[]"
+          },
+          {
+            "name": "legDestinationChainIds",
+            "type": "uint256[]",
+            "internalType": "uint256[]"
           }
         ]
       }
@@ -145,6 +160,11 @@
               },
               {
                 "name": "legChainIds",
+                "type": "uint256[]",
+                "internalType": "uint256[]"
+              },
+              {
+                "name": "legDestinationChainIds",
                 "type": "uint256[]",
                 "internalType": "uint256[]"
               }
@@ -297,30 +317,6 @@
   },
   {
     "type": "function",
-    "name": "legAccepted",
-    "inputs": [
-      {
-        "name": "_flowId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "_bundleHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "legState",
     "inputs": [
       {
@@ -394,6 +390,11 @@
                   },
                   {
                     "name": "legChainIds",
+                    "type": "uint256[]",
+                    "internalType": "uint256[]"
+                  },
+                  {
+                    "name": "legDestinationChainIds",
                     "type": "uint256[]",
                     "internalType": "uint256[]"
                   }
@@ -486,37 +487,6 @@
         "type": "bytes32",
         "indexed": true,
         "internalType": "bytes32"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "FlowCommitted",
-    "inputs": [
-      {
-        "name": "flowId",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "bundleHash",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "deadline",
-        "type": "uint64",
-        "indexed": false,
-        "internalType": "uint64"
-      },
-      {
-        "name": "leafIndex",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
       }
     ],
     "anonymous": false
