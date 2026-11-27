@@ -4,9 +4,9 @@
 > their soundness/completeness arguments. The `AtomicInteropProof` library
 > (`atomic-interop/libraries/AtomicInteropProof.sol`) implements it and its header points here.
 
-Cross-chain authentication for the atomic flow reduces to one question asked against a source chain's
-commitment tree (see {protocol-docs/atomicity/imt.md}): **is a leg's `commitValue` present in
-(finality) or absent from (timeout) the tree, as of a batch that settled within / past the deadline?**
+Cross-chain authentication checks whether a required commitment is present in or absent from its chain's
+IMT at the deadline. A source-only flow checks each leg's `commitValue` on its source chain. An accepted flow
+checks one [participation value](./acceptance.md#commitments) per participating chain.
 Both directions authenticate the claimed IMT root the same way; they differ in which IMT root leaf they
 target, which timestamp comparison they make, and — for the timeout end branch alone — one extra
 last-batch check.
@@ -31,7 +31,7 @@ on L1: `AtomicFlowManager` rejects any flow whose `settlementLayerChainId` is no
 timestamps of an L1 block. The proof library itself stays layer-agnostic: `verifyInclusion` /
 `verifyTimeoutAbsence` only require each proof's resolved `slChainId` to equal the flow's
 `settlementLayerChainId` (else `ProofSettlementLayerMismatch`), which under the invariant pins every
-leg's proof to L1 and keeps all per-leg `t`/`T`/`deadline` comparisons on one clock.
+commitment's proof to L1 and keeps all `t`/`T`/`deadline` comparisons on one clock.
 
 ## Root authentication (shared by both directions)
 
@@ -57,22 +57,22 @@ can only ever target leaf 2 or leaf 3 — never the logs or multichain leaves of
 
 ## Finality
 
-> **A leg FINALIZES iff its `commitValue` is present in the batch-END IMT root (leaf 3) of a batch with
-> `t <= deadline`, on the flow's settlement layer.**
+> **A flow finalizes when every required commitment is present in its chain's batch-end IMT root (leaf 3)
+> for a batch with `t <= deadline` on the flow's settlement layer.**
 
 `verifyInclusion` authenticates the root as the batch-**end** leaf, requires `slChainId ==
 settlementLayerChainId` and `t <= deadline` (`ProofDeadlineExceeded` otherwise), and then runs a plain
-IMT membership proof for `commitValue`. Because a batch's inclusion time `t` only ever rises, a commit
+IMT membership proof for the commitment. Because a batch's inclusion time `t` only ever rises, a commitment
 cannot be back-dated to look in-time after the fact.
 
-Inclusion is **self-binding**: `commitValue` bakes in the chain-specific `bundleHash`, so it can only
-ever exist in — and pass a membership proof against — its true source chain's tree. The source-chain
-check on the finality path is therefore defense-in-depth; on the timeout path it is load-bearing (below).
+Inclusion is **self-binding**. The leg's `commitValue` incorporates its chain-specific `bundleHash`, and the
+participation value incorporates the participating chain ID. The manager checks the proof's chain for both
+finality and timeout. The timeout check is essential because the value is also absent on unrelated chains.
 
 ## Timeout
 
-> **A leg TIMES OUT (becomes refund-_authorizable_) via an aggregated root created strictly after the
-> deadline (`T > deadline`) plus one batch of the source chain inside that root.**
+> **A flow times out when a required commitment is proven absent using an aggregated root created
+> strictly after the deadline (`T > deadline`) and one batch of the commitment's chain in that root.**
 
 Throughout this page, "times out" means a valid timeout proof exists, so `authorizeRefund` will mark the
 flow's committed legs `Revertable`. Whether the assets are then actually returned is a separate,
@@ -82,7 +82,7 @@ The prover declares the branch (`ImtProof.provesAgainstBeginRoot`), which `verif
 validates against the authenticated `t` — no unverified value drives control flow. Both branches first
 require `T > deadline` (`ProofInteropRootNotAfterDeadline`; and `T != 0`, i.e. the root was actually
 imported) and `slChainId == settlementLayerChainId`, then a non-inclusion (low-nullifier) proof of
-`commitValue`:
+the required commitment:
 
 - **Begin branch** (`t > deadline` required): the value is absent from the batch-**begin** IMT root
   (leaf 2). The tree is append-only and `begin(N) == end(N-1)`, so absence at the begin of a late batch
@@ -92,14 +92,14 @@ imported) and `slChainId == settlementLayerChainId`, then a non-inclusion (low-n
   is a left child, its right sibling must be the empty-subtree hash of the `DynamicIncrementalMerkle`
   zero cascade), and the value is absent from its batch-**end** IMT root (leaf 3) — the final IMT state
   reachable in time, since any later batch has `t' >= T > deadline`. This branch keeps a timeout proof
-  producible for a source chain that **halts** and never settles a post-deadline batch; the required
+  producible for a chain that **halts** and never settles a post-deadline batch; the required
   "last batch" always exists (see {protocol-docs/atomicity/security.md#timeout-protocol-preconditions}).
 
 The absence proof is bound by the caller to a chain leg `i` declares: its source `legChainIds[i]`, or in an
 accepted flow also its destination `legDestinationChainIds[i]` (`authorizeRefund` checks `sourceChainId` is one of
 them, `ManagerAbsenceChainNotInLeg`). This binding is essential: a commitment value is trivially absent
 from _any other_ chain's tree, so an unbound absence proof would let a finalized flow be refunded too — a double-mint. Non-inclusion is not self-binding the way inclusion is,
-which is exactly why the source chain must be checked explicitly here.
+which is exactly why the commitment's chain must be checked explicitly here.
 
 ## Soundness
 
@@ -116,8 +116,8 @@ versa: a flow is either finalizable or refund-authorizable, never both.
 
 ## Completeness
 
-If a leg has really timed out, a valid timeout proof can **always** be produced from _any_ aggregated
-root with `T > deadline`, even if the source chain inserts the value later:
+If a required commitment is absent past the deadline, a valid timeout proof can **always** be produced from
+_any_ aggregated root with `T > deadline`, even if the commitment's chain inserts the value later:
 
 - if the root contains a batch with `t > deadline`, the **first** such batch works — its begin root
   equals the end root of the last in-time batch, and the value is absent there (begin branch);

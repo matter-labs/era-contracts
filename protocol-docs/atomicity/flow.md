@@ -29,7 +29,8 @@ started. Anything else reverts with `ManagerFlowPreimageVersionMismatch`.
 Because `version` is a hashed field, a preimage of one version can never collide with — or be
 reinterpreted under the rules of — another. A new value is introduced whenever the field set or its
 canonicalization changes. Introducing one stops new sends of the old, but finality and refunds keep accepting
-every version that may still be in flight, so flows sent under a prior version stay finalizable and refundable.
+every version that may still be in flight. A source-only flow with all legs sent can still finalize.
+A source-only flow with legs unsent at the upgrade can only time out and refund.
 
 ### `legBundleHashes` vs the chain ids
 
@@ -55,7 +56,10 @@ the logs/multichain leaves. Full mechanics in {protocol-docs/atomicity/proofs.md
 
 ## Lifecycle
 
-![Atomic interop success path: send and commit on Chain A, settle to L1, finalize on Chain B](./img/atomic_flow_success.png)
+The diagram shows a pre-v36 source-only flow (`0x01`). In v36, new flows use `0x02` and need participation
+from every chain before finality.
+
+![Source-only flow success path: commit on Chain A, settle to L1, finalize on Chain B](./img/atomic_flow_success.png)
 
 ### 1. Atomic send (append)
 
@@ -93,6 +97,12 @@ destinationChainId, lowNullifierIndex, preimage)`. `append`:
    value into its `L2InteropCommitmentTree`, emitting `FlowParticipated(flowId, deadline, leafIndex)`. The tree
    additionally mirrors the inserted value into an L2->L1 log for data availability (see
    {protocol-docs/atomicity/imt.md} and {protocol-docs/atomicity/security.md#data-availability}).
+
+### Destination acceptance
+
+For a new flow, relay each sent bundle and its preimage to its destination. Anyone can call
+[`acceptAtomicBundle`](./acceptance.md#accepting-a-leg) there. Each participating chain inserts its IMT value
+when all its outgoing legs are committed and all its incoming legs are accepted.
 
 ### 2. Root settlement + import
 

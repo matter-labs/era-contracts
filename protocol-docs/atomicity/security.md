@@ -8,25 +8,24 @@ release. The proof-level soundness/completeness arguments live in
 ## Guarantees
 
 - **Finalizability and refundability are mutually exclusive.** For a given flow, exactly one of the two
-  outcomes is ever provable: either every leg is proven committed before the deadline (so any leg's
-  destination _may_ execute), or a leg is proven absent past it (so committed legs _may_ be refunded) —
-  never both. This follows from the mutual exclusivity of the finality and timeout conditions
-  ({protocol-docs/atomicity/proofs.md#soundness}), and it is the guarantee the protocol actually
-  enforces.
+  outcomes is ever provable. Finality proves every required commitment in time and permits execution.
+  Timeout proves a required commitment absent past the deadline and permits refunds for committed legs.
+  The preimage version determines which [commitments](./acceptance.md#commitments) the proof checks.
+  The [proof conditions](./proofs.md#soundness) make these outcomes mutually exclusive.
 
   This is deliberately weaker than "every destination call executes". The atomicity gate governs
-  **whether execution is permitted**, not whether it happens: `requireFlowFinalized` proves all legs
-  committed, but each destination is then driven independently by whoever submits
+  **whether execution is permitted**, not whether it happens: `requireFlowFinalized` proves the flow
+  met its finality conditions, but each destination is then driven independently by whoever submits
   `executeAtomicBundle`, and a bundle that only reached `Verified` can still be partially executed or
   have individual calls `Cancelled` through `unbundleBundle`
   ({protocol-docs/interop.md#unbundling-unbundlebundle}). What atomicity rules out is the dangerous
   asymmetry — a leg being burned on one chain while the flow is refunded on another — not
   under-execution by a passive or adversarial destination caller.
 
-- **No back-dating.** A batch's settlement inclusion time `t` only ever rises, so a commit that lands
+- **No back-dating.** A batch's settlement inclusion time `t` only ever rises, so a commitment that lands
   late cannot be made to look in-time; the deadline check is monotone.
 - **Timeout-proof liveness.** If a flow genuinely times out, a valid timeout proof can always be
-  produced from any post-deadline aggregated root — including for a source chain that halts
+  produced from any post-deadline aggregated root — including for a chain that halts
   ({protocol-docs/atomicity/proofs.md#completeness}), provided the preconditions below hold. Note this is
   liveness of the _proof_, hence of `authorizeRefund`: it guarantees the legs become `Revertable`, not
   that `claimRefund` then succeeds in returning the assets (see the recovery non-guarantees below).

@@ -10,7 +10,10 @@ happens _after_ the proof checks out.
 
 ## `authorizeRefund` → `claimRefund`
 
-![Atomic interop timeout path: absence proof against Chain B's settled IMT roots, refund on Chain A](./img/atomic_flow_recovery.png)
+The diagram shows a pre-v36 source-only flow (`0x01`). For an accepted flow (`0x02`), prove the absence of a
+chain's participation value against that chain's settled IMT roots.
+
+![Source-only flow timeout path: absence proof against Chain B's settled IMT roots, refund on Chain A](./img/atomic_flow_recovery.png)
 
 1. **`authorizeRefund(flow, missingLegIndex, absence)`** — verifies one timeout absence proof for the
    missing commitment (bound to the leg's source `legChainIds[missingLegIndex]`, or in an accepted flow also its
@@ -18,7 +21,7 @@ happens _after_ the proof checks out.
    {protocol-docs/interop-gating.md#receive-filter}; see [acceptance](./acceptance.md#commitments)), then flips **this chain's** `Committed` legs
    of the flow to `Revertable`, emitting `FlowRefundAuthorized` for each. Legs committed on other chains
    are not in this manager's state and are simply skipped; each chain authorizes its own legs from the
-   same absence proof. One proof of _one_ missing leg is enough to unwind the whole flow, because a flow
+   same absence proof. One proof of a missing commitment is enough to unwind the whole flow, because a flow
    that cannot finalize cannot finalize anywhere.
 2. **`claimRefund(flowId, bundle)`** — requires the leg to be `Revertable`, flips it to `Reverted`
    **before** any external call (CEI — a reentrant claim hits the state check), then calls

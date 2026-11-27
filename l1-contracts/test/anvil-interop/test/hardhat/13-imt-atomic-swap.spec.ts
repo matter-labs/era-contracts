@@ -759,6 +759,10 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     const realHash = await predictLegBundleHash(chainA, chainB, amount, user, salt);
     const strayLeg = ethers.utils.id("stale predicted bundle hash");
     const interopCenter = chainA.stack.interopCenter.connect(chainA.user);
+    const [, , otherPeerChainId] = getInteropChainIds(state.chains!.config);
+    if (otherPeerChainId === undefined) {
+      throw new Error("Need a third interop chain for the source and destination mismatch checks");
+    }
 
     const sendWithPreimage = (preimage: AtomicFlowPreimage) => () =>
       interopCenter.callStatic.sendBundle(
@@ -786,27 +790,27 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       ])
     );
 
-    // 2. Preimage that contains the bundle, but declares the wrong source chain for it.
-    const wrongSourcePreimage = buildFlowPreimage([{ ...sentLeg, source: chainB.chainId }, coLeg], deadline);
+    // 2. A third allowed peer lets the wrong source reach the source check without declaring a self-leg.
+    const wrongSourcePreimage = buildFlowPreimage([{ ...sentLeg, source: otherPeerChainId }, coLeg], deadline);
     await expectRevert(
       sendWithPreimage(wrongSourcePreimage),
       "atomic send with wrong declared source chain",
       customError("AtomicFlowManager", "ManagerCommittedLegSourceChainMismatch(bytes32,uint256,uint256)", [
         computeFlowId(wrongSourcePreimage),
         chainA.chainId,
-        chainB.chainId,
+        otherPeerChainId,
       ])
     );
 
     // 3. Preimage that contains the bundle, but declares the wrong destination chain for it.
-    const wrongDestPreimage = buildFlowPreimage([{ ...sentLeg, dest: chainA.chainId }, coLeg], deadline);
+    const wrongDestPreimage = buildFlowPreimage([{ ...sentLeg, dest: otherPeerChainId }, coLeg], deadline);
     await expectRevert(
       sendWithPreimage(wrongDestPreimage),
       "atomic send with wrong declared destination chain",
       customError("AtomicFlowManager", "ManagerCommittedLegDestinationChainMismatch(bytes32,uint256,uint256)", [
         computeFlowId(wrongDestPreimage),
         chainB.chainId,
-        chainA.chainId,
+        otherPeerChainId,
       ])
     );
 
