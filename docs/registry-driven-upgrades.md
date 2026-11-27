@@ -729,6 +729,20 @@ sequenceDiagram
     Note over D: Applies derived cuts,<br/>version and verifier,<br/>and L2 transaction
 ```
 
+### Preconditions checked against live state
+
+The prepares refuse two upgrades that would be unsafe to apply to the live state they read
+(`UpgradeSafetyChecks`):
+
+- **A plain swap of a validator timelock below initializer version 2.** Such a proxy still runs as a
+  plain `ValidatorTimelock`; moving it to `MultisigCommitter` takes `upgradeAndCall(…, reinitializeV2)`,
+  which a plain swap does not send. Do that first, outside the upgrade.
+- **A core upgrade of an Ethereum mainnet bridgehub that hosts a chain on an EraVM chain type manager, or
+  a chain below v0.33.0.** This line's L1 code keeps no state or message format from before v0.33.0: no
+  finalizer for old-format withdrawals, no legacy deposit hashes, no proof path for batches settled on the
+  legacy Era Gateway. Swapped in under such chains, it would strand their withdrawals and failed deposits.
+  An operator who has settled those first can set `UPGRADE_ALLOW_CORE_UPGRADE_OVER_LEGACY_CHAINS=true`.
+
 The executor legs are ALL a registry-driven upgrade emits; every other call is a declared external
 action listed in the prepare output (see the runbook). One proposal applies the legs it carries in
 order — the ecosystem rows, then the CTM-domain rows, then the transition — and reverts all of them

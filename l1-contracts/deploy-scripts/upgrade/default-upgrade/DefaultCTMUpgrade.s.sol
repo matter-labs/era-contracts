@@ -31,6 +31,7 @@ import {DeployCTMScript} from "../../ctm/DeployCTM.s.sol";
 import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
 import {ReleaseMemberProbe} from "./ReleaseMemberProbe.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
+import {UpgradeSafetyChecks} from "./UpgradeSafetyChecks.sol";
 import {CTMUpgradeParams, UpgradeKind} from "./UpgradeParams.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
@@ -457,6 +458,11 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             ctmAddresses.stateTransition.proxies.validatorTimelock,
             ctmAddresses.stateTransition.implementations.validatorTimelock
         );
+        if (rows[uint256(CTMContract.ValidatorTimelock)].implNew != address(0)) {
+            UpgradeSafetyChecks.requireValidatorTimelockAtVersion2(
+                ctmAddresses.stateTransition.proxies.validatorTimelock
+            );
+        }
         rows[uint256(CTMContract.ServerNotifier)] = _ctmRow(
             ctmAddresses.stateTransition.proxies.serverNotifier,
             ctmAddresses.stateTransition.implementations.serverNotifier
