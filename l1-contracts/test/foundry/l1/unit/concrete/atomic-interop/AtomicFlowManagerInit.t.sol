@@ -34,9 +34,11 @@ contract AtomicFlowManagerInitTest is Test {
     function _flow(uint256 _settlementLayerChainId) internal pure returns (AtomicFlow memory flow) {
         bytes32[] memory legs = new bytes32[](1);
         legs[0] = keccak256("leg");
-        uint256[] memory chains = new uint256[](1);
-        chains[0] = 271;
-        flow.preimage = AtomicFlowFixtures.nLegPreimage(legs, chains, 123, _settlementLayerChainId);
+        uint256[] memory sources = new uint256[](1);
+        sources[0] = 271;
+        uint256[] memory destinations = new uint256[](1);
+        destinations[0] = 272;
+        flow.preimage = AtomicFlowFixtures.nLegPreimage(legs, sources, destinations, 123, _settlementLayerChainId);
         flow.flowId = AtomicFlowFixtures.flowId(flow.preimage);
     }
 

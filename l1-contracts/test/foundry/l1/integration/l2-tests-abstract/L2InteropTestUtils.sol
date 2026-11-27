@@ -15,7 +15,7 @@ import {InteropBundle} from "contracts/common/Messaging.sol";
 import {
     AtomicFinalityProof,
     AtomicFlowPreimage,
-    ATOMIC_FLOW_PREIMAGE_VERSION
+    ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED
 } from "contracts/atomic-interop/IAtomicInterop.sol";
 import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
@@ -58,11 +58,12 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
             IERC7786Attributes.atomicBundle,
             (
                 AtomicFlowPreimage({
-                    version: ATOMIC_FLOW_PREIMAGE_VERSION,
+                    version: ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED,
                     deadline: type(uint64).max,
                     settlementLayerChainId: 0,
                     legBundleHashes: new bytes32[](0),
-                    legSourceChainIds: new uint256[](0)
+                    legChainIds: new uint256[](0),
+                    legDestinationChainIds: new uint256[](0)
                 }),
                 uint256(0)
             )

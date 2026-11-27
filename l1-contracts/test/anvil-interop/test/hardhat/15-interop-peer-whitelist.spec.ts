@@ -136,7 +136,7 @@ describe("15 - Interop peer whitelist", function () {
     await expectRevert(
       () => executeBundle(chainProvider, heldMessage, peerChainId),
       "execute a bundle from a removed peer",
-      customError("AtomicFlowManager", "ManagerLegSourceChainNotAllowed(uint256)", [peerChainId]),
+      customError("AtomicFlowManager", "ManagerLegChainNotAllowed(uint256)", [peerChainId]),
       chainProvider
     );
     expect(await getBundleStatus(chainProvider, heldMessage.bundleHash), "the held bundle's status").to.equal(

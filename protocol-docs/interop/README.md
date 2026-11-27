@@ -3,9 +3,10 @@
 ZKsync interop sends calls and assets from an L2 source chain to another chain through an
 `InteropBundle`. The current release has two deliberately different delivery paths:
 
-- L2 -> L2 bundles are atomic. Every send carries the `atomicBundle` attribute, commits a leg to the
-  source chain's interop commitment tree, and executes on the destination only after every leg in the
-  flow is proven committed before its deadline.
+- L2 -> L2 bundles are atomic. Every send carries the `atomicBundle` attribute and commits a leg on the
+  source chain, and the destination accepts it. The leg executes only after every chain of the flow is
+  proven to have recorded its participation in its interop commitment tree before the deadline
+  ([acceptance](../atomicity/acceptance.md)).
 - L2 -> L1 bundles are non-atomic, single-call asset withdrawals. The bundle is published as an
   L2 -> L1 message and executed by `L1InteropHandler` after a message-inclusion proof.
 
@@ -28,8 +29,9 @@ destination handler.
 
 1. [Atomic interop overview](../atomicity/README.md) — the L2 -> L2 commitment, finality, timeout, and
    recovery protocol, followed by its detailed pages: [commitment tree](../atomicity/imt.md),
-   [lifecycle](../atomicity/flow.md), [proofs](../atomicity/proofs.md),
-   [recovery](../atomicity/recovery.md), and [security](../atomicity/security.md).
+   [lifecycle](../atomicity/flow.md), [acceptance](../atomicity/acceptance.md),
+   [proofs](../atomicity/proofs.md), [recovery](../atomicity/recovery.md), and
+   [security](../atomicity/security.md).
 
 ### Related subsystems
 
@@ -47,8 +49,9 @@ presenting a second source of truth for the contract behavior.
 2. `InteropCenter` validates and funds the bundle. Direct calls preserve the requested destination
    call; an indirect asset-router call first burns the asset on the source chain and returns the actual
    destination call.
-3. An L2 -> L2 leg is appended to the source chain's commitment tree. An L2 -> L1 withdrawal is sent
-   through the L2-to-L1 messenger.
+3. An L2 -> L2 leg is committed on the source chain, and anyone accepts it on its destination with the
+   full bundle. Each chain of the flow inserts its participation value into its commitment tree with its
+   last step. An L2 -> L1 withdrawal is sent through the L2-to-L1 messenger.
 4. Settlement folds the relevant root into `MessageRoot`. Destination chains import dependency roots
    through the bootloader, and batch execution double-checks the imported `(root, timestamp)` values.
 5. Anyone satisfying the optional execution permission submits the bundle and its proof to the

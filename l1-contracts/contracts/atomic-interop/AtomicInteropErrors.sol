@@ -7,12 +7,28 @@ import {LegState} from "./IAtomicInterop.sol";
 error CommitmentTreeNotAppender(address sender);
 // 0x6bbd3c7c
 error InteropCommitmentLeafHookFailed();
+// 0x1defdb80
+error ManagerAbsenceChainNotInLeg(bytes32 flowId, uint256 legIndex, uint256 absenceChainId);
+// 0xf30c75fb
+error ManagerAcceptedLegDestinationChainMismatch(
+    bytes32 flowId,
+    uint256 thisChainId,
+    uint256 declaredDestinationChainId
+);
+// 0x19dd7658
+error ManagerAcceptedLegSourceChainMismatch(bytes32 flowId, uint256 bundleSourceChainId, uint256 declaredSourceChainId);
 // 0x00bf0e3a
 error ManagerAlreadyInitialized();
 // 0xeff05b36
 error ManagerBundleHashesNotSorted();
-// 0xca272942
-error ManagerCommittedBundleNotInFlow(bytes32 flowId, bytes32 bundleHash);
+// 0x03460b6a
+error ManagerBundleNotInFlow(bytes32 flowId, bytes32 bundleHash);
+// 0xdff68473
+error ManagerCommittedLegDestinationChainMismatch(
+    bytes32 flowId,
+    uint256 bundleDestinationChainId,
+    uint256 declaredDestinationChainId
+);
 // 0xbd57b2b9
 error ManagerCommittedLegSourceChainMismatch(bytes32 flowId, uint256 thisChainId, uint256 declaredSourceChainId);
 // 0x6a8bdfa0
@@ -25,16 +41,18 @@ error ManagerFlowIdMismatch(bytes32 expected, bytes32 computed);
 error ManagerFlowPreimageVersionMismatch(bytes1 expected, bytes1 actual);
 // 0xb5e6e3fc
 error ManagerL1ChainIdZero();
-// 0x3a62d7e3
-error ManagerLegAlreadyCommitted(bytes32 flowId, bytes32 bundleHash);
+// 0xb2e8cabb
+error ManagerLegAlreadyRecorded(bytes32 flowId, bytes32 bundleHash, LegState actual);
+// 0xe0ec98f5
+error ManagerLegChainIdsLengthMismatch(uint256 expected, uint256 actual);
+// 0xa8978a1f
+error ManagerLegChainNotAllowed(uint256 legChainId);
+// 0x0060a508
+error ManagerLegDestinationChainIdsLengthMismatch(uint256 expected, uint256 actual);
+// 0x923d52e0
+error ManagerLegFromChainToItself(uint256 legIndex, uint256 chainId);
 // 0x83562707
 error ManagerLegNotRevertable(bytes32 flowId, bytes32 bundleHash, LegState actual);
-// 0xe1a77fd3
-error ManagerLegSourceChainIdsLengthMismatch(uint256 legs, uint256 chainIds);
-// 0x36657c01
-error ManagerLegSourceChainNotAllowed(uint256 legSourceChainId);
-// 0x62c42f1d
-error ManagerLegSourceChainNotRegistered(uint256 legSourceChainId);
 // 0x4dbe1536
 error ManagerMissingLegIndexOutOfRange(uint256 legs, uint256 missingLegIndex);
 // 0xd7522d7a
@@ -42,7 +60,7 @@ error ManagerNotInteropCenter(address sender);
 // 0x07029ea6
 error ManagerNotInteropHandler(address sender);
 // 0x87fcf6d9
-error ManagerProofCountMismatch(uint256 legs, uint256 proofs);
+error ManagerProofCountMismatch(uint256 expected, uint256 proofs);
 // 0xbf1e3a23
 error ManagerSettlementLayerNotL1(uint256 expectedL1ChainId, uint256 actual);
 // 0x9f73095b

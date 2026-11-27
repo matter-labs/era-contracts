@@ -548,7 +548,7 @@ contract InteropCenter is
         // or value burn (both `sendMessage` and `sendBundle` funnel through here). Exactly one destination is
         // valid per atomicity:
         //  - Atomic  => an L2 destination. An atomic bundle can never target L1: it is not published as an
-        //    L2->L1 message (its commit value goes to the IMT instead) and L1 has no atomic execution, so
+        //    L2->L1 message (it is committed as an atomic leg instead) and L1 has no atomic execution, so
         //    its only possible outcome would be a timeout refund — but L2->L1 withdrawals must never be
         //    revertable (their `totalWithdrawalsToL1` accounting must stay append-only for a future
         //    settlement-layer migration, see {L2AssetTracker}).
@@ -600,8 +600,8 @@ contract InteropCenter is
             _callCount: callStartersLength
         });
 
-        // Hash the bundle and dispatch it. For an L2->L2 bundle this appends the commit value to the interop
-        // IMT via the AtomicFlowManager (atomic-only); for an L2->L1 withdrawal it publishes the bundle to L1.
+        // Hash the bundle and dispatch it. For an L2->L2 bundle this commits the leg in the AtomicFlowManager
+        // (atomic-only); for an L2->L1 withdrawal it publishes the bundle to L1.
         // The atomic send metadata travels out-of-band (`_atomicSend`), not embedded in the bundle, so
         // `bundleHash` does not depend on `flowId` (a circular dependency). `msgHash` is the L2->L1 message
         // hash for a withdrawal, or `bytes32(0)` for an atomic L2->L2 bundle.
@@ -712,8 +712,8 @@ contract InteropCenter is
 
     /// @notice Handles base-token value collection for the bundle.
     /// @notice Hashes the bundle and dispatches it along one of two paths, keyed on the destination:
-    /// - **L2->L2 interop (atomic):** the bundle's commit value is appended to the interop IMT via the
-    ///   {AtomicFlowManager} and is NOT published to L1 — source-side funds were already collected earlier in
+    /// - **L2->L2 interop (atomic):** the bundle is committed as a leg in the {AtomicFlowManager} and is
+    ///   NOT published to L1 — source-side funds were already collected earlier in
     ///   the send (`initiateIndirectCall` for indirect asset-transfer calls, `_ensureCorrectTotalValue` for a
     ///   direct call's value; a fund-free direct call collects nothing), and the destination executes it via
     ///   {L2InteropHandler.executeAtomicBundle}.
@@ -744,10 +744,11 @@ contract InteropCenter is
         }
 
         // L2->L2 interop: atomic-only (`_sendBundle` already guaranteed `isAtomic` for a non-L1 destination
-        // and rejected atomic-to-L1). Append the leg's commit value to the interop IMT. The AtomicFlowManager
-        // recomputes `flowId` from the out-of-band preimage and requires `bundleHash` to be one of its legs.
+        // and rejected atomic-to-L1). Commit the leg. The AtomicFlowManager recomputes `flowId` from the
+        // out-of-band preimage and requires `bundleHash` to be one of its legs.
         IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).append({
             _bundleHash: bundleHash,
+            _destinationChainId: _bundle.destinationChainId,
             _lowNullifierIndex: _atomicSend.lowNullifierIndex,
             _flowPreimage: _atomicSend.flowPreimage
         });

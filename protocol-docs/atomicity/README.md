@@ -10,8 +10,8 @@ path (`InteropCenter.sendBundle`/`sendMessage` -> `InteropHandler.executeAtomicB
 fact the _only_ L2->L2 path: the `atomicBundle` attribute is mandatory on every L2->L2 send, since
 L1-published (non-atomic) L2->L2 interop was removed; the only non-atomic send left is an L2->L1
 withdrawal (see {protocol-docs/interop.md#atomic-bundles}). The only addition to that path is an
-**Indexed Merkle Tree (IMT)** per chain that records each leg's commitment, plus per-leg
-**IMT proofs** authenticated against the regular **interop-root channel**. There is no extra L1
+**Indexed Merkle Tree (IMT)** per chain that records the flows' commitments, plus
+**IMT proofs** of them authenticated against the regular **interop-root channel**. There is no extra L1
 contract, no global-root registry, and no L2->L1 finality message — finality is proven, not dispatched.
 (Each inserted IMT leaf _is_ mirrored into an L2->L1 log, but purely so the tree stays reconstructible
 from L1 data; nothing reads it on L1. See {protocol-docs/atomicity/security.md#data-availability}.)
@@ -21,14 +21,15 @@ from L1 data; nothing reads it on L1. See {protocol-docs/atomicity/security.md#d
 This folder is the **canonical home** for the atomic-interop protocol. It is layered: each file opens
 with an engineer-facing summary and defers the rigorous arguments to clearly-marked deep-dive sections.
 
-| File                         | Covers                                                                                                   | Audience              |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------- |
-| this README                  | What atomic interop is, the key values, a lifecycle tour, contracts, genesis, tooling                    | everyone (start here) |
-| [imt.md](./imt.md)           | The per-chain commitment tree: how the IMT is used, seeded, and read by the bootloader                   | engineers             |
-| [flow.md](./flow.md)         | End-to-end lifecycle, the shared data structures, and the `AtomicFlowManager` state machine              | engineers             |
-| [proofs.md](./proofs.md)     | The proof system: the two authenticated clocks, finality, the timeout branches, soundness & completeness | auditors              |
-| [recovery.md](./recovery.md) | The timeout/refund path and its best-effort recovery semantics                                           | engineers + auditors  |
-| [security.md](./security.md) | Guarantees, non-guarantees, on-chain preconditions, trust assumptions, edge cases                        | auditors              |
+| File                             | Covers                                                                                                   | Audience              |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------- |
+| this README                      | What atomic interop is, the key values, a lifecycle tour, contracts, genesis, tooling                    | everyone (start here) |
+| [imt.md](./imt.md)               | The per-chain commitment tree: how the IMT is used, seeded, and read by the bootloader                   | engineers             |
+| [flow.md](./flow.md)             | End-to-end lifecycle, the shared data structures, and the `AtomicFlowManager` state machine              | engineers             |
+| [proofs.md](./proofs.md)         | The proof system: the two authenticated clocks, finality, the timeout branches, soundness & completeness | auditors              |
+| [recovery.md](./recovery.md)     | The timeout/refund path and its best-effort recovery semantics                                           | engineers + auditors  |
+| [acceptance.md](./acceptance.md) | Accepted flows (`0x02`): every chain accepts its incoming legs and inserts one participation value       | engineers + auditors  |
+| [security.md](./security.md)     | Guarantees, non-guarantees, on-chain preconditions, trust assumptions, edge cases                        | auditors              |
 
 The atomic protocol's **integration** with the surrounding stack is documented where that stack lives,
 and referenced from here rather than restated: the interop send/execute wiring in
@@ -41,19 +42,24 @@ machinery in {protocol-docs/message-root.md}.
 - `bundleHash = keccak256(abi.encode(bundle))` (`InteropDataEncoding.encodeInteropBundleHash`) — a leg's
   bundle. Chain-specific, because `sourceChainId` is one of the bundle's own fields.
 - `flowId = keccak256(abi.encode(preimage))` — binds the preimage `version`, all legs, each leg's source
-  chain, the deadline, and the settlement layer. `legBundleHashes` is strictly ascending (a canonical,
-  deduplicated order); `legSourceChainIds` is positional (aligned 1:1, may repeat); `deadline` is a
+  and destination chain, the deadline, and the settlement layer (a `0x01` flow has no destinations and hashes
+  the other five fields). `legBundleHashes` is strictly ascending (a canonical, deduplicated order);
+  `legChainIds` and `legDestinationChainIds` are positional (aligned 1:1, may repeat); `deadline` is a
   settlement-layer timestamp. See {protocol-docs/atomicity/flow.md#data-structures}.
+- `participationValue = uint256(keccak256(abi.encode(ATOMIC_PARTICIPATION_LEAF_TAG, flowId, chainId)))` — the
+  IMT leaf value a chain inserts once it has committed every leg it sends in the flow and accepted every leg it
+  receives ([acceptance](./acceptance.md#commitments)). It bakes in `flowId` (hence all legs) and the chain's
+  id, so it can only ever be inserted into that chain's IMT. This self-binding is what lets an **inclusion**
+  proof stand on its own while a **non-inclusion** proof must additionally be bound to the chain (see
+  {protocol-docs/atomicity/proofs.md}).
 - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))` — the IMT
-  leaf value for a leg. It bakes in `flowId` (hence all legs) and the chain-specific `bundleHash`, so a
-  leg's commit value can only ever be inserted into its own source chain's IMT. This self-binding is
-  what lets an **inclusion** proof stand on its own while a **non-inclusion** proof must additionally be
-  bound to the source chain (see {protocol-docs/atomicity/proofs.md}).
+  leaf value for a leg of a `0x01` flow, inserted at send; the chain-specific `bundleHash` binds it to the
+  leg's source chain the same way.
 
 The atomic-send parameters (the full `flowId` **preimage** — `version`, `deadline`,
-`settlementLayerChainId`, `legBundleHashes`, `legSourceChainIds` — plus `lowNullifierIndex`) travel
-out-of-band as the ERC-7786
-`atomicBundle((bytes1,uint64,uint256,bytes32[],uint256[]),uint256)` bundle attribute — deliberately **not**
+`settlementLayerChainId`, `legBundleHashes`, `legChainIds`, `legDestinationChainIds` — plus `lowNullifierIndex`)
+travel out-of-band as the ERC-7786
+`atomicBundle((bytes1,uint64,uint256,bytes32[],uint256[],uint256[]),uint256)` bundle attribute — deliberately **not**
 part of the bundle, so `bundleHash` does not depend on the preimage (which would be circular: the
 preimage's leg hashes include the bundle's own hash). The attribute carries the preimage rather than an
 opaque `flowId` so that `AtomicFlowManager.append` can recompute the id on-chain and verify the sent
@@ -62,31 +68,36 @@ interop-side send wiring.
 
 ## Lifecycle at a glance
 
-1. **Atomic send** (each leg, on its source chain). The user sends the leg's bundle with the
-   `atomicBundle` attribute; `AtomicFlowManager.append` validates the preimage and inserts the leg's
-   `commitValue` into this chain's IMT. The leg's local state becomes `Committed`.
+1. **Atomic send and acceptance.** The user sends each leg's bundle on its source chain with the
+   `atomicBundle` attribute; `AtomicFlowManager.append` validates the preimage and marks the leg `Committed`.
+   Anyone then accepts the bundle on its destination (`acceptAtomicBundle`), which marks it `Accepted` there.
+   A chain's last such step inserts its `participationValue` into its IMT.
 2. **Root settlement + import.** The bootloader snapshots the IMT root at every batch boundary; the
    snapshot settles into the settlement layer's `MessageRoot` and is re-imported into every chain
    through the standard interop-root channel.
 3. **Finalize** (destination). `InteropHandler.executeAtomicBundle(bundle, finalityProof)` proves, via
-   the manager, that **every** leg was committed in its source chain's IMT before the deadline; only
-   then do the bundle's calls execute.
-4. **Timeout / refund.** If a leg never commits in time, a single absence proof authorizes refunds; each
-   committed leg reverses its own burn best-effort.
+   the manager, that **every** chain's participation was in its IMT before the deadline; only then do the
+   bundle's calls execute.
+4. **Timeout / refund.** If a chain never participates in time, a single absence proof authorizes refunds;
+   each committed leg reverses its own burn best-effort.
+
+New flows are accepted flows (`0x02`, [acceptance.md](./acceptance.md)). Source-only flows (`0x01`) sent before
+this release insert one commit value per leg at send instead, and finality and the timeout cover those values.
 
 Steps 1 and 3–4 are detailed in [flow.md](./flow.md); the proof mechanics of steps 3–4 in
 [proofs.md](./proofs.md); the refund in [recovery.md](./recovery.md); step 2's channel in
 {protocol-docs/message-root.md}.
 
-Leg state machine (`LegState`): `Unset -> Committed` (send) `-> Revertable -> Reverted` (timeout path).
+Leg state machine (`LegState`): `Unset -> Committed` (send) `-> Revertable -> Reverted` (timeout path) on the
+source; `Unset -> Accepted` on the destination.
 
 ## Contracts
 
 | Contract                                                                                                        | Layer | Role                                                                                                                                                                                                                                                                                                                                                                                           |
 | --------------------------------------------------------------------------------------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `L2InteropCommitmentTree`                                                                                       | L2    | Per-chain append-only **Indexed** Merkle Tree. `insert` is appender-gated (the flow manager). The root is never published — the bootloader reads it straight from the tree's (consensus-critical) storage at batch boundaries; each inserted leaf is separately recorded as an L2->L1 log via `INTEROP_COMMITMENT_LEAF_HOOK` (`0x7004`) for DA. Built-in at `0x10012`. See [imt.md](./imt.md). |
-| `AtomicFlowManager`                                                                                             | L2    | `append` (from `InteropCenter`), `requireFlowFinalized` (from `InteropHandler`), `authorizeRefund` / `claimRefund` (timeout). Holds per-leg `LegState`. Built-in at `0x10014`. See [flow.md](./flow.md).                                                                                                                                                                                       |
-| `libraries/AtomicInteropProof`                                                                                  | L2    | `verifyInclusion` and `verifyTimeoutAbsence`, `commitValue`, and root authentication against the imported interop root. See [proofs.md](./proofs.md).                                                                                                                                                                                                                                          |
+| `AtomicFlowManager`                                                                                             | L2    | `append` (from `InteropCenter`), `accept` and `requireFlowFinalized` (from `InteropHandler`), `authorizeRefund` / `claimRefund` (timeout). Holds per-leg `LegState`. Built-in at `0x10014`. See [flow.md](./flow.md).                                                                                                                                                                          |
+| `libraries/AtomicInteropProof`                                                                                  | L2    | `verifyInclusion` and `verifyTimeoutAbsence`, `participationValue` and `commitValue`, and root authentication against the imported interop root. See [proofs.md](./proofs.md).                                                                                                                                                                                                                 |
 | `IL2InteropCommitmentTree`, `IAtomicFlowManager`, `IAtomicInterop`, `IAtomicRecoverable`, `AtomicInteropErrors` | L2    | Interfaces, shared structs (`ImtProof`, `AtomicFlow`, `AtomicFlowPreimage`, `AtomicFinalityProof`, `LegState`), and errors.                                                                                                                                                                                                                                                                    |
 
 The flow's entry points live outside this directory: `InteropCenter`

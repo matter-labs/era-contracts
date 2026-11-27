@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {IndexedMerkleTree} from "../../common/libraries/IndexedMerkleTree.sol";
 import {Merkle} from "../../common/libraries/Merkle.sol";
-import {ImtProof, ATOMIC_COMMIT_LEAF_TAG} from "../IAtomicInterop.sol";
+import {ImtProof, ATOMIC_COMMIT_LEAF_TAG, ATOMIC_PARTICIPATION_LEAF_TAG} from "../IAtomicInterop.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
 import {ChainBatchRootTree} from "../../common/libraries/ChainBatchRootTree.sol";
 import {L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_VERIFICATION} from "../../common/l2-helpers/L2ContractInterfaces.sol";
@@ -24,8 +24,9 @@ import {
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Cross-chain authentication for the atomic interop flow: verifies a leg's commit value
-/// present in (finality) or absent from (timeout) its source chain's IMT, with the claimed IMT root
+/// @notice Cross-chain authentication for the atomic interop flow: verifies a commitment value (a leg's
+/// commit value or a chain's participation value) present in (finality) or absent from (timeout) its
+/// chain's IMT, with the claimed IMT root
 /// authenticated as a chain-batch-root leaf against an imported interop root. The finality/timeout
 /// conditions and their soundness/completeness arguments are specified canonically in
 /// {protocol-docs/atomicity/proofs.md}.
@@ -35,11 +36,16 @@ library AtomicInteropProof {
         return uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, _flowId, _specHash)));
     }
 
+    /// @notice The value a chain of an accepted flow inserts into its IMT once it took every local step.
+    function participationValue(bytes32 _flowId, uint256 _chainId) internal pure returns (uint256) {
+        return uint256(keccak256(abi.encode(ATOMIC_PARTICIPATION_LEAF_TAG, _flowId, _chainId)));
+    }
+
     /// @notice Verifies `_commitValue` is present in `_proof.sourceChainId`'s batch-END IMT root as of
     /// a batch settled on `_expectedSlChainId` with `l1BatchTimestamp <= _deadline` (the finality
     /// condition from the library header).
-    /// @dev Inclusion is self-binding: `_commitValue` bakes in the chain-specific `bundleHash`, so it
-    /// can only ever pass against the leg's true source chain.
+    /// @dev Inclusion is self-binding: `_commitValue` bakes in the chain-specific `bundleHash` (or, for a
+    /// participation value, the chain id), so it can only ever pass against its true chain.
     /// @param _expectedSlChainId The flow's `settlementLayerChainId` the proof's root must settle on.
     function verifyInclusion(
         ImtProof calldata _proof,
@@ -70,7 +76,7 @@ library AtomicInteropProof {
     /// @notice Timeout proof: shows `_commitValue` was not committed by the deadline and the flow can
     /// never finalize (the timeout condition from the library header, either branch).
     /// @dev The caller ({AtomicFlowManager.authorizeRefund}) checks
-    /// `_proof.sourceChainId == legSourceChainIds[i]`; the SL match is checked here.
+    /// that `_proof.sourceChainId` is a chain of the missing leg; the SL match is checked here.
     /// @param _absence Non-inclusion proof against the begin (late batch) or end (last in-time batch)
     /// IMT root.
     /// @param _expectedSlChainId The flow's `settlementLayerChainId` the proof's root must settle on.

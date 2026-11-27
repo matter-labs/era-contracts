@@ -1,12 +1,17 @@
 [
   {
     "type": "function",
-    "name": "append",
+    "name": "accept",
     "inputs": [
       {
         "name": "_bundleHash",
         "type": "bytes32",
         "internalType": "bytes32"
+      },
+      {
+        "name": "_sourceChainId",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
         "name": "_lowNullifierIndex",
@@ -39,7 +44,72 @@
             "internalType": "bytes32[]"
           },
           {
-            "name": "legSourceChainIds",
+            "name": "legChainIds",
+            "type": "uint256[]",
+            "internalType": "uint256[]"
+          },
+          {
+            "name": "legDestinationChainIds",
+            "type": "uint256[]",
+            "internalType": "uint256[]"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "append",
+    "inputs": [
+      {
+        "name": "_bundleHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_destinationChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_lowNullifierIndex",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_flowPreimage",
+        "type": "tuple",
+        "internalType": "struct AtomicFlowPreimage",
+        "components": [
+          {
+            "name": "version",
+            "type": "bytes1",
+            "internalType": "bytes1"
+          },
+          {
+            "name": "deadline",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "settlementLayerChainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "legBundleHashes",
+            "type": "bytes32[]",
+            "internalType": "bytes32[]"
+          },
+          {
+            "name": "legChainIds",
+            "type": "uint256[]",
+            "internalType": "uint256[]"
+          },
+          {
+            "name": "legDestinationChainIds",
             "type": "uint256[]",
             "internalType": "uint256[]"
           }
@@ -89,7 +159,12 @@
                 "internalType": "bytes32[]"
               },
               {
-                "name": "legSourceChainIds",
+                "name": "legChainIds",
+                "type": "uint256[]",
+                "internalType": "uint256[]"
+              },
+              {
+                "name": "legDestinationChainIds",
                 "type": "uint256[]",
                 "internalType": "uint256[]"
               }
@@ -314,7 +389,12 @@
                     "internalType": "bytes32[]"
                   },
                   {
-                    "name": "legSourceChainIds",
+                    "name": "legChainIds",
+                    "type": "uint256[]",
+                    "internalType": "uint256[]"
+                  },
+                  {
+                    "name": "legDestinationChainIds",
                     "type": "uint256[]",
                     "internalType": "uint256[]"
                   }
@@ -394,7 +474,7 @@
   },
   {
     "type": "event",
-    "name": "FlowCommitted",
+    "name": "FlowAccepted",
     "inputs": [
       {
         "name": "flowId",
@@ -404,6 +484,38 @@
       },
       {
         "name": "bundleHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "FlowLegCommitted",
+    "inputs": [
+      {
+        "name": "flowId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "bundleHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "FlowParticipated",
+    "inputs": [
+      {
+        "name": "flowId",
         "type": "bytes32",
         "indexed": true,
         "internalType": "bytes32"

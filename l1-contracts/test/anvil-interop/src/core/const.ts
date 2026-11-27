@@ -197,6 +197,15 @@ export enum CallStatus {
   Cancelled = 2,
 }
 
+// Mirrors `LegState` in IAtomicInterop.sol.
+export enum LegState {
+  Unset = 0,
+  Committed = 1,
+  Revertable = 2,
+  Reverted = 3,
+  Accepted = 4,
+}
+
 // Selector for a non-existent function: someVeryUnfortunateCall()
 export const FAILING_CALL_CALLDATA = "0x00056d83";
 export const FAILING_INTEROP_CALL_REASON = "Intentional interop receiver failure";

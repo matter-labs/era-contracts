@@ -17,25 +17,28 @@ import {
   FAILING_INTEROP_CALL_REASON,
   INTEROP_BUNDLE_TUPLE_TYPE,
   INTEROP_CENTER_ADDR,
+  L2_ATOMIC_FLOW_MANAGER_ADDR,
   L2_BOOTLOADER_ADDR,
   L2_ASSET_ROUTER_ADDR,
   L2_INTEROP_COMMITMENT_TREE_ADDR,
   L2_INTEROP_HANDLER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
+  LegState,
 } from "../core/const";
 import { encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
 import { impersonateAndRun } from "../core/utils";
 import { decodeEvmChainId, encodeEvmChain, encodeEvmAddress } from "./erc7930";
 import {
   atomicFinalityProofTuple,
+  buildFlowPreimage,
   buildInclusionProof,
-  commitValue,
   commitmentTree,
   computeFlowId,
   flowPreimageTuple,
   lowNullifierIndexFor,
-  DEFAULT_SL_CHAIN_ID,
-  ATOMIC_FLOW_PREIMAGE_VERSION,
+  participatingChains,
+  participationValue,
+  ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED,
 } from "./imt-engine-lib";
 import type { AtomicFlowPreimage } from "./imt-engine-lib";
 export type { AtomicFlowPreimage } from "./imt-engine-lib";
@@ -61,49 +64,83 @@ const ATOMIC_INTEROP_DEADLINE = 4_000_000_000;
 
 /**
  * Derives the single-leg atomic-flow metadata for a predicted `bundleHash`: computes the `flowId` (which
- * commits to the hash), finds the IMT low-nullifier index for the commit value, and returns the
- * `atomicBundle` attribute to attach to the send plus the flow fields needed later to build the
- * {AtomicFinalityProof} at execute time.
+ * commits to the hash), finds the IMT low-nullifier index for the source's participation value (the send is
+ * the source's only step in the flow, so it inserts it), and returns the `atomicBundle` attribute to attach
+ * to the send plus the flow fields needed later to accept the leg and build the {AtomicFinalityProof}.
  */
 async function buildSingleLegAtomicSend(
   sourceProvider: providers.JsonRpcProvider,
+  destinationChainId: number,
   bundleHash: string
 ): Promise<{ attribute: string; flowId: string; preimage: AtomicFlowPreimage; sourceChainId: number }> {
   const sourceChainId = (await sourceProvider.getNetwork()).chainId;
-  // Single-leg flow preimage: this bundle is the only leg, sourced from this chain. `flowId` is
-  // recomputed on-chain from this exact preimage, so it must match byte-for-byte at execute time.
-  const preimage: AtomicFlowPreimage = {
-    version: ATOMIC_FLOW_PREIMAGE_VERSION,
-    deadline: ATOMIC_INTEROP_DEADLINE,
-    settlementLayerChainId: DEFAULT_SL_CHAIN_ID,
-    legBundleHashes: [bundleHash],
-    legSourceChainIds: [sourceChainId],
-  };
+  // `flowId` is recomputed on-chain from this exact preimage, so it must match byte-for-byte at accept and
+  // execute time.
+  const preimage = buildFlowPreimage(
+    [{ hash: bundleHash, source: sourceChainId, dest: destinationChainId }],
+    ATOMIC_INTEROP_DEADLINE
+  );
   const flowId = computeFlowId(preimage);
-  const value = commitValue(flowId, bundleHash);
   const tree = commitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR, sourceProvider);
-  const lowNull = await lowNullifierIndexFor(tree, value);
+  const lowNull = await lowNullifierIndexFor(tree, participationValue(flowId, sourceChainId));
   return { attribute: atomicBundleAttr(preimage, lowNull), flowId, preimage, sourceChainId };
 }
 
 /**
- * Builds the single-leg {AtomicFinalityProof} tuple for a previously-sent bundle, proving its commit leaf
- * is present in the source chain's {L2InteropCommitmentTree}. Root-message authentication is mocked to
- * `true` on the anvil harness, so the exercised checks are IMT membership and `l1Timestamp <= deadline`.
+ * Accepts a previously-sent single-leg bundle on `destProvider` via {L2InteropHandler.acceptAtomicBundle},
+ * unless that chain already accepted it (a replayed execute, or an execute after a verify). The leg is the
+ * destination's only step, so the call also inserts its participation value.
  */
-async function buildSingleLegFinality(sendResult: InteropSendResult): Promise<unknown> {
-  const value = commitValue(sendResult.flowId, sendResult.bundleHash);
-  const tree = commitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR, sendResult.sourceProvider);
-  const proof = await buildInclusionProof({
-    l2Tree: tree,
-    chainId: sendResult.legSourceChainId,
-    value,
-    l1Timestamp: sendResult.preimage.deadline,
-  });
+async function acceptSingleLeg(destProvider: providers.JsonRpcProvider, sendResult: InteropSendResult): Promise<void> {
+  const manager = new Contract(L2_ATOMIC_FLOW_MANAGER_ADDR, getAbi("AtomicFlowManager"), destProvider);
+  if ((await manager.legState(sendResult.flowId, sendResult.bundleHash)) === LegState.Accepted) {
+    return;
+  }
+  const destChainId = (await destProvider.getNetwork()).chainId;
+  const tree = commitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR, destProvider);
+  const lowNull = await lowNullifierIndexFor(tree, participationValue(sendResult.flowId, destChainId));
+  const tx = await connectInteropHandler(destProvider).acceptAtomicBundle(
+    sendResult.bundleData,
+    flowPreimageTuple(sendResult.preimage),
+    lowNull,
+    { gasLimit: DEFAULT_TX_GAS_LIMIT }
+  );
+  const accepted = expectEvent(await tx.wait(), "AtomicFlowManager", L2_ATOMIC_FLOW_MANAGER_ADDR, "FlowAccepted");
+  expect(accepted.bundleHash, "accepted leg").to.equal(sendResult.bundleHash);
+}
+
+/**
+ * Builds the {AtomicFinalityProof} tuple for a previously-sent single-leg bundle: one participation inclusion
+ * proof per participating chain (the source, then the destination), each from that chain's
+ * {L2InteropCommitmentTree}. Root-message authentication is mocked to `true` on the anvil harness, so the
+ * exercised checks are IMT membership and `l1Timestamp <= deadline`.
+ */
+async function buildSingleLegFinality(
+  destProvider: providers.JsonRpcProvider,
+  sendResult: InteropSendResult
+): Promise<unknown> {
+  const providerByChain = new Map<string, providers.JsonRpcProvider>([
+    [sendResult.legSourceChainId.toString(), sendResult.sourceProvider],
+    [(await destProvider.getNetwork()).chainId.toString(), destProvider],
+  ]);
+  const proofs = await Promise.all(
+    participatingChains(sendResult.preimage).map((chainId) => {
+      const provider = providerByChain.get(chainId);
+      if (provider === undefined) {
+        throw new Error(`no provider for participating chain ${chainId}`);
+      }
+      return buildInclusionProof({
+        l2Tree: commitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR, provider),
+        chainId,
+        value: participationValue(sendResult.flowId, chainId),
+        l1Timestamp: sendResult.preimage.deadline,
+      });
+    })
+  );
   return atomicFinalityProofTuple({
     flowId: sendResult.flowId,
     preimage: sendResult.preimage,
-    proofs: [proof],
+    proofs,
   });
 }
 
@@ -184,7 +221,8 @@ function decodeAtomicBundleAttribute(attrs: string[]): { flowId: string; preimag
     deadline: Number(raw[1]),
     settlementLayerChainId: raw[2],
     legBundleHashes: raw[3] as string[],
-    legSourceChainIds: raw[4] as BigNumber[],
+    legChainIds: raw[4] as BigNumber[],
+    legDestinationChainIds: raw[5] as BigNumber[],
   };
   return { flowId: computeFlowId(preimage), preimage };
 }
@@ -416,11 +454,12 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
   let predictedBundleHash: string | undefined;
   // Empty preimage for the non-atomic withdrawal path (unused on the L1 finalization path).
   const emptyPreimage: AtomicFlowPreimage = {
-    version: ATOMIC_FLOW_PREIMAGE_VERSION,
+    version: ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED,
     deadline: 0,
     settlementLayerChainId: 0,
     legBundleHashes: [],
-    legSourceChainIds: [],
+    legChainIds: [],
+    legDestinationChainIds: [],
   };
   if (options.atomic === false) {
     // L2->L1 withdrawal: non-atomic. The bundle is published to L1 and finalized there via a
@@ -443,7 +482,7 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
       [destinationChainIdBytes, options.callStarters, baseAttributes]
     );
     predictedBundleHash = predicted;
-    const atomic = await buildSingleLegAtomicSend(options.sourceProvider, predicted);
+    const atomic = await buildSingleLegAtomicSend(options.sourceProvider, options.destinationChainId, predicted);
     attributes = [...baseAttributes, atomic.attribute];
     flowId = atomic.flowId;
     preimage = atomic.preimage;
@@ -515,7 +554,11 @@ export async function simulateInteropBundle(options: SendBundleOptions): Promise
       "previewBundleHash",
       [destinationChainIdBytes, options.callStarters, baseAttributes]
     );
-    const atomic = await buildSingleLegAtomicSend(options.sourceProvider, predictedBundleHash);
+    const atomic = await buildSingleLegAtomicSend(
+      options.sourceProvider,
+      options.destinationChainId,
+      predictedBundleHash
+    );
     attributes = [...baseAttributes, atomic.attribute];
   }
   await interopCenter.callStatic.sendBundle(destinationChainIdBytes, options.callStarters, attributes, {
@@ -553,7 +596,11 @@ export async function sendInteropMessage(options: SendMessageOptions): Promise<I
     "previewMessageHash",
     [options.recipient, options.payload, baseAttributes]
   );
-  const atomic = await buildSingleLegAtomicSend(options.sourceProvider, predictedBundleHash);
+  const atomic = await buildSingleLegAtomicSend(
+    options.sourceProvider,
+    decodeEvmChainId(options.recipient),
+    predictedBundleHash
+  );
 
   const tx = await interopCenter.sendMessage(
     options.recipient,
@@ -623,22 +670,26 @@ export interface InteropExecutionData {
   proof: unknown;
 }
 
+/**
+ * Accepts the bundle on `destProvider` if it is not yet, then builds its {AtomicFinalityProof}. The accept is a
+ * real transaction, so it persists even when the caller only simulates or expects a revert from the execute or
+ * verify that follows; a rejected accept reverts here instead, with the destination's error.
+ */
 export async function getInteropExecutionData(
-  _destProvider: providers.JsonRpcProvider,
+  destProvider: providers.JsonRpcProvider,
   bundleInput: BundleExecutionInput,
   _sourceChainId: number
 ): Promise<InteropExecutionData> {
-  // Atomic interop: the proof is a per-leg IMT inclusion proof ({AtomicFinalityProof}) built from the
-  // source chain's commitment tree, not a live gateway message-inclusion proof. The flow metadata
-  // (flowId/deadline/source chain) was recorded when the bundle was sent. `_destProvider` and
-  // `_sourceChainId` are therefore unused here; they are kept for signature parity with `executeBundle`.
-  void _destProvider;
+  // Atomic interop: the proof is a per-chain IMT inclusion proof ({AtomicFinalityProof}), not a live gateway
+  // message-inclusion proof. The flow metadata (flowId/deadline/source chain) was recorded when the bundle was
+  // sent, so `_sourceChainId` is unused here; it is kept for signature parity with `executeBundle`.
   void _sourceChainId;
   const sendResult = getSendResult(bundleInput);
   if (isLiveInteropMode()) {
     throw new Error("Atomic live-mode interop proof generation is not yet implemented");
   }
-  const proof = await buildSingleLegFinality(sendResult);
+  await acceptSingleLeg(destProvider, sendResult);
+  const proof = await buildSingleLegFinality(destProvider, sendResult);
   return {
     bundleData: sendResult.bundleData,
     proof,
@@ -646,9 +697,9 @@ export async function getInteropExecutionData(
 }
 
 /**
- * Execute an interop bundle on the destination chain via InteropHandler.executeBundle.
- * Builds the atomic {AtomicFinalityProof} (single-leg IMT inclusion) from the source chain's commitment
- * tree; the bundle must have been sent via `sendInteropBundle`/`sendInteropMessage` in this process.
+ * Execute an interop bundle on the destination chain via InteropHandler.executeBundle, after
+ * {getInteropExecutionData}; the bundle must have been sent via `sendInteropBundle`/`sendInteropMessage` in
+ * this process.
  */
 export async function executeBundle(
   destProvider: providers.JsonRpcProvider,
@@ -667,7 +718,8 @@ export async function executeBundle(
 }
 
 /**
- * Simulate InteropHandler.executeBundle via callStatic to capture revert data without sending a tx.
+ * Simulate InteropHandler.executeBundle via callStatic to capture revert data. Only the execute is simulated:
+ * {getInteropExecutionData} still sends the accept.
  */
 export async function simulateExecuteBundle(
   destProvider: providers.JsonRpcProvider,
@@ -683,9 +735,8 @@ export async function simulateExecuteBundle(
 }
 
 /**
- * Verify a bundle on the destination chain via InteropHandler.verifyBundle.
- * Uses the same atomic {AtomicFinalityProof} as {executeBundle}; marks the bundle Verified so it can
- * later be unbundled.
+ * Verify a bundle on the destination chain via InteropHandler.verifyBundle, after {getInteropExecutionData}
+ * (as {executeBundle}); marks the bundle Verified so it can later be unbundled.
  */
 export async function verifyBundle(
   destProvider: providers.JsonRpcProvider,

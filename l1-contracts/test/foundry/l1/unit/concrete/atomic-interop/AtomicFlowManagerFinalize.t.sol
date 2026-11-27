@@ -10,14 +10,15 @@ import {
     AtomicFlowPreimage,
     AtomicFinalityProof,
     ImtProof,
-    ATOMIC_FLOW_PREIMAGE_VERSION
+    ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY
 } from "contracts/atomic-interop/IAtomicInterop.sol";
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {
     ManagerFlowIdMismatch,
     ManagerProofCountMismatch,
     ManagerExecutingBundleNotInFlow,
-    ManagerLegSourceChainNotAllowed,
+    ManagerLegChainNotAllowed,
+    ManagerLegDestinationChainIdsLengthMismatch,
     ManagerNotInteropHandler,
     ProofSourceChainMismatch,
     ProofDeadlineExceeded
@@ -60,22 +61,22 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
         bytes32 legB = keccak256("finalize leg B");
         (legFirst, legSecond) = legA < legB ? (legA, legB) : (legB, legA);
 
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY;
         preimage.deadline = DEADLINE;
         preimage.settlementLayerChainId = SETTLEMENT_LAYER_CHAIN_ID;
         preimage.legBundleHashes = new bytes32[](2);
         preimage.legBundleHashes[0] = legFirst;
         preimage.legBundleHashes[1] = legSecond;
-        preimage.legSourceChainIds = new uint256[](2);
-        preimage.legSourceChainIds[0] = CHAIN_A;
-        preimage.legSourceChainIds[1] = CHAIN_B;
+        preimage.legChainIds = new uint256[](2);
+        preimage.legChainIds[0] = CHAIN_A;
+        preimage.legChainIds[1] = CHAIN_B;
         flowId = AtomicFlowFixtures.flowId(preimage);
 
         legFirstIndex = _insertCommit(AtomicFlowFixtures.commitValue(flowId, legFirst));
         legSecondIndex = _insertCommit(AtomicFlowFixtures.commitValue(flowId, legSecond));
 
-        _setLegSourceAllowed(CHAIN_A, true);
-        _setLegSourceAllowed(CHAIN_B, true);
+        _setLegChainAllowed(CHAIN_A, true);
+        _setLegChainAllowed(CHAIN_B, true);
     }
 
     /// @dev A finality proof with a genuine in-time inclusion proof per leg; `_tsFirst`/`_tsSecond` are
@@ -119,6 +120,36 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
     }
 
     // ============ reverts ============
+
+    /// @notice A source-only flow keeps the `flowId` it was sent with: the hash of the pre-upgrade preimage
+    /// layout, which had no `legDestinationChainIds`.
+    /// @dev The literal is `cast keccak $(cast abi-encode "f((bytes1,uint64,uint256,bytes32[],uint256[]))"
+    /// "(0x01,1000,1,[0x00..01,0x00..02],[271,272])")`. The manager accepts it: the call gets past the
+    /// `flowId` check and fails on the missing proofs.
+    function test_requireFlowFinalized_SourceOnlyFlowIdIsPreUpgradeHash() public {
+        bytes32 preUpgradeFlowId = 0x0af21d99786dc37b9f7c15218140c67275cf1b05a7ceee404ec6a840995ea8ae;
+        bytes32[] memory legs = new bytes32[](2);
+        (legs[0], legs[1]) = (bytes32(uint256(1)), bytes32(uint256(2)));
+        uint256[] memory chains = new uint256[](2);
+        (chains[0], chains[1]) = (CHAIN_A, CHAIN_B);
+        AtomicFinalityProof memory finality;
+        finality.flow.preimage = AtomicFlowFixtures.sourceOnlyPreimage(legs, chains, 1000, 1);
+        finality.flow.flowId = preUpgradeFlowId;
+        assertEq(AtomicFlowFixtures.flowId(finality.flow.preimage), preUpgradeFlowId, "fixture hash");
+
+        vm.expectRevert(abi.encodeWithSelector(ManagerProofCountMismatch.selector, 2, 0));
+        _requireFinalizedAsHandler(legs[0], finality);
+    }
+
+    /// @notice A source-only flow declares no destinations: with them, its `flowId` would ignore part of the
+    /// preimage.
+    function test_RevertWhen_SourceOnlyFlowDeclaresDestinations() public {
+        AtomicFinalityProof memory finality = _validFinality();
+        finality.flow.preimage.legDestinationChainIds = new uint256[](2);
+
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegDestinationChainIdsLengthMismatch.selector, 0, 2));
+        _requireFinalizedAsHandler(legFirst, finality);
+    }
 
     /// @notice Only the InteropHandler may consult the gate, even with a valid finality proof.
     function test_RevertWhen_NotInteropHandler() public {
@@ -181,9 +212,9 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
     /// fails the gate even with a genuine in-time inclusion proof.
     function test_RevertWhen_LegSourceNotAllowed() public {
         AtomicFinalityProof memory finality = _validFinality();
-        _setLegSourceAllowed(CHAIN_B, false);
+        _setLegChainAllowed(CHAIN_B, false);
 
-        vm.expectRevert(abi.encodeWithSelector(ManagerLegSourceChainNotAllowed.selector, CHAIN_B));
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegChainNotAllowed.selector, CHAIN_B));
         _requireFinalizedAsHandler(legFirst, finality);
     }
 

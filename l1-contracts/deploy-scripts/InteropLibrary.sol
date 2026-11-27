@@ -12,7 +12,7 @@ import {
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 // import {IInteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
-import {AtomicFlowPreimage, ATOMIC_FLOW_PREIMAGE_VERSION} from "contracts/atomic-interop/IAtomicInterop.sol";
+import {AtomicFlowPreimage, ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {AmountMustBeGreaterThanZero, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -148,7 +148,7 @@ library InteropLibrary {
         }
         attributes[attributesPointer++] = abi.encodeCall(IERC7786Attributes.useFixedFee, (useFixedFee));
         // L2->L2 interop is atomic, so an `atomicBundle` attribute is mandatory or `InteropCenter` reverts
-        // `NonAtomicSendUnsupported`. The flow metadata below (flowId=1, deadline=max, lowNullifierIndex=0)
+        // `NonAtomicSendUnsupported`. The flow metadata below (an empty preimage, deadline=max, lowNullifierIndex=0)
         // is a PLACEHOLDER that is only valid when the `AtomicFlowManager.append`/`requireFlowFinalized`
         // gate is mocked — which it is in the Foundry tests that use this helper. It is NOT usable for a real
         // send: a real `flowId` commits to the `bundleHash`, which is not known until the bundle is assembled
@@ -161,11 +161,12 @@ library InteropLibrary {
             IERC7786Attributes.atomicBundle,
             (
                 AtomicFlowPreimage({
-                    version: ATOMIC_FLOW_PREIMAGE_VERSION,
+                    version: ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED,
                     deadline: type(uint64).max,
                     settlementLayerChainId: 0,
                     legBundleHashes: new bytes32[](0),
-                    legSourceChainIds: new uint256[](0)
+                    legChainIds: new uint256[](0),
+                    legDestinationChainIds: new uint256[](0)
                 }),
                 uint256(0)
             )

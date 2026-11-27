@@ -29,7 +29,12 @@
             "internalType": "bytes32[]"
           },
           {
-            "name": "legSourceChainIds",
+            "name": "legChainIds",
+            "type": "uint256[]",
+            "internalType": "uint256[]"
+          },
+          {
+            "name": "legDestinationChainIds",
             "type": "uint256[]",
             "internalType": "uint256[]"
           }

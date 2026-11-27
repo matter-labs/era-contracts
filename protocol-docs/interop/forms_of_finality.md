@@ -6,14 +6,16 @@ do not select a finality mode with an SDK flag.
 ## Atomic IMT finality for L2 -> L2
 
 Every L2 -> L2 bundle is a leg of an atomic flow. The source `InteropCenter` sends the bundle hash to
-`AtomicFlowManager`, which inserts a flow-bound commit value into that chain's indexed interop
-commitment tree. At batch boundaries the chain batch root commits to the tree root. Settlement then
-incorporates the chain batch root into `MessageRoot`, and other L2s import the aggregate root.
+`AtomicFlowManager`, and the destination accepts the bundle ([acceptance](../atomicity/acceptance.md)). Each
+chain of the flow inserts a flow-bound participation value into its indexed interop commitment tree with its
+last such step (a source-only flow sent before this release inserted each leg's commit value at send instead).
+At batch boundaries the chain batch root commits to the tree root. Settlement then incorporates the chain
+batch root into `MessageRoot`, and other L2s import the aggregate root.
 
-`L2InteropHandler.executeAtomicBundle` or `verifyAtomicBundle` receives one inclusion proof per flow
-leg. `AtomicFlowManager.requireFlowFinalized` authenticates each source-chain tree root against an
-imported interop root and checks that every leg was committed no later than the flow deadline. See
-{protocol-docs/atomicity/proofs.md} for the proof format and its soundness argument.
+`L2InteropHandler.executeAtomicBundle` or `verifyAtomicBundle` receives one inclusion proof per
+participating chain (per leg for a source-only flow). `AtomicFlowManager.requireFlowFinalized` authenticates
+each chain's tree root against an imported interop root and checks that every value was inserted no later than
+the flow deadline. See {protocol-docs/atomicity/proofs.md} for the proof format and its soundness argument.
 
 The proof shows commitment-tree membership. It is not the older public-bundle design in which an L2 -> L1 message was proven separately for each L2 -> L2 call.
 
