@@ -50,10 +50,10 @@
   {
     "contractName": "l1-contracts/AtomicFlowManager",
     "evmBytecodePath": "/l1-contracts/out/AtomicFlowManager.sol/AtomicFlowManager.json",
-    "evmBytecodeHash": "0x424c47d4c396bf85f8a97e11ace945c3a5cedb11d2c13de7cf4b25d513b6ec0c",
-    "evmDeployedBytecodeHash": "0xfd7860a2daca8e210e68f57c61dc9bc2ff6a675f9a001cc4df572fb50e8807de",
-    "evmDeployedBytecodeBlakeHash": "0x1c361a1fc1ed9d5ca8fad1f824ca1e336108b506964fff66301ab9cfcb7be1c2",
-    "evmDeployedBytecodeLength": 15176
+    "evmBytecodeHash": "0x6687bd064eb8aa3b445e45e26928eae4c5bd180dc0dff88af090d41410a63768",
+    "evmDeployedBytecodeHash": "0x769422dd7b496d660957a7a1ed2856bb9b6490ff44b7345870edccc848b1fcf8",
+    "evmDeployedBytecodeBlakeHash": "0xbb8905a31afda264d374ce1338bcdf43344db1b96fd2d75c123c0d09acde2131",
+    "evmDeployedBytecodeLength": 15042
   },
   {
     "contractName": "l1-contracts/AtomicInteropProof",
@@ -538,18 +538,18 @@
   {
     "contractName": "l1-contracts/InteropAttributeParser",
     "evmBytecodePath": "/l1-contracts/out/InteropAttributeParser.sol/InteropAttributeParser.json",
-    "evmBytecodeHash": "0x7c3b0e6e8fdf97120c877e171655b6cf5a381fa2e98b5dde0789357d10958ed2",
-    "evmDeployedBytecodeHash": "0x03d76685c01206f6cd36d57462f22d39de04723d3496439fdc31ff16059e441f",
-    "evmDeployedBytecodeBlakeHash": "0x77a7f1de8d4061b669d6b5e41231cee96ca0d580cc2fec2c8e1b3ad531b96bab",
-    "evmDeployedBytecodeLength": 5277
+    "evmBytecodeHash": "0x36a49f90a6c0a8084682cc1123ce69802681a94a85b88112464be113c4812b22",
+    "evmDeployedBytecodeHash": "0x6ea2ab1e42e712895c6859f74ce7715624d50ee3bb93303fb4906a8840395b56",
+    "evmDeployedBytecodeBlakeHash": "0x2b8ec36e3f160b19f25896bc3a484bfcb378bb2d706ea558e2419a5cbf13e91b",
+    "evmDeployedBytecodeLength": 5406
   },
   {
     "contractName": "l1-contracts/InteropCenter",
     "evmBytecodePath": "/l1-contracts/out/InteropCenter.sol/InteropCenter.json",
-    "evmBytecodeHash": "0x64c4abb72cc7a6b33e0d5fd0eb56b32d8b99ea8ee89942483fe88dbfd6a3d04c",
-    "evmDeployedBytecodeHash": "0x44d2ada6cd08aad61e2de6c2fb66f52db41864132d86c1ab51527e9be1b0614e",
-    "evmDeployedBytecodeBlakeHash": "0xca4bf7f10695987ba618b55e3316cee1a79ef7ccd77d1ec80c8fda18a1937da8",
-    "evmDeployedBytecodeLength": 22193
+    "evmBytecodeHash": "0xda480a82e0f1517d24b17abad71fac77ae3a7679de31fba2184a765998ef45c7",
+    "evmDeployedBytecodeHash": "0x8c4ec95a124db271603104a0ecee16e5a15c4890bb88b1b53303b225493b3319",
+    "evmDeployedBytecodeBlakeHash": "0x559a2f9aaff7f19cd0aa183aaae1fd14ce38e2c54d5480d85913af6e023e180d",
+    "evmDeployedBytecodeLength": 22294
   },
   {
     "contractName": "l1-contracts/InteropDataEncoding",
@@ -762,10 +762,10 @@
   {
     "contractName": "l1-contracts/L2InteropHandler",
     "evmBytecodePath": "/l1-contracts/out/L2InteropHandler.sol/L2InteropHandler.json",
-    "evmBytecodeHash": "0xfe2d1557bf491b0cbc6f7cb97b480c8bdbb3125404348aacc5c34157b9b4f330",
-    "evmDeployedBytecodeHash": "0x02c1ad3224ee08464b8f049d35387c96131b8849285411b298445827e6660f56",
-    "evmDeployedBytecodeBlakeHash": "0x3deb3cefbcd4bf3f3e26307e2a46f29a25f753e25e3239ee2a7c2f5e354a4c64",
-    "evmDeployedBytecodeLength": 14594
+    "evmBytecodeHash": "0x09cec88705db3baa453d81d7da43bcb528d819fe8289b9fa2a573ddb231cd7d5",
+    "evmDeployedBytecodeHash": "0x2c84e9bd0a78da833834b597bc2afde26974e6997e29afe218056b1fa72a1962",
+    "evmDeployedBytecodeBlakeHash": "0x31d75d4f28aeb64b823e387c416299d44ecad3e10662209cffa05771f1dba2d7",
+    "evmDeployedBytecodeLength": 14814
   },
   {
     "contractName": "l1-contracts/L2InteropRootStorage",
