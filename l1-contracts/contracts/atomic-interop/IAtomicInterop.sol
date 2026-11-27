@@ -5,9 +5,10 @@ import {IMTLeaf} from "../common/libraries/IndexedMerkleTree.sol";
 
 /// @notice Per-`(flowId, bundleHash)` leg state in {AtomicFlowManager}. On the leg's source: `Unset ->
 /// Committed` (send; terminal on the happy path), `-> Revertable -> Reverted` (timeout path). On the
-/// destination of an accepted flow's leg: `Unset -> Accepted`. A leg's source and destination differ, so
-/// one chain never holds both lifecycles for a key. Destination execution is NOT tracked here — the
-/// {InteropHandler}'s own `bundleStatus` is the replay guard, exactly as for a normal interop bundle.
+/// destination of an accepted flow's leg: `Unset -> Accepted`. A leg's source and destination differ
+/// (`ManagerLegFromChainToItself`), so one chain never holds both lifecycles for a key. Destination
+/// execution is NOT tracked here — the {InteropHandler}'s own `bundleStatus` is the replay guard, exactly
+/// as for a normal interop bundle.
 enum LegState {
     Unset,
     Committed,
@@ -39,7 +40,7 @@ struct ImtProof {
 }
 
 /// @notice The full `flowId` preimage: `flowId = keccak256(abi.encode(preimage))`, except that a source-only
-/// flow hashes as {SourceOnlyFlowPreimage}. Supplied by the
+/// flow hashes as {AtomicFlowPreimageV35}. Supplied by the
 /// sender in the `atomicBundle` ERC-7786 attribute; {AtomicFlowManager.append} recomputes `flowId`
 /// from it and verifies the committing bundle is one of the legs, so a wrong or stale preimage
 /// reverts the send. See {protocol-docs/atomicity/flow.md#1-atomic-send-append}.
@@ -61,11 +62,10 @@ struct AtomicFlowPreimage {
     uint256[] legDestinationChainIds;
 }
 
-/// @notice The preimage layout source-only flows were sent with: their `flowId` is
-/// `keccak256(abi.encode(SourceOnlyFlowPreimage))`, so it does not change with {AtomicFlowPreimage}.
-/// @dev Only for flows sent before accepted flows were introduced; removable once none can still be finalized
-/// or refunded.
-struct SourceOnlyFlowPreimage {
+/// @notice The v35 preimage layout, which source-only flows were sent with: their `flowId` is
+/// `keccak256(abi.encode(AtomicFlowPreimageV35))`, so it does not change with {AtomicFlowPreimage}.
+/// @dev Only for flows sent before v36; removable once none can still be finalized or refunded.
+struct AtomicFlowPreimageV35 {
     bytes1 version;
     uint64 deadline;
     uint256 settlementLayerChainId;
@@ -111,7 +111,7 @@ bytes4 constant ATOMIC_PARTICIPATION_LEAF_TAG = bytes4(keccak256("AtomicInterop.
 /// {INTEROP_CALL_VERSION}). Each version is validated under its own rules, so a preimage of one version can
 /// never be accepted — or hash to the same `flowId` — under the rules of another. New flows are sent in the
 /// latest version only ({AtomicFlowManager.append}); the finalize and refund paths keep accepting earlier
-/// versions, so flows sent before an upgrade stay finalizable and refundable.
+/// versions, so a flow sent before an upgrade stays refundable, and finalizable if all its legs were sent.
 /// @dev Source-only flow: only the legs' source chains commit. No longer sent; kept for flows sent before
 /// accepted flows were introduced.
 bytes1 constant ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY = 0x01;

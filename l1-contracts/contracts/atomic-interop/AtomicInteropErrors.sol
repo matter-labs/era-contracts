@@ -49,6 +49,8 @@ error ManagerLegChainIdsLengthMismatch(uint256 expected, uint256 actual);
 error ManagerLegChainNotAllowed(uint256 legChainId);
 // 0x0060a508
 error ManagerLegDestinationChainIdsLengthMismatch(uint256 expected, uint256 actual);
+// 0x923d52e0
+error ManagerLegFromChainToItself(uint256 legIndex, uint256 chainId);
 // 0x83562707
 error ManagerLegNotRevertable(bytes32 flowId, bytes32 bundleHash, LegState actual);
 // 0x4dbe1536

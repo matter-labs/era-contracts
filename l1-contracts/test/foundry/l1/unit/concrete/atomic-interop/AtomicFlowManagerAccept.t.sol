@@ -27,6 +27,7 @@ import {
     ManagerLegAlreadyRecorded,
     ManagerLegChainNotAllowed,
     ManagerLegDestinationChainIdsLengthMismatch,
+    ManagerLegFromChainToItself,
     ManagerNotInteropHandler,
     ManagerProofCountMismatch,
     ProofSourceChainMismatch
@@ -209,18 +210,18 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         );
     }
 
-    /// @notice A preimage may declare a leg from this chain to itself. Accepting a real incoming bundle under
-    /// that leg records the acceptance but does not count as committing it, so the chain never participates
-    /// and the flow cannot finalize.
-    function test_accept_DeclaredSelfLeg_DoesNotParticipate() public {
-        bytes32 leg = keccak256("bundle from CHAIN_A, declared as sent by this chain");
+    /// @notice An accepted flow cannot declare a leg from a chain to itself. `accept` does not authenticate the
+    /// bundle's source, so such a leg would let anyone record a forged bundle as this chain's own.
+    function test_accept_RevertWhen_LegFromChainToItself() public {
+        bytes32 leg = keccak256("bundle claiming this chain as its source");
         AtomicFlowPreimage memory preimage = _singleLegPreimage(leg, block.chainid, block.chainid);
         bytes32 flowId = AtomicFlowFixtures.flowId(preimage);
         uint256 leavesBefore = canonicalTree.leafCount();
 
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegFromChainToItself.selector, 0, block.chainid));
         _acceptAsHandler(leg, preimage);
 
-        assertEq(uint256(manager.legState(flowId, leg)), uint256(LegState.Accepted), "acceptance recorded");
+        assertEq(uint256(manager.legState(flowId, leg)), uint256(LegState.Unset), "nothing recorded");
         assertEq(canonicalTree.leafCount(), leavesBefore, "no participation value");
     }
 

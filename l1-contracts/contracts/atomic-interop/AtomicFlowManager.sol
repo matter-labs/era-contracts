@@ -9,7 +9,7 @@ import {
     LegState,
     AtomicFlow,
     AtomicFlowPreimage,
-    SourceOnlyFlowPreimage,
+    AtomicFlowPreimageV35,
     ImtProof,
     AtomicFinalityProof,
     ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY,
@@ -49,6 +49,7 @@ import {
     ManagerTooManyLegs,
     ManagerLegChainIdsLengthMismatch,
     ManagerLegDestinationChainIdsLengthMismatch,
+    ManagerLegFromChainToItself,
     ManagerMissingLegIndexOutOfRange,
     ManagerProofCountMismatch,
     ManagerExecutingBundleNotInFlow,
@@ -442,11 +443,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
         uint256 n = _flowPreimage.legBundleHashes.length;
         for (uint256 i = 0; i < n; ++i) {
             LegState state = _state[_flowId][_flowPreimage.legBundleHashes[i]];
-            // `Accepted` is not a commit: a preimage may declare a leg from this chain to itself, and accepting
-            // a real incoming bundle under that leg must not also count as sending it.
-            if (
-                _flowPreimage.legChainIds[i] == block.chainid && (state == LegState.Unset || state == LegState.Accepted)
-            ) {
+            if (_flowPreimage.legChainIds[i] == block.chainid && state == LegState.Unset) {
                 return;
             }
             if (_flowPreimage.legDestinationChainIds[i] == block.chainid && state != LegState.Accepted) {
@@ -492,7 +489,8 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// {ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED}); `legBundleHashes` must be strictly ascending; the chain id arrays
     /// are positional (may repeat — a set would let a sibling chain in it enable a wrong-chain refund), so only
     /// their lengths are checked: one source per leg, and one destination per leg for an accepted flow or none
-    /// for a source-only flow, which its hash does not cover.
+    /// for a source-only flow, which its hash does not cover. An accepted flow's leg must not go from a chain
+    /// to itself.
     /// Shared by `_checkLegStep` and `_checkFlowId`, so canonicalization cannot drift.
     function _validateAndComputeFlowId(AtomicFlowPreimage calldata _preimage) internal pure returns (bytes32) {
         bool isSourceOnly = _preimage.version == ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY;
@@ -517,11 +515,18 @@ contract AtomicFlowManager is IAtomicFlowManager {
         if (_preimage.legDestinationChainIds.length != destinations) {
             revert ManagerLegDestinationChainIdsLengthMismatch(destinations, _preimage.legDestinationChainIds.length);
         }
+        // Such a leg could never be sent, and `acceptAtomicBundle` does not authenticate the bundle's source:
+        // refusing it here keeps a chain from accepting a forged bundle under a leg it declares as its own.
+        for (uint256 i = 0; i < destinations; ++i) {
+            if (_preimage.legChainIds[i] == _preimage.legDestinationChainIds[i]) {
+                revert ManagerLegFromChainToItself(i, _preimage.legChainIds[i]);
+            }
+        }
         if (isSourceOnly) {
             return
                 keccak256(
                     abi.encode(
-                        SourceOnlyFlowPreimage({
+                        AtomicFlowPreimageV35({
                             version: _preimage.version,
                             deadline: _preimage.deadline,
                             settlementLayerChainId: _preimage.settlementLayerChainId,

@@ -7,7 +7,7 @@ import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol"
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {
     AtomicFlowPreimage,
-    SourceOnlyFlowPreimage,
+    AtomicFlowPreimageV35,
     ATOMIC_COMMIT_LEAF_TAG,
     ATOMIC_PARTICIPATION_LEAF_TAG,
     ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED,
@@ -41,7 +41,7 @@ library AtomicFlowFixtures {
             return
                 keccak256(
                     abi.encode(
-                        SourceOnlyFlowPreimage({
+                        AtomicFlowPreimageV35({
                             version: _preimage.version,
                             deadline: _preimage.deadline,
                             settlementLayerChainId: _preimage.settlementLayerChainId,

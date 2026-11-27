@@ -38,8 +38,9 @@ changed. Two consequences the proofs lean on:
   conclusive for "never committed in time."
 
 Leaf-value rules inherited from `IndexedMerkleTree`, relevant here: the zero value is reserved
-(`commitValue` is a keccak digest, so it is never zero in practice), duplicates revert
-(`IMTValueAlreadyExists` — a `(flowId, bundleHash)` pair can be committed at most once), and empty tree
+(every value is a keccak digest, so it is never zero in practice), duplicates revert
+(`IMTValueAlreadyExists` — a chain inserts each flow's participation value, or a `0x01` leg's commit value,
+at most once), and empty tree
 positions are padded with `IMT_EMPTY_LEAF_HASH` rather than `hashLeaf({0,0,0})` so a padded slot can
 never be passed off as the `{0,0,0}` low leaf to forge a non-inclusion proof.
 
@@ -49,9 +50,9 @@ A thin, access-controlled wrapper over one `IMT` in storage:
 
 - `insert(_value, _lowNullifierIndex)` — **appender-gated**: only the `AtomicFlowManager` (the
   `appender()` getter, a canonical fixed address) may insert, otherwise `CommitmentTreeNotAppender`.
-  This is the sole mutator; the manager calls it from `append` with the leg's `commitValue`, or from
-  `append` / `accept` with the chain's participation value, and the caller-supplied low-nullifier hint. Besides mutating the tree it publishes the leaf for DA and emits
-  `RootUpdated` (see [below](#the-root-is-read-from-storage-never-published)).
+  This is the sole mutator; the manager calls it from `append` or `accept` with the chain's participation
+  value and the caller-supplied low-nullifier hint. Besides mutating the tree it publishes the leaf for DA
+  and emits `RootUpdated` (see [below](#the-root-is-read-from-storage-never-published)).
 - `root()`, `leafCount()`, `leafAt(_index)`, `merklePath(_index)` — read-only accessors used by the
   off-chain proof engine and tests to build inclusion / non-inclusion proofs. `leafCount()` counts the
   index-0 sentinel too.

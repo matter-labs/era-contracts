@@ -17,10 +17,10 @@ and dependency-root import separate source-chain commitment from destination exe
 | `InteropCenter`           | L2    | Parses sends, builds/funds bundles, emits events, and dispatches each route.   |
 | `InteropAttributeParser`  | L2    | Decodes the seven supported ERC-7786 attributes outside the center's bytecode. |
 | `L2AssetRouter`           | L2    | Produces indirect asset-transfer calls and implements timeout recovery.        |
-| `AtomicFlowManager`       | L2    | Commits, finalizes, and authorizes recovery for atomic L2 -> L2 legs.          |
-| `L2InteropCommitmentTree` | L2    | Stores the append-only indexed tree of flow-bound commit values.               |
+| `AtomicFlowManager`       | L2    | Commits, accepts, finalizes, and authorizes recovery for atomic L2 -> L2 legs. |
+| `L2InteropCommitmentTree` | L2    | Stores the append-only indexed tree of flow-bound participation values.        |
 | `L2InteropRootStorage`    | L2    | Stores bootloader-imported settlement roots and timestamps.                    |
-| `L2InteropHandler`        | L2    | Verifies atomic finality and executes or unbundles L2 -> L2 bundles.           |
+| `L2InteropHandler`        | L2    | Accepts, verifies, and executes or unbundles atomic L2 -> L2 bundles.          |
 | `L1InteropHandler`        | L1    | Proves and finalizes restricted L2 -> L1 withdrawal bundles.                   |
 | `MessageRoot`             | L1    | Aggregates per-chain batch roots and authenticates imported dependencies.      |
 | `BaseTokenHolder` / NTV   | L2    | Account for destination call value and cross-base-token movement.              |
@@ -30,9 +30,9 @@ and dependency-root import separate source-chain commitment from destination exe
 The old documentation described four levels: message, call, bundle, and trigger-driven interop
 transaction. Three concepts remain, with different wire and execution rules:
 
-1. **Transport commitment.** For L2 -> L2 this is a flow-bound value in the source IMT. For L2 -> L1
-   it is `BUNDLE_IDENTIFIER || abi.encode(bundle)` in the L2-to-L1 message tree. There is no standalone
-   public `InteropMessage` object in the application API.
+1. **Transport commitment.** For L2 -> L2 this is a flow-bound value in the IMT of each chain of the
+   flow. For L2 -> L1 it is `BUNDLE_IDENTIFIER || abi.encode(bundle)` in the L2-to-L1 message tree.
+   There is no standalone public `InteropMessage` object in the application API.
 2. **Call.** `InteropCall` identifies the source sender, destination recipient, value, calldata, and
    version. The destination handler always invokes the recipient's ERC-7786 `receiveMessage`; it does
    not deploy an aliased or shadow account.
@@ -93,8 +93,8 @@ The real send repeats the bundle-affecting inputs and adds the flow preimage plu
 
 The final dispatch is a strict route split:
 
-- atomic L2 -> L2: append the commit value through `AtomicFlowManager`; do not publish the bundle as an
-  L2-to-L1 message;
+- atomic L2 -> L2: commit the leg through `AtomicFlowManager`; do not publish the bundle as an L2-to-L1
+  message;
 - non-atomic L2 -> L1: publish the prefixed bundle through the messenger; do not append to the atomic
   tree.
 
@@ -124,11 +124,11 @@ implemented.
 
 ### Timing, privacy, and liveness
 
-There is no protocol promise of instant delivery. L2 -> L2 execution waits for each source leg's batch
-root to settle, for an aggregate root to be imported on the destination, and for someone to submit the
-finality proof. L2 -> L1 execution waits for the withdrawal message to become provable on L1. Root
-updates are snapshots rather than mutable proof targets: a proof names the block or batch whose root it
-uses, so later roots do not invalidate it.
+There is no protocol promise of instant delivery. L2 -> L2 execution waits for the destination to accept
+each incoming leg, for every participating chain's batch root to settle, for an aggregate root to be
+imported on the destination, and for someone to submit the finality proof. L2 -> L1 execution waits
+for the withdrawal message to become provable on L1. Root updates are snapshots rather than mutable
+proof targets: a proof names the block or batch whose root it uses, so later roots do not invalidate it.
 
 Atomic `deadline` is a settlement-layer timestamp that separates finality from timeout; it is not a
 general message expiration field. A finalized bundle remains executable subject to its destination
@@ -214,9 +214,10 @@ architecture, not optional bridge behavior.
 ## Atomicity and failure paths
 
 Every L2 -> L2 bundle belongs to an atomic flow of at most eight legs. A flow binds the ordered bundle
-hashes, their source chains, a deadline, the L1 settlement layer, and a version. Every destination
-proves all legs committed before the deadline. If one leg is absent after the deadline, committed
-source legs become recoverable.
+hashes, their source and destination chains, a deadline, the L1 settlement layer, and a version. Each
+destination accepts its incoming legs, and execution proves that every chain of the flow took part
+before the deadline ({protocol-docs/atomicity/acceptance.md}). If a chain's participation is absent
+after the deadline, committed source legs become recoverable.
 
 In particular:
 

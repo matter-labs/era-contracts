@@ -12,9 +12,10 @@ The amount transferred is encoded in that returned payload. An indirect call mus
 
 As with every L2 -> L2 transfer, the caller first previews the bundle hash, includes it in an atomic
 flow preimage, and repeats the same inputs in `sendBundle` with the `atomicBundle` attribute. At the
-destination, `executeAtomicBundle` proves the flow and delivers the router-produced call. The
-destination asset router validates the ERC-7786 sender and finalizes the mint through the registered
-asset handler.
+destination, anyone first accepts the bundle (`acceptAtomicBundle`, see
+{protocol-docs/atomicity/acceptance.md}); `executeAtomicBundle` then proves the flow and delivers the
+router-produced call. The destination asset router validates the ERC-7786 sender and finalizes the
+mint through the registered asset handler.
 
 If the flow times out, the source `AtomicFlowManager` passes the stored destination and call data to
 `L2AssetRouter.recoverAtomicCall`. The router recognizes the historical `finalizeDeposit` encoding and

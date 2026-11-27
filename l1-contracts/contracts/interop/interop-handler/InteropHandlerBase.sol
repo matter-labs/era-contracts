@@ -180,8 +180,9 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
     /// @dev The proof-specific execute/verify branches are delegated to virtual hooks (`_receiveExecuteBundle`
     ///      / `_receiveVerifyBundle`) implemented per layer; the unbundle branch is proof-agnostic and handled
     ///      here. The dispatched selectors are the derived contract's own `executeBundle`/`verifyBundle`
-    ///      selectors (which differ per layer by proof type). NOTE: never change these selectors — previously
-    ///      sent messages must stay executable.
+    ///      selectors (which differ per layer by proof type). NOTE: changing one of these selectors makes rescue
+    ///      messages already sent with the old one unexecutable, so it may only change while none can be in
+    ///      flight ({protocol-docs/interop.md#receivemessage-rescue-path}).
     /// @param sender ERC-7930 interoperable address of the message sender.
     /// @param payload ABI-encoded function call data with selector and parameters.
     /// @return selector The function selector of this receiveMessage function, as per ERC-7786.

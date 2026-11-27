@@ -548,7 +548,7 @@ contract InteropCenter is
         // or value burn (both `sendMessage` and `sendBundle` funnel through here). Exactly one destination is
         // valid per atomicity:
         //  - Atomic  => an L2 destination. An atomic bundle can never target L1: it is not published as an
-        //    L2->L1 message (its commit value goes to the IMT instead) and L1 has no atomic execution, so
+        //    L2->L1 message (it is committed as an atomic leg instead) and L1 has no atomic execution, so
         //    its only possible outcome would be a timeout refund — but L2->L1 withdrawals must never be
         //    revertable (their `totalWithdrawalsToL1` accounting must stay append-only for a future
         //    settlement-layer migration, see {L2AssetTracker}).

@@ -30,7 +30,8 @@ import {
 import {IMTLeafValueMismatch} from "contracts/common/L1ContractErrors.sol";
 import {
     ManagerAcceptedLegSourceChainMismatch,
-    ManagerLegChainNotAllowed
+    ManagerLegChainNotAllowed,
+    ManagerLegFromChainToItself
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
@@ -638,6 +639,29 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
             )
         );
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).acceptAtomicBundle(forgedBundle, preimage, 0);
+    }
+
+    /// @notice Regression: acceptance does not prove where a bundle came from, so a forged bundle claiming the
+    /// destination as its own source, under a leg declared from the destination to itself, must not be recorded.
+    /// Counted as that chain's send, it would insert its participation and let the forged calls execute.
+    function test_acceptAtomicBundle_RevertWhen_ForgedBundleFromThisChain() public {
+        _setUpAtomicStack();
+        _sendAcceptedSingleLeg(keccak256("accept self source salt"), bytes(""));
+        InteropBundle memory bundle = abi.decode(ectxBundleBytes, (InteropBundle));
+        bundle.sourceChainId = destinationChainId;
+        (bytes memory forgedBundle, AtomicFlowPreimage memory preimage) = _flowForForgedBundle(bundle);
+        preimage.legChainIds[0] = destinationChainId;
+        vm.chainId(destinationChainId);
+        uint256 leavesBefore = L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount();
+
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegFromChainToItself.selector, 0, destinationChainId));
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).acceptAtomicBundle(forgedBundle, preimage, 0);
+
+        assertEq(
+            L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount(),
+            leavesBefore,
+            "no participation value"
+        );
     }
 
     /// @dev The sent flow with its only leg replaced by `_bundle`'s hash, so the forged bundle is in its flow.

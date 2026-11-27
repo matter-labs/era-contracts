@@ -121,7 +121,6 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
 
     // ============ reverts ============
 
-    /// @notice Only the InteropHandler may consult the gate, even with a valid finality proof.
     /// @notice A source-only flow keeps the `flowId` it was sent with: the hash of the pre-upgrade preimage
     /// layout, which had no `legDestinationChainIds`.
     /// @dev The literal is `cast keccak $(cast abi-encode "f((bytes1,uint64,uint256,bytes32[],uint256[]))"
@@ -152,6 +151,7 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
         _requireFinalizedAsHandler(legFirst, finality);
     }
 
+    /// @notice Only the InteropHandler may consult the gate, even with a valid finality proof.
     function test_RevertWhen_NotInteropHandler() public {
         AtomicFinalityProof memory finality = _validFinality();
 

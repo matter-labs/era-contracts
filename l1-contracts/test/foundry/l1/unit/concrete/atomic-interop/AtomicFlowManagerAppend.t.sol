@@ -24,6 +24,7 @@ import {
     ManagerLegChainIdsLengthMismatch,
     ManagerLegChainNotAllowed,
     ManagerLegDestinationChainIdsLengthMismatch,
+    ManagerLegFromChainToItself,
     ManagerNotInteropCenter,
     ManagerSettlementLayerNotL1,
     ManagerTooManyLegs
@@ -43,6 +44,7 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
     uint64 internal constant DEADLINE = 1_700_000_000;
     uint256 internal constant OTHER_CHAIN_ID = 777;
     uint256 internal constant NOT_ALLOWED_CHAIN_ID = 888;
+    uint256 internal constant THIRD_CHAIN_ID = 999;
 
     AtomicFlowManager internal manager;
     L2InteropCommitmentTree internal tree;
@@ -57,6 +59,7 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
 
         // The remote chain of every flow below passes the receive filter; the filter tests use another.
         _setLegChainAllowed(OTHER_CHAIN_ID, true);
+        _setLegChainAllowed(THIRD_CHAIN_ID, true);
         _setLegChainAllowed(NOT_ALLOWED_CHAIN_ID, false);
         _setLegChainAllowed(L1_CHAIN_ID, false);
     }
@@ -294,6 +297,22 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
         _appendAsInteropCenter(localLeg, preimage);
     }
 
+    /// @notice A preimage must declare one source per leg; here it declares an extra one.
+    function test_append_RevertWhen_LegChainIdsLonger() public {
+        bytes32 localLeg = keccak256("local leg");
+        AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
+        uint256[] memory threeSources = new uint256[](3);
+        (threeSources[0], threeSources[1], threeSources[2]) = (
+            preimage.legChainIds[0],
+            preimage.legChainIds[1],
+            OTHER_CHAIN_ID
+        );
+        preimage.legChainIds = threeSources;
+
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegChainIdsLengthMismatch.selector, 2, 3));
+        _appendAsInteropCenter(localLeg, preimage);
+    }
+
     /// @notice An accepted flow must declare one destination per leg; here it declares an extra one.
     function test_append_RevertWhen_LegDestinationChainIdsLengthMismatch() public {
         bytes32 localLeg = keccak256("local leg");
@@ -316,17 +335,31 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
     function test_append_RevertWhen_LegDestinationChainMismatch() public {
         bytes32 localLeg = keccak256("local leg");
         AtomicFlowPreimage memory preimage = _singleLegPreimage(localLeg);
-        preimage.legDestinationChainIds[0] = block.chainid;
+        preimage.legDestinationChainIds[0] = THIRD_CHAIN_ID;
 
         vm.expectRevert(
             abi.encodeWithSelector(
                 ManagerCommittedLegDestinationChainMismatch.selector,
                 AtomicFlowFixtures.flowId(preimage),
                 OTHER_CHAIN_ID,
-                block.chainid
+                THIRD_CHAIN_ID
             )
         );
         _appendAsInteropCenter(localLeg, preimage);
+    }
+
+    /// @notice A flow declaring a leg from a chain to itself is refused at send too, as it is on every path
+    /// that validates the preimage.
+    function test_append_RevertWhen_LegFromChainToItself() public {
+        bytes32 localLeg = keccak256("local leg");
+        AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
+        uint256 remoteIndex = preimage.legBundleHashes[0] == localLeg ? 1 : 0;
+        preimage.legDestinationChainIds[remoteIndex] = OTHER_CHAIN_ID;
+        uint256 leafCountBefore = tree.leafCount();
+
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegFromChainToItself.selector, remoteIndex, OTHER_CHAIN_ID));
+        _appendAsInteropCenter(localLeg, preimage);
+        assertEq(tree.leafCount(), leafCountBefore, "nothing inserted");
     }
 
     /// @notice A flow declaring a non-L1 settlement layer is rejected at send time: neither finalization

@@ -29,9 +29,8 @@ interface IERC7786Attributes {
     ///      See {protocol-docs/interop.md#atomic-bundles} and {protocol-docs/atomicity/flow.md}.
     /// @param _flowPreimage The full `flowId` preimage; the AtomicFlowManager recomputes `flowId` and
     ///      requires this bundle's hash to be one of its legs, else the send reverts.
-    /// @param _lowNullifierIndex The low-nullifier slot in the IMT for the value this send inserts: the leg's
-    ///      commit value, or this chain's participation value for an accepted flow
-    ///      ({protocol-docs/atomicity/acceptance.md#accepting-a-leg}).
+    /// @param _lowNullifierIndex The low-nullifier slot in the IMT for this chain's participation value, if this
+    ///      send inserts it ({protocol-docs/atomicity/acceptance.md#accepting-a-leg}).
     function atomicBundle(AtomicFlowPreimage calldata _flowPreimage, uint256 _lowNullifierIndex) external pure;
 
     /// @notice Specifies a user-provided salt for the interop bundle.

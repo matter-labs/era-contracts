@@ -11,7 +11,8 @@ The lifecycle of an interop interaction is:
 1. **Prepare** — for L2 -> L2, preview every leg's bundle hash and construct the shared atomic-flow
    preimage. L2 -> L1 withdrawals need no atomic preimage.
 2. **Send** — `sendMessage` (one call) or `sendBundle` (one or more calls) forms an `InteropBundle`,
-   funds it, and either appends an atomic commit value or publishes the withdrawal to L1.
+   funds it, and either commits an atomic leg, which anyone then accepts on the destination
+   ([acceptance](./atomicity/acceptance.md)), or publishes the withdrawal to L1.
 3. **Settle and import** — chain batch roots enter the settlement-layer `MessageRoot`; L2 bootloaders
    import dependency roots into `L2InteropRootStorage`, and batch execution double-checks them.
 4. **Receive** — the destination handler verifies atomic IMT finality on L2 or message inclusion on L1,
@@ -236,7 +237,7 @@ A more flexible processing/cancellation path: the caller provides a desired `Cal
 
 ### `receiveMessage` rescue path
 
-The handler itself implements `IERC7786Recipient.receiveMessage`, callable **only by itself** (i.e. only as a call inside an executing bundle). Its purpose is a rescue mechanism for a contract executor/unbundler pinned to another chain: on the supported L2 -> L2 path it sends another atomic bundle whose call payload is `abi.encodeCall` of `executeAtomicBundle`, `verifyAtomicBundle`, or `unbundleBundle`. The handler validates the cross-chain sender against the bundle's `executionAddress`/`unbundlerAddress` (verification is permissionless) and then self-calls the target function, which skips its own permission check because `msg.sender == address(this)`. The L1 handler retains analogous selector dispatch for compatibility, but the current send restrictions provide no general L2 -> L1 rescue-message path. Previously supported selectors must remain stable so in-flight messages do not become unexecutable.
+The handler itself implements `IERC7786Recipient.receiveMessage`, callable **only by itself** (i.e. only as a call inside an executing bundle). Its purpose is a rescue mechanism for a contract executor/unbundler pinned to another chain: on the supported L2 -> L2 path it sends another atomic bundle whose call payload is `abi.encodeCall` of `executeAtomicBundle`, `verifyAtomicBundle`, or `unbundleBundle`. The handler validates the cross-chain sender against the bundle's `executionAddress`/`unbundlerAddress` (verification is permissionless) and then self-calls the target function, which skips its own permission check because `msg.sender == address(this)`. The L1 handler retains analogous selector dispatch for compatibility, but the current send restrictions provide no general L2 -> L1 rescue-message path. Changing a dispatched selector makes rescue messages already sent with the old one unexecutable, so a selector may only change while no such message can be in flight. v36 changes the `executeAtomicBundle` and `verifyAtomicBundle` selectors (`AtomicFlowPreimage` gained `legDestinationChainIds`), so no rescue message carrying the old ones may be pending for a chain when it upgrades.
 
 ### L1 specifics (`L1InteropHandler`)
 

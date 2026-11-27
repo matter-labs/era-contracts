@@ -7,7 +7,7 @@ is in time; otherwise the timeout refund ([recovery.md](./recovery.md)) returns 
 the only one: no separate expiry or retirement path is needed.
 
 New flows are sent as `0x02` only. Source-only flows (`0x01`) sent before this release keep the original rules
-and stay finalizable and refundable.
+and stay refundable, and finalizable if all their legs were sent ([rollout](#rollout)).
 
 ## Why
 
@@ -57,7 +57,8 @@ acceptance and inserts the chain's participation value if this was its last loca
 - the bundle is for this chain and its base token, its calls have the supported version and header, and it has
   not been verified or executed;
 - the preimage is `0x02`, contains the bundle, declares this chain as its destination and the bundle's source as
-  its source;
+  its source, and declares no leg from a chain to itself (acceptance does not prove where the bundle came from, so
+  a bundle claiming this chain as its source must not be recorded as its own send);
 - every chain of the flow passes this chain's receive filter
   ([receive filter](../interop-gating.md#receive-filter));
 - the deadline has not verifiably passed, and the leg is not already recorded.
@@ -140,5 +141,6 @@ Each destination also sends one acceptance transaction per incoming leg, which c
 
 A chain on this release sends `0x02` only. A destination below this release cannot accept, so a `0x02` leg sent to
 it can only time out: interop peers upgrade together. `0x01` flows sent before the upgrade stay finalizable and
-refundable. Removing those paths in a later release needs every `0x01` leg refunded or executed first, and
+refundable; a multi-leg `0x01` flow with a leg not yet committed at the upgrade can only be refunded, since `append`
+no longer takes `0x01`. Removing those paths in a later release needs every `0x01` leg refunded or executed first, and
 destinations cannot list the `0x01` legs addressed to them ([retiring a format](#retiring-a-format)).

@@ -148,7 +148,7 @@ library InteropLibrary {
         }
         attributes[attributesPointer++] = abi.encodeCall(IERC7786Attributes.useFixedFee, (useFixedFee));
         // L2->L2 interop is atomic, so an `atomicBundle` attribute is mandatory or `InteropCenter` reverts
-        // `NonAtomicSendUnsupported`. The flow metadata below (flowId=1, deadline=max, lowNullifierIndex=0)
+        // `NonAtomicSendUnsupported`. The flow metadata below (an empty preimage, deadline=max, lowNullifierIndex=0)
         // is a PLACEHOLDER that is only valid when the `AtomicFlowManager.append`/`requireFlowFinalized`
         // gate is mocked — which it is in the Foundry tests that use this helper. It is NOT usable for a real
         // send: a real `flowId` commits to the `bundleHash`, which is not known until the bundle is assembled
