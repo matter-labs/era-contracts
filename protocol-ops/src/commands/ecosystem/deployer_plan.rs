@@ -2485,7 +2485,7 @@ transparent_proxy_admin = "{CTM_PROXY_ADMIN}"
     /// prepare drives (without one the CTM prepare draws a random salt, which the check refuses).
     #[test]
     fn every_deployed_env_declares_the_reviewed_inputs() {
-        for env in ["stage", "testnet", "mainnet"] {
+        for env in ["stage", "testnet", "mainnet", "zksync-os-mainnet"] {
             let cfg = match EnvConfig::load(env) {
                 Ok(cfg) => cfg,
                 // no checkout around the test binary

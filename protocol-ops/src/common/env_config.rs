@@ -614,7 +614,7 @@ mod tests {
     /// production verifier: the flag decides whether an upgrade installs a verifier that accepts unproven batches.
     #[test]
     fn every_env_declares_testnet_verifier_and_only_mainnet_ecosystems_are_production() {
-        const PRODUCTION_ENVS: [&str; 2] = ["mainnet", "adi"];
+        const PRODUCTION_ENVS: [&str; 3] = ["mainnet", "adi", "zksync-os-mainnet"];
         let dir = resolve_l1_contracts_path()
             .unwrap()
             .join(PERMANENT_VALUES_DIR);
