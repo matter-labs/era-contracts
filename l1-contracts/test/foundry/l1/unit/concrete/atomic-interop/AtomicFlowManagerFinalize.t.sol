@@ -18,6 +18,7 @@ import {
     ManagerProofCountMismatch,
     ManagerExecutingBundleNotInFlow,
     ManagerLegChainNotAllowed,
+    ManagerLegDestinationChainIdsLengthMismatch,
     ManagerNotInteropHandler,
     ProofSourceChainMismatch,
     ProofDeadlineExceeded
@@ -121,6 +122,36 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
     // ============ reverts ============
 
     /// @notice Only the InteropHandler may consult the gate, even with a valid finality proof.
+    /// @notice A source-only flow keeps the `flowId` it was sent with: the hash of the pre-upgrade preimage
+    /// layout, which had no `legDestinationChainIds`.
+    /// @dev The literal is `cast keccak $(cast abi-encode "f((bytes1,uint64,uint256,bytes32[],uint256[]))"
+    /// "(0x01,1000,1,[0x00..01,0x00..02],[271,272])")`. The manager accepts it: the call gets past the
+    /// `flowId` check and fails on the missing proofs.
+    function test_requireFlowFinalized_SourceOnlyFlowIdIsPreUpgradeHash() public {
+        bytes32 preUpgradeFlowId = 0x0af21d99786dc37b9f7c15218140c67275cf1b05a7ceee404ec6a840995ea8ae;
+        bytes32[] memory legs = new bytes32[](2);
+        (legs[0], legs[1]) = (bytes32(uint256(1)), bytes32(uint256(2)));
+        uint256[] memory chains = new uint256[](2);
+        (chains[0], chains[1]) = (CHAIN_A, CHAIN_B);
+        AtomicFinalityProof memory finality;
+        finality.flow.preimage = AtomicFlowFixtures.sourceOnlyPreimage(legs, chains, 1000, 1);
+        finality.flow.flowId = preUpgradeFlowId;
+        assertEq(AtomicFlowFixtures.flowId(finality.flow.preimage), preUpgradeFlowId, "fixture hash");
+
+        vm.expectRevert(abi.encodeWithSelector(ManagerProofCountMismatch.selector, 2, 0));
+        _requireFinalizedAsHandler(legs[0], finality);
+    }
+
+    /// @notice A source-only flow declares no destinations: with them, its `flowId` would ignore part of the
+    /// preimage.
+    function test_RevertWhen_SourceOnlyFlowDeclaresDestinations() public {
+        AtomicFinalityProof memory finality = _validFinality();
+        finality.flow.preimage.legDestinationChainIds = new uint256[](2);
+
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegDestinationChainIdsLengthMismatch.selector, 0, 2));
+        _requireFinalizedAsHandler(legFirst, finality);
+    }
+
     function test_RevertWhen_NotInteropHandler() public {
         AtomicFinalityProof memory finality = _validFinality();
 

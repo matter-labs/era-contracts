@@ -9,18 +9,12 @@ import {MockRecoveryRouter} from "./AtomicFlowManagerRecover.t.sol";
 
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
+import {AtomicFlow, AtomicFlowPreimage, ImtProof, LegState} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {
-    AtomicFlow,
-    AtomicFlowPreimage,
-    ImtProof,
-    LegState,
-    ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY
-} from "contracts/atomic-interop/IAtomicInterop.sol";
-import {
+    ManagerAbsenceChainNotInLeg,
     ManagerFlowIdMismatch,
     ManagerLegNotRevertable,
     ManagerLegChainNotAllowed,
-    ProofSourceChainMismatch,
     ProofImtRootInclusionFailed
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {IAtomicRecoverable} from "contracts/atomic-interop/IAtomicRecoverable.sol";
@@ -29,25 +23,35 @@ import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
-    L2_BRIDGEHUB_ADDR,
+    L2_ATOMIC_FLOW_MANAGER_ADDR,
     L2_INTEROP_CENTER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
+/// @dev Writes the `Committed` state a pre-upgrade `append` of a source-only flow left behind: `append` no
+/// longer takes one, so no production path can create it any more.
+contract AtomicFlowManagerSourceOnlyLegHarness is AtomicFlowManager {
+    function commitSourceOnlyLeg(bytes32 _flowId, bytes32 _bundleHash) external {
+        _state[_flowId][_bundleHash] = LegState.Committed;
+    }
+}
+
 /// @notice Covers the refund path's guards in `AtomicFlowManager` — `authorizeRefund`'s proof and
-/// source-chain binding checks (the anti-double-mint, see {protocol-docs/atomicity/proofs.md#timeout})
+/// chain binding checks (the anti-double-mint, see {protocol-docs/atomicity/proofs.md#timeout})
 /// and `claimRefund`'s leg state machine.
 /// @dev Manager + commitment tree run at their canonical predeploys; the committed leg goes through
-/// the real `append` (pranked canonical InteropCenter). The MISSING leg declares a remote source
-/// (`MISSING_LEG_CHAIN`) so its absence proof runs end-to-end through real aggregation + import +
-/// {L2MessageVerification} (see {AtomicInteropProofBuilder}); the intrinsically-local late-commit case
-/// forward-computes its proof instead, and the authentication-failure case withholds the root import.
+/// the real `append` (pranked canonical InteropCenter). The MISSING leg comes from a remote chain
+/// (`MISSING_LEG_CHAIN`) that never takes a step, so the absence of its participation is proven end-to-end
+/// through real aggregation + import + {L2MessageVerification} (see {AtomicInteropProofBuilder}); the
+/// intrinsically-local case (this chain's own participation is missing) forward-computes its proof instead,
+/// and the authentication-failure case withholds the root import.
 /// Real fund recovery is covered by `L2AtomicInteropSendRefundTestAbstract` and
 /// `AtomicRecoveryForgery.t.sol`.
 contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
     uint256 internal constant REMOTE_BATCH_NUMBER = 7;
     uint256 internal constant SL_BLOCK = 300;
-    /// @dev The missing leg's remote source chain — aggregatable in the settlement-layer MessageRoot
-    /// (unlike the local chain), so its absence gets a real, unmocked authentication.
+    /// @dev The missing leg's remote source chain, also the committed leg's destination — aggregatable in the
+    /// settlement-layer MessageRoot (unlike the local chain), so the absence of its participation gets a real,
+    /// unmocked authentication.
     uint256 internal constant MISSING_LEG_CHAIN = 271;
     /// @dev Destination chain of the recovery bundles below: any chain that is not the settlement
     /// layer, since `_recoverBundle` rejects L1-destined bundles outright.
@@ -78,39 +82,28 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         committedLeg = InteropDataEncoding.encodeInteropBundleHash(committedLegBundleBytes);
         missingLeg = keccak256("never committed leg");
 
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY;
-        preimage.deadline = DEADLINE;
-        preimage.settlementLayerChainId = SETTLEMENT_LAYER_CHAIN_ID;
-        preimage.legBundleHashes = new bytes32[](2);
-        preimage.legChainIds = new uint256[](2);
-        (uint256 committedIdx, uint256 missingIdx) = committedLeg < missingLeg ? (0, 1) : (1, 0);
-        preimage.legBundleHashes[committedIdx] = committedLeg;
-        preimage.legBundleHashes[missingIdx] = missingLeg;
-        // The committed leg is local (append requires the committing bundle's source to be this chain);
-        // the missing leg declares a remote source so its absence gets a real MessageRoot aggregation.
-        preimage.legChainIds[committedIdx] = block.chainid;
-        preimage.legChainIds[missingIdx] = MISSING_LEG_CHAIN;
-        missingLegIndex = missingIdx;
+        // A swap: the committed leg goes from this chain to `MISSING_LEG_CHAIN`, which never sends the leg back.
+        // The refund names the missing leg, whose source `MISSING_LEG_CHAIN` never participates.
+        AtomicFlowPreimage memory swap;
+        (swap, , missingLegIndex) = AtomicFlowFixtures.swapPreimage({
+            _legA: committedLeg,
+            _chainA: block.chainid,
+            _legB: missingLeg,
+            _chainB: MISSING_LEG_CHAIN,
+            _deadline: DEADLINE,
+            _settlementLayerChainId: SETTLEMENT_LAYER_CHAIN_ID
+        });
+        preimage = swap;
         flowId = AtomicFlowFixtures.flowId(preimage);
 
-        // The remote missing-leg source must look interop-registered to the send-side `append` and
-        // allowed to the refund's receive filter (Bridgehub lookups, orthogonal to the atomic proof machinery).
-        _registerRemoteLegSource(MISSING_LEG_CHAIN);
+        // The remote chains must pass the receive filter of `append` and the refund (a Bridgehub lookup,
+        // orthogonal to the atomic proof machinery).
         _setLegChainAllowed(MISSING_LEG_CHAIN, true);
+        _setLegChainAllowed(RECOVERY_DEST_CHAIN_ID, true);
 
         // Commit the real leg through the production send-side path.
         vm.prank(L2_INTEROP_CENTER_ADDR);
-        manager.append(committedLeg, AtomicFlowFixtures.UNCHECKED_DESTINATION, 0, preimage);
-    }
-
-    /// @dev Stubs the send-side Bridgehub `baseTokenAssetId` registry so `append` accepts `_chainId` as
-    /// a declared remote leg source. This is the only send-side stub; the absence-proof path is real.
-    function _registerRemoteLegSource(uint256 _chainId) internal {
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSignature("baseTokenAssetId(uint256)", _chainId),
-            abi.encode(keccak256(abi.encode("remote base token asset id", _chainId)))
-        );
+        manager.append(committedLeg, MISSING_LEG_CHAIN, 0, preimage);
     }
 
     /// @dev A minimal well-formed bundle for the committed leg. Its call content is irrelevant here:
@@ -120,7 +113,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         bundle = InteropBundle({
             version: INTEROP_BUNDLE_VERSION,
             sourceChainId: block.chainid,
-            destinationChainId: 777,
+            destinationChainId: MISSING_LEG_CHAIN,
             destinationBaseTokenAssetId: bytes32(uint256(1)),
             interopBundleSalt: keccak256("refund state machine salt"),
             calls: new InteropCall[](0),
@@ -128,13 +121,13 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         });
     }
 
-    /// @dev A genuine end-to-end absence proof for the missing leg (begin branch, declared on
-    /// `MISSING_LEG_CHAIN`). NOT `view`: real aggregation + import mutate settlement-layer state.
+    /// @dev A genuine end-to-end absence proof for `MISSING_LEG_CHAIN`'s participation (begin branch).
+    /// NOT `view`: real aggregation + import mutate settlement-layer state.
     function _validAbsence() internal returns (ImtProof memory) {
         return
             _realTimeoutBeginProof(
                 MISSING_LEG_CHAIN,
-                AtomicFlowFixtures.commitValue(flowId, missingLeg),
+                AtomicFlowFixtures.participationValue(flowId, MISSING_LEG_CHAIN),
                 uint256(DEADLINE) + 1
             );
     }
@@ -150,22 +143,25 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
     /// committed legs to `Revertable` — with exactly one `FlowRefundAuthorized` event each — while
     /// the missing leg stays `Unset`.
     function test_authorizeRefund_MarksAllLocalCommittedLegs() public {
-        // A fresh three-leg flow (independent of the setUp fixture): two locally committed legs and a
-        // never-committed remote leg at slot 1 whose absence is authenticated by real aggregation.
-        AtomicFlowPreimage memory multiPreimage;
-        multiPreimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY;
-        multiPreimage.deadline = DEADLINE;
-        multiPreimage.settlementLayerChainId = SETTLEMENT_LAYER_CHAIN_ID;
-        multiPreimage.legBundleHashes = new bytes32[](3);
-        multiPreimage.legBundleHashes[0] = bytes32(uint256(1));
-        multiPreimage.legBundleHashes[1] = bytes32(uint256(2));
-        multiPreimage.legBundleHashes[2] = bytes32(uint256(3));
+        // A fresh three-leg flow (independent of the setUp fixture): two locally committed legs to
+        // `MISSING_LEG_CHAIN` and a never-sent leg back at slot 1, whose chain's missing participation is
+        // authenticated by real aggregation.
+        bytes32[] memory legs = new bytes32[](3);
+        legs[0] = bytes32(uint256(1));
+        legs[1] = bytes32(uint256(2));
+        legs[2] = bytes32(uint256(3));
         uint256 multiMissingIndex = 1;
-        bytes32 missingLegHash = multiPreimage.legBundleHashes[multiMissingIndex];
-        multiPreimage.legChainIds = new uint256[](3);
-        multiPreimage.legChainIds[0] = block.chainid;
-        multiPreimage.legChainIds[1] = MISSING_LEG_CHAIN;
-        multiPreimage.legChainIds[2] = block.chainid;
+        uint256[] memory sources = new uint256[](3);
+        (sources[0], sources[1], sources[2]) = (block.chainid, MISSING_LEG_CHAIN, block.chainid);
+        uint256[] memory destinations = new uint256[](3);
+        (destinations[0], destinations[1], destinations[2]) = (MISSING_LEG_CHAIN, block.chainid, MISSING_LEG_CHAIN);
+        AtomicFlowPreimage memory multiPreimage = AtomicFlowFixtures.nLegPreimage(
+            legs,
+            sources,
+            destinations,
+            DEADLINE,
+            SETTLEMENT_LAYER_CHAIN_ID
+        );
         bytes32 multiFlowId = AtomicFlowFixtures.flowId(multiPreimage);
 
         // Commit BOTH non-missing legs through the production send-side path.
@@ -174,17 +170,12 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
                 continue;
             }
             vm.prank(L2_INTEROP_CENTER_ADDR);
-            manager.append(
-                multiPreimage.legBundleHashes[i],
-                AtomicFlowFixtures.UNCHECKED_DESTINATION,
-                0,
-                multiPreimage
-            );
+            manager.append(multiPreimage.legBundleHashes[i], MISSING_LEG_CHAIN, 0, multiPreimage);
         }
 
         ImtProof memory absence = _realTimeoutBeginProof(
             MISSING_LEG_CHAIN,
-            AtomicFlowFixtures.commitValue(multiFlowId, missingLegHash),
+            AtomicFlowFixtures.participationValue(multiFlowId, MISSING_LEG_CHAIN),
             uint256(DEADLINE) + 1
         );
 
@@ -236,8 +227,9 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
     }
 
     /// @notice A leg that is currently `Committed` remains refundable when an authenticated
-    /// post-deadline snapshot proves that it was absent. This pins the case where the committed leg
-    /// is itself at `_missingLegIndex`.
+    /// post-deadline snapshot proves that this chain's own participation was absent: it committed the late
+    /// leg but never accepted the peer leg. This pins the case where `_missingLegIndex` is the committed
+    /// leg itself, with the absence proven on its source.
     /// @dev Recovery is isolated to a single mock (`recoverAtomicCall`); the real recovery chain is
     /// covered by `AtomicRecoveryForgery.t.sol` and the send/refund integration suite.
     function test_authorizeRefund_CommittedLegAtMissingIndexIsRefundable() public {
@@ -254,7 +246,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         InteropBundle memory lateBundle = InteropBundle({
             version: INTEROP_BUNDLE_VERSION,
             sourceChainId: block.chainid,
-            destinationChainId: 777, // not L1: recovery rejects L1-destined bundles
+            destinationChainId: RECOVERY_DEST_CHAIN_ID,
             destinationBaseTokenAssetId: bytes32(uint256(1)),
             interopBundleSalt: keccak256("late leg salt"),
             calls: calls,
@@ -264,40 +256,34 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         bytes32 lateLeg = InteropDataEncoding.encodeInteropBundleHash(lateBundleBytes);
         bytes32 peerLeg = keccak256("late-flow peer leg");
 
-        // Two-leg all-local flow; the LATE leg is the one whose absence gets proven (_missingLegIndex).
-        AtomicFlowPreimage memory latePreimage;
-        latePreimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY;
-        latePreimage.deadline = DEADLINE;
-        latePreimage.settlementLayerChainId = SETTLEMENT_LAYER_CHAIN_ID;
-        latePreimage.legBundleHashes = new bytes32[](2);
-        latePreimage.legChainIds = new uint256[](2);
-        (uint256 lateIdx, uint256 peerIdx) = lateLeg < peerLeg ? (0, 1) : (1, 0);
-        latePreimage.legBundleHashes[lateIdx] = lateLeg;
-        latePreimage.legBundleHashes[peerIdx] = peerLeg;
-        latePreimage.legChainIds[lateIdx] = block.chainid;
-        latePreimage.legChainIds[peerIdx] = block.chainid;
+        // A swap with `RECOVERY_DEST_CHAIN_ID`: this chain commits the late leg but never accepts the peer
+        // leg, so its own participation (proven absent as the late leg's source) is never inserted.
+        (AtomicFlowPreimage memory latePreimage, uint256 lateIdx, ) = AtomicFlowFixtures.swapPreimage({
+            _legA: lateLeg,
+            _chainA: block.chainid,
+            _legB: peerLeg,
+            _chainB: RECOVERY_DEST_CHAIN_ID,
+            _deadline: DEADLINE,
+            _settlementLayerChainId: SETTLEMENT_LAYER_CHAIN_ID
+        });
         bytes32 lateFlowId = AtomicFlowFixtures.flowId(latePreimage);
 
-        // Both legs are committed in current manager state; the proof below authenticates historical
-        // absence from a post-deadline batch root.
         vm.prank(L2_INTEROP_CENTER_ADDR);
-        manager.append(lateLeg, AtomicFlowFixtures.UNCHECKED_DESTINATION, 0, latePreimage);
-        vm.prank(L2_INTEROP_CENTER_ADDR);
-        manager.append(peerLeg, AtomicFlowFixtures.UNCHECKED_DESTINATION, 0, latePreimage);
+        manager.append(lateLeg, RECOVERY_DEST_CHAIN_ID, 0, latePreimage);
         assertEq(
             uint256(manager.legState(lateFlowId, lateLeg)),
             uint256(LegState.Committed),
             "the late leg is locally Committed before the refund"
         );
 
-        // The receive filter accepts this chain's own legs without a whitelist entry: none is set for it here.
-        // Intrinsically LOCAL: the proven-absent leg's source is this chain, which the settlement-layer
-        // MessageRoot cannot aggregate as remote — so this case forward-computes the proof and imports
-        // its root directly.
+        // The receive filter accepts this chain's own participation without a whitelist entry: none is set for
+        // it here. Intrinsically LOCAL: the proven-absent participation is this chain's, which the
+        // settlement-layer MessageRoot cannot aggregate as remote — so this case forward-computes the proof
+        // and imports its root directly.
         (ImtProof memory absence, bytes32 aggregatedRoot) = _nonInclusionProof({
             _sourceChainId: block.chainid,
             _batchNumber: REMOTE_BATCH_NUMBER,
-            _absentValue: AtomicFlowFixtures.commitValue(lateFlowId, lateLeg),
+            _absentValue: AtomicFlowFixtures.participationValue(lateFlowId, block.chainid),
             _imtRootLeafIndex: ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX,
             _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
             _slBlock: SL_BLOCK,
@@ -311,7 +297,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         emit IAtomicFlowManager.FlowRefundAuthorized(lateFlowId, lateLeg);
         manager.authorizeRefund(AtomicFlow({flowId: lateFlowId, preimage: latePreimage}), lateIdx, absence);
 
-        // The load-bearing assertion: the _missingLegIndex leg itself became Revertable.
+        // The load-bearing assertion: the leg at _missingLegIndex itself became Revertable.
         assertEq(
             uint256(manager.legState(lateFlowId, lateLeg)),
             uint256(LegState.Revertable),
@@ -338,22 +324,49 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
     // before the aligned arrays are indexed) is pinned by
     // AtomicFlowManagerInitTest.test_RevertWhen_refundMissingLegIndexOutOfRange — not repeated here.
 
-    /// @notice The double-mint guard: the absence proof must be bound to the missing leg's DECLARED
-    /// source chain. A proof against any other chain's tree is rejected before verification — a
-    /// commit value exists only in its own chain's tree and is trivially absent elsewhere.
-    function test_RevertWhen_AbsenceSourceChainMismatch() public {
+    /// @notice The double-mint guard: the absence proof must be on a chain the indexed leg DECLARES. A proof
+    /// against any other chain's tree is rejected before verification — a participation value exists only in
+    /// its own chain's tree and is trivially absent elsewhere.
+    function test_RevertWhen_AbsenceChainNotInLeg() public {
         ImtProof memory absence = _validAbsence();
         uint256 unrelatedChainId = 999;
         absence.sourceChainId = unrelatedChainId;
 
-        vm.expectRevert(abi.encodeWithSelector(ProofSourceChainMismatch.selector, MISSING_LEG_CHAIN, unrelatedChainId));
+        vm.expectRevert(
+            abi.encodeWithSelector(ManagerAbsenceChainNotInLeg.selector, flowId, missingLegIndex, unrelatedChainId)
+        );
         manager.authorizeRefund(_flow(), missingLegIndex, absence);
     }
 
-    /// @notice The receive filter: this chain refunds only on the absence of a leg whose source it
-    /// accepts ({protocol-docs/interop-gating.md#receive-filter}). A genuine absence proof from a source
-    /// the chain doesn't allow leaves the committed leg `Committed`.
-    function test_RevertWhen_MissingLegSourceNotAllowed() public {
+    /// @notice Same guard for a source-only flow, whose legs declare only their source: the missing leg's
+    /// commit value is proven absent there, so a proof on any other chain (this one, its destination) is
+    /// rejected.
+    function test_RevertWhen_SourceOnlyAbsenceNotOnSource() public {
+        (uint256 committedIdx, uint256 missingIdx) = committedLeg < missingLeg ? (0, 1) : (1, 0);
+        bytes32[] memory legs = new bytes32[](2);
+        uint256[] memory chains = new uint256[](2);
+        (legs[committedIdx], legs[missingIdx]) = (committedLeg, missingLeg);
+        (chains[committedIdx], chains[missingIdx]) = (block.chainid, MISSING_LEG_CHAIN);
+        AtomicFlowPreimage memory sourceOnly = AtomicFlowFixtures.sourceOnlyPreimage(
+            legs,
+            chains,
+            DEADLINE,
+            SETTLEMENT_LAYER_CHAIN_ID
+        );
+        bytes32 sourceOnlyFlowId = AtomicFlowFixtures.flowId(sourceOnly);
+        ImtProof memory absence = _validAbsence();
+        absence.sourceChainId = block.chainid;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ManagerAbsenceChainNotInLeg.selector, sourceOnlyFlowId, missingIdx, block.chainid)
+        );
+        manager.authorizeRefund(AtomicFlow({flowId: sourceOnlyFlowId, preimage: sourceOnly}), missingIdx, absence);
+    }
+
+    /// @notice The receive filter: this chain refunds only on an absence proven on a chain it accepts
+    /// ({protocol-docs/interop-gating.md#receive-filter}). A genuine absence proof from a chain the chain
+    /// doesn't allow leaves the committed leg `Committed`.
+    function test_RevertWhen_AbsenceChainNotAllowed() public {
         ImtProof memory absence = _validAbsence();
         _setLegChainAllowed(MISSING_LEG_CHAIN, false);
 
@@ -385,7 +398,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         (ImtProof memory absence, ) = _nonInclusionProof({
             _sourceChainId: MISSING_LEG_CHAIN,
             _batchNumber: REMOTE_BATCH_NUMBER,
-            _absentValue: AtomicFlowFixtures.commitValue(flowId, missingLeg),
+            _absentValue: AtomicFlowFixtures.participationValue(flowId, MISSING_LEG_CHAIN),
             _imtRootLeafIndex: ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX,
             _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
             _slBlock: SL_BLOCK,
@@ -403,6 +416,49 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
             )
         );
         manager.authorizeRefund(_flow(), missingLegIndex, absence);
+    }
+
+    /// @notice A source-only flow sent before accepted flows were introduced stays refundable: its timeout
+    /// proof is for the missing leg's commit value, and the leg this chain committed flips to `Revertable`.
+    /// @dev `append` no longer takes a source-only flow, so the harness writes the state its pre-upgrade
+    /// `append` left behind.
+    function test_authorizeRefund_SourceOnlyFlowSentBeforeUpgrade() public {
+        deployCodeTo(
+            "AtomicFlowManagerRefund.t.sol:AtomicFlowManagerSourceOnlyLegHarness",
+            L2_ATOMIC_FLOW_MANAGER_ADDR
+        );
+        AtomicFlowManagerSourceOnlyLegHarness harness = AtomicFlowManagerSourceOnlyLegHarness(
+            L2_ATOMIC_FLOW_MANAGER_ADDR
+        );
+
+        (uint256 committedIdx, uint256 missingIdx) = committedLeg < missingLeg ? (0, 1) : (1, 0);
+        bytes32[] memory legs = new bytes32[](2);
+        uint256[] memory chains = new uint256[](2);
+        (legs[committedIdx], legs[missingIdx]) = (committedLeg, missingLeg);
+        (chains[committedIdx], chains[missingIdx]) = (block.chainid, MISSING_LEG_CHAIN);
+        AtomicFlowPreimage memory sourceOnly = AtomicFlowFixtures.sourceOnlyPreimage(
+            legs,
+            chains,
+            DEADLINE,
+            SETTLEMENT_LAYER_CHAIN_ID
+        );
+        bytes32 sourceOnlyFlowId = AtomicFlowFixtures.flowId(sourceOnly);
+        harness.commitSourceOnlyLeg(sourceOnlyFlowId, committedLeg);
+
+        ImtProof memory absence = _realTimeoutBeginProof(
+            MISSING_LEG_CHAIN,
+            AtomicFlowFixtures.commitValue(sourceOnlyFlowId, missingLeg),
+            uint256(DEADLINE) + 1
+        );
+        vm.expectEmit(true, true, true, true, address(harness));
+        emit IAtomicFlowManager.FlowRefundAuthorized(sourceOnlyFlowId, committedLeg);
+        harness.authorizeRefund(AtomicFlow({flowId: sourceOnlyFlowId, preimage: sourceOnly}), missingIdx, absence);
+
+        assertEq(
+            uint256(harness.legState(sourceOnlyFlowId, committedLeg)),
+            uint256(LegState.Revertable),
+            "the pre-upgrade leg must become Revertable"
+        );
     }
 
     // ============ claimRefund state machine ============
@@ -428,7 +484,8 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
     // ============ multi-call recovery through the real Revertable path ============
 
     /// @dev Drives `_bundle`'s leg to `Revertable` through production entry points only: a real
-    /// `append`, then a real `authorizeRefund` against an absence proof for the never-committed co-leg.
+    /// `append`, then a real `authorizeRefund` against an absence proof for the participation of the chain
+    /// that never sends the co-leg.
     /// @dev Consumes `MISSING_LEG_CHAIN`'s single post-genesis batch, so a caller must not also call
     /// {_validAbsence}. `append` must precede the post-deadline root import, hence this order.
     function _revertableLegFromBundle(
@@ -438,25 +495,29 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundleBytes);
         bytes32 coLeg = keccak256("recovery co-leg");
 
-        AtomicFlowPreimage memory recoveryPreimage;
-        recoveryPreimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY;
-        recoveryPreimage.deadline = DEADLINE;
-        recoveryPreimage.settlementLayerChainId = SETTLEMENT_LAYER_CHAIN_ID;
-        recoveryPreimage.legBundleHashes = new bytes32[](2);
-        recoveryPreimage.legChainIds = new uint256[](2);
+        // `_bundle` goes to `RECOVERY_DEST_CHAIN_ID`; the co-leg would come from `MISSING_LEG_CHAIN`.
         (uint256 localIdx, uint256 coIdx) = bundleHash < coLeg ? (0, 1) : (1, 0);
-        recoveryPreimage.legBundleHashes[localIdx] = bundleHash;
-        recoveryPreimage.legBundleHashes[coIdx] = coLeg;
-        recoveryPreimage.legChainIds[localIdx] = block.chainid;
-        recoveryPreimage.legChainIds[coIdx] = MISSING_LEG_CHAIN;
+        bytes32[] memory legs = new bytes32[](2);
+        uint256[] memory sources = new uint256[](2);
+        uint256[] memory destinations = new uint256[](2);
+        (legs[localIdx], legs[coIdx]) = (bundleHash, coLeg);
+        (sources[localIdx], destinations[localIdx]) = (block.chainid, RECOVERY_DEST_CHAIN_ID);
+        (sources[coIdx], destinations[coIdx]) = (MISSING_LEG_CHAIN, block.chainid);
+        AtomicFlowPreimage memory recoveryPreimage = AtomicFlowFixtures.nLegPreimage(
+            legs,
+            sources,
+            destinations,
+            DEADLINE,
+            SETTLEMENT_LAYER_CHAIN_ID
+        );
         recoveryFlowId = AtomicFlowFixtures.flowId(recoveryPreimage);
 
         vm.prank(L2_INTEROP_CENTER_ADDR);
-        manager.append(bundleHash, AtomicFlowFixtures.UNCHECKED_DESTINATION, 0, recoveryPreimage);
+        manager.append(bundleHash, RECOVERY_DEST_CHAIN_ID, 0, recoveryPreimage);
 
         ImtProof memory absence = _realTimeoutBeginProof(
             MISSING_LEG_CHAIN,
-            AtomicFlowFixtures.commitValue(recoveryFlowId, coLeg),
+            AtomicFlowFixtures.participationValue(recoveryFlowId, MISSING_LEG_CHAIN),
             uint256(DEADLINE) + 1
         );
         manager.authorizeRefund(AtomicFlow({flowId: recoveryFlowId, preimage: recoveryPreimage}), coIdx, absence);

@@ -12,9 +12,7 @@ import {LegState, AtomicFlow, AtomicFlowPreimage, ImtProof, AtomicFinalityProof}
 /// path. Never custodies funds. Deployed as an
 /// L2 predeploy (no constructor). See {protocol-docs/atomicity/flow.md#the-atomicflowmanager}.
 interface IAtomicFlowManager {
-    /// @notice Emitted when a source leg of a source-only flow is committed to this chain's IMT.
-    event FlowCommitted(bytes32 indexed flowId, bytes32 indexed bundleHash, uint64 deadline, uint256 leafIndex);
-    /// @notice Emitted when a source leg of an accepted flow is committed on this chain (no IMT leaf of its own).
+    /// @notice Emitted when a source leg is committed on this chain (no IMT leaf of its own).
     event FlowLegCommitted(bytes32 indexed flowId, bytes32 indexed bundleHash);
     /// @notice Emitted when this chain, as a leg's destination, accepts it (no IMT leaf of its own).
     event FlowAccepted(bytes32 indexed flowId, bytes32 indexed bundleHash);
@@ -28,20 +26,19 @@ interface IAtomicFlowManager {
     event FlowRefunded(bytes32 indexed flowId, bytes32 indexed bundleHash);
 
     /// @notice Records an atomic source leg: recomputes `flowId` from the supplied preimage, verifies
-    /// the committing bundle is one of the flow's legs (declared with this chain as its source) and
-    /// that every other leg declares an interop-registered source chain. A source-only flow inserts the
-    /// leg's commit value into the interop IMT. An accepted flow checks the leg's declared destination
-    /// against the bundle's and inserts this chain's participation value if this was its last step.
-    /// State `Unset -> Committed`. Callable only by the {InteropCenter}.
+    /// the committing bundle is one of the flow's legs, declared from this chain to the bundle's
+    /// destination, and that every chain of the flow passes this chain's receive filter
+    /// ({protocol-docs/interop-gating.md#receive-filter}), then inserts this chain's participation value if
+    /// this was its last step. State `Unset -> Committed`. Callable only by the {InteropCenter}.
     /// @dev Taking the full preimage (not an opaque `flowId`) is what couples the committed leg to its
     /// flow; a wrong or stale preimage reverts the whole send instead of stranding the burned funds.
     /// See {protocol-docs/atomicity/flow.md#1-atomic-send-append}.
     /// @param _bundleHash `keccak256(interopBundleBytes)` of this leg (chain-specific via the bundle's
     /// own `sourceChainId` field).
     /// @param _destinationChainId The bundle's destination chain.
-    /// @param _lowNullifierIndex The low-nullifier slot for the value this call inserts, if any (from the IMT
-    /// engine).
-    /// @param _flowPreimage The full `flowId` preimage ({AtomicFlowPreimage}).
+    /// @param _lowNullifierIndex The low-nullifier slot for the participation value, if this call inserts it
+    /// (from the IMT engine).
+    /// @param _flowPreimage The full `flowId` preimage; must be {ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED}.
     function append(
         bytes32 _bundleHash,
         uint256 _destinationChainId,
@@ -50,16 +47,18 @@ interface IAtomicFlowManager {
     ) external;
 
     /// @notice Records this chain's acceptance of an accepted flow's leg: recomputes `flowId`, verifies the
-    /// bundle is a leg declared with this chain as its destination and that every chain of the flow is
-    /// registered and passes this chain's receive filter, then inserts this chain's participation value if
-    /// this was its last step. Callable only by the {InteropHandler}. See
+    /// bundle is a leg declared from the bundle's source to this chain and that every chain of the flow
+    /// passes this chain's receive filter, then inserts this chain's participation value if this was its
+    /// last step. State `Unset -> Accepted`. Callable only by the {InteropHandler}. See
     /// {protocol-docs/atomicity/acceptance.md}.
     /// @param _bundleHash `keccak256(interopBundleBytes)` of the accepted leg.
+    /// @param _sourceChainId The bundle's source chain.
     /// @param _lowNullifierIndex The low-nullifier slot for the participation value, if this call inserts it
     /// (from the IMT engine).
     /// @param _flowPreimage The full `flowId` preimage; must be {ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED}.
     function accept(
         bytes32 _bundleHash,
+        uint256 _sourceChainId,
         uint256 _lowNullifierIndex,
         AtomicFlowPreimage calldata _flowPreimage
     ) external;
@@ -77,12 +76,13 @@ interface IAtomicFlowManager {
     /// finalize, proven by a timeout for one commitment (a leg's commit or, for an accepted flow, a chain's
     /// participation) on a chain this chain accepts ({protocol-docs/interop-gating.md#receive-filter}).
     /// Permissionless.
-    /// @param _flow The flow definition ({AtomicFlow}). The absence proof must target
-    /// `_flow.preimage.legChainIds[_missingLegIndex]`.
-    /// @param _missingLegIndex Index into `_flow.preimage.legChainIds` naming the commitment proven absent: that
-    /// leg's commit (source-only flows) or that chain's participation (accepted flows).
-    /// @param _absence Timeout proof for the missing commitment's value
-    /// (see {AtomicInteropProof.verifyTimeoutAbsence}).
+    /// @param _flow The flow definition ({AtomicFlow}).
+    /// @param _missingLegIndex Index into `_flow.preimage.legBundleHashes` of a leg that cannot complete: its
+    /// commit is missing (source-only flows), or the participation of its source or destination chain
+    /// (accepted flows).
+    /// @param _absence Timeout proof for the missing commitment's value (see
+    /// {AtomicInteropProof.verifyTimeoutAbsence}), against the tree of the chain it names: the leg's source,
+    /// or for an accepted flow either of its chains.
     function authorizeRefund(AtomicFlow calldata _flow, uint256 _missingLegIndex, ImtProof calldata _absence) external;
 
     /// @notice Claims a `Revertable` leg's refund (best-effort — see
@@ -93,11 +93,9 @@ interface IAtomicFlowManager {
     /// @param _bundle The ABI-encoded {InteropBundle} of the source leg (hashes to the committed leg).
     function claimRefund(bytes32 _flowId, bytes calldata _bundle) external;
 
-    /// @notice Current source-leg state of a `(flowId, bundleHash)` on this chain.
+    /// @notice Current state of a `(flowId, bundleHash)` on this chain: its source-leg lifecycle, or
+    /// `Accepted` once this chain, as the leg's destination, accepted it.
     function legState(bytes32 _flowId, bytes32 _bundleHash) external view returns (LegState);
-
-    /// @notice Whether this chain, as the leg's destination, accepted `(flowId, bundleHash)`.
-    function legAccepted(bytes32 _flowId, bytes32 _bundleHash) external view returns (bool);
 
     /// @notice One-time L2 initialization performed by the genesis upgrade; sets the L1 chain ID
     /// every flow's settlement layer is checked against.

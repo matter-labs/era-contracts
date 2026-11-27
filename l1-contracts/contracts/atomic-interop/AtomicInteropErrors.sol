@@ -7,20 +7,22 @@ import {LegState} from "./IAtomicInterop.sol";
 error CommitmentTreeNotAppender(address sender);
 // 0x6bbd3c7c
 error InteropCommitmentLeafHookFailed();
-// 0xcdc92090
-error ManagerAcceptedBundleNotInFlow(bytes32 flowId, bytes32 bundleHash);
+// 0x1defdb80
+error ManagerAbsenceChainNotInLeg(bytes32 flowId, uint256 legIndex, uint256 absenceChainId);
 // 0xf30c75fb
 error ManagerAcceptedLegDestinationChainMismatch(
     bytes32 flowId,
     uint256 thisChainId,
     uint256 declaredDestinationChainId
 );
+// 0x19dd7658
+error ManagerAcceptedLegSourceChainMismatch(bytes32 flowId, uint256 bundleSourceChainId, uint256 declaredSourceChainId);
 // 0x00bf0e3a
 error ManagerAlreadyInitialized();
 // 0xeff05b36
 error ManagerBundleHashesNotSorted();
-// 0xca272942
-error ManagerCommittedBundleNotInFlow(bytes32 flowId, bytes32 bundleHash);
+// 0x03460b6a
+error ManagerBundleNotInFlow(bytes32 flowId, bytes32 bundleHash);
 // 0xdff68473
 error ManagerCommittedLegDestinationChainMismatch(
     bytes32 flowId,
@@ -39,20 +41,18 @@ error ManagerFlowIdMismatch(bytes32 expected, bytes32 computed);
 error ManagerFlowPreimageVersionMismatch(bytes1 expected, bytes1 actual);
 // 0xb5e6e3fc
 error ManagerL1ChainIdZero();
-// 0x638605e7
-error ManagerLegAlreadyAccepted(bytes32 flowId, bytes32 bundleHash);
-// 0x3a62d7e3
-error ManagerLegAlreadyCommitted(bytes32 flowId, bytes32 bundleHash);
+// 0xb2e8cabb
+error ManagerLegAlreadyRecorded(bytes32 flowId, bytes32 bundleHash, LegState actual);
 // 0xe0ec98f5
 error ManagerLegChainIdsLengthMismatch(uint256 expected, uint256 actual);
 // 0xa8978a1f
 error ManagerLegChainNotAllowed(uint256 legChainId);
-// 0xbac4bbb8
-error ManagerLegChainNotRegistered(uint256 legChainId);
+// 0x0060a508
+error ManagerLegDestinationChainIdsLengthMismatch(uint256 expected, uint256 actual);
 // 0x83562707
 error ManagerLegNotRevertable(bytes32 flowId, bytes32 bundleHash, LegState actual);
 // 0x4dbe1536
-error ManagerMissingLegIndexOutOfRange(uint256 commitments, uint256 missingLegIndex);
+error ManagerMissingLegIndexOutOfRange(uint256 legs, uint256 missingLegIndex);
 // 0xd7522d7a
 error ManagerNotInteropCenter(address sender);
 // 0x07029ea6

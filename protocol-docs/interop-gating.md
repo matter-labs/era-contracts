@@ -191,8 +191,8 @@ A chain S is **allowed** for a chain C if S is C, or if C's `L2Bridgehub.isPeerA
 
 The filter reads the whitelist when the bundle is verified, or executed if it wasn't verified first, not when it was
 sent. A bundle from a peer that is removed stays unreceived, and executes once the admin allows the peer again; one
-verified before the removal still executes. `accept` also checks the whitelist on its own chain when recording a
-receipt. `append` checks registration for the chains in the preimage without applying the receive filter.
+verified before the removal still executes. `append` and `accept` also apply the filter to every chain of the flow,
+each leg's source and destination, so a chain takes part only in flows it can execute and refund.
 
 The message root can't tell enabled chains apart: L1 aggregates every L1-settled chain's batch roots, so a disabled
 chain's batches are as provable as any other. The filter has to cover refunds too. Otherwise a disabled chain's
@@ -274,12 +274,14 @@ Before `enableInterop(X)`:
 
 ### K1: stuck flows
 
-A flow gets stuck when a chain's [receive filter](#receive-filter) refuses one of its legs' sources. With all legs
-present, that chain can't finalize the flow; with a leg missing, a committed leg on that chain can't be refunded.
-Causes:
+A flow gets stuck when a chain's [receive filter](#receive-filter) refuses one of the flow's chains. With every
+commitment present, that chain can't finalize the flow; with one missing, a committed leg on that chain can't be
+refunded. `append` and `accept` apply the filter to every chain of the flow, so a chain that refuses another never
+takes a step in the flow: it times out, and the chains that did take a step refund. Causes:
 
-- a one-sided whitelist, or a removed pair;
-- a leg from a chain that the destination doesn't whitelist;
+- a pair removed after a chain committed or accepted a leg of the flow;
+- a `0x01` flow sent before this release with a one-sided whitelist, or with a leg from a chain that the
+  destination doesn't whitelist;
 - legacy flows that involve a chain that stays disabled.
 
 SDKs should check both whitelists on L1 before sending.

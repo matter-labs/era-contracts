@@ -10,10 +10,7 @@ import {L2_INTEROP_CENTER_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
-import {
-    AtomicFlowPreimage,
-    ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY
-} from "contracts/atomic-interop/IAtomicInterop.sol";
+import {AtomicFlowPreimage, ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {
     AtomicBundleToL1NotSupported,
@@ -118,15 +115,18 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
         legBundleHashes[0] = keccak256("leg bundle hash");
         uint256[] memory legChainIds = new uint256[](1);
         legChainIds[0] = block.chainid;
+        uint256[] memory legDestinationChainIds = new uint256[](1);
+        legDestinationChainIds[0] = L1_CHAIN_ID;
         attrs[1] = abi.encodeCall(
             IERC7786Attributes.atomicBundle,
             (
                 AtomicFlowPreimage({
-                    version: ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY,
+                    version: ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED,
                     deadline: uint64(block.timestamp + 1 days),
                     settlementLayerChainId: L1_CHAIN_ID,
                     legBundleHashes: legBundleHashes,
-                    legChainIds: legChainIds
+                    legChainIds: legChainIds,
+                    legDestinationChainIds: legDestinationChainIds
                 }),
                 0
             )

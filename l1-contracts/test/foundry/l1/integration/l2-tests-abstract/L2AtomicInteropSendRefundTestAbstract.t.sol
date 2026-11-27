@@ -12,17 +12,11 @@ import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
+import {AtomicFlow, AtomicFlowPreimage, ImtProof, LegState} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {
-    AtomicFlow,
-    AtomicFlowPreimage,
-    ImtProof,
-    LegState,
-    ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY
-} from "contracts/atomic-interop/IAtomicInterop.sol";
-import {
-    ManagerCommittedBundleNotInFlow,
+    ManagerBundleNotInFlow,
     ManagerLegNotRevertable,
-    ManagerLegChainNotRegistered
+    ManagerLegChainNotAllowed
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropBundle, InteropCallStarter} from "contracts/common/Messaging.sol";
@@ -88,7 +82,8 @@ contract ReentrantRefundClaimer {
 
 /// @notice Atomic interop exercised through the REAL send entry point: `InteropCenter.sendBundle` with
 /// the `atomicBundle` attribute drives a real `L2AssetRouter.initiateIndirectCall` burn and a real
-/// `AtomicFlowManager.append` -> `L2InteropCommitmentTree.insert`, and the timeout path recovers the
+/// `AtomicFlowManager.append` (-> `L2InteropCommitmentTree.insert` once this chain's steps are complete), and the
+/// timeout path recovers the
 /// burn through the real `authorizeRefund` -> `claimRefund` -> `L2AssetRouter.recoverAtomicCall` ->
 /// NTV re-mint chain. Everything runs on the shared L2-in-L1-context deployment (real InteropCenter,
 /// AssetRouter, NTV, Bridgehub registry and bridged token). Nothing on the proof path is mocked: the
@@ -101,8 +96,8 @@ contract ReentrantRefundClaimer {
 ///   1. A user sends an atomic leg whose preimage pairs it with an INVALID remote leg
 ///      (`keccak256("invalid")` — a bundle hash the remote chain will never commit). The send itself
 ///      succeeds (the preimage is well-formed and contains the local bundle), the funds burn, and the
-///      user then recovers them via the timeout path: the invalid leg is proven absent from the remote
-///      chain's IMT after the deadline, and `claimRefund` re-mints the burned tokens.
+///      user then recovers them via the timeout path: the remote chain's participation is proven absent
+///      from its IMT after the deadline, and `claimRefund` re-mints the burned tokens.
 ///   2. A preimage that does NOT contain the sent bundle reverts the whole `sendBundle` — including
 ///      the already-performed burn — leaving the sender's balance untouched.
 ///   3. A DIRECT native-value leg to a SAME-base destination: the value is escrowed in the real
@@ -186,22 +181,31 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         );
     }
 
-    /// @dev Two-leg preimage: local leg on this chain + `INVALID_REMOTE_LEG` on the destination chain,
-    /// leg hashes strictly ascending.
+    /// @dev Two-leg preimage: the local leg from this chain to `_localLegDestination`, and `INVALID_REMOTE_LEG`
+    /// from the destination chain back to this one, so neither chain ever participates. `missingLegIndex` is
+    /// the invalid leg's index; its absence is proven on its source, the destination chain.
     function _preimageWithInvalidRemoteLeg(
-        bytes32 _localLeg
+        bytes32 _localLeg,
+        uint256 _localLegDestination
     ) internal view returns (AtomicFlowPreimage memory preimage, uint256 missingLegIndex) {
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY;
-        preimage.deadline = DEADLINE;
-        preimage.settlementLayerChainId = L1_CHAIN_ID;
-        preimage.legBundleHashes = new bytes32[](2);
-        preimage.legChainIds = new uint256[](2);
         (uint256 localIndex, uint256 remoteIndex) = _localLeg < INVALID_REMOTE_LEG ? (0, 1) : (1, 0);
-        preimage.legBundleHashes[localIndex] = _localLeg;
-        preimage.legBundleHashes[remoteIndex] = INVALID_REMOTE_LEG;
-        preimage.legChainIds[localIndex] = block.chainid;
-        preimage.legChainIds[remoteIndex] = destinationChainId;
+        bytes32[] memory legs = new bytes32[](2);
+        uint256[] memory sources = new uint256[](2);
+        uint256[] memory destinations = new uint256[](2);
+        (legs[localIndex], legs[remoteIndex]) = (_localLeg, INVALID_REMOTE_LEG);
+        (sources[localIndex], destinations[localIndex]) = (block.chainid, _localLegDestination);
+        (sources[remoteIndex], destinations[remoteIndex]) = (destinationChainId, block.chainid);
+        preimage = AtomicFlowFixtures.nLegPreimage(legs, sources, destinations, DEADLINE, L1_CHAIN_ID);
         missingLegIndex = remoteIndex;
+    }
+
+    /// @dev Single-leg preimage: `_leg` from this chain to the destination chain.
+    function _singleLegPreimage(bytes32 _leg) internal view returns (AtomicFlowPreimage memory) {
+        bytes32[] memory legs = new bytes32[](1);
+        uint256[] memory sources = new uint256[](1);
+        uint256[] memory destinations = new uint256[](1);
+        (legs[0], sources[0], destinations[0]) = (_leg, block.chainid, destinationChainId);
+        return AtomicFlowFixtures.nLegPreimage(legs, sources, destinations, DEADLINE, L1_CHAIN_ID);
     }
 
     function _atomicAttributes(
@@ -293,7 +297,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         );
     }
 
-    /// @dev Send phase: real burn + IMT commit; records everything the refund phases need.
+    /// @dev Send phase: real burn + leg commit; records everything the refund phases need.
     function _sendAtomicLegWithInvalidRemotePeer() internal {
         AtomicFlowManager manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
         ctx.l2Token = initializeTokenByDeposit();
@@ -305,7 +309,10 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         );
 
         bytes32 predicted = _predictBundleHash(calls, salt);
-        (AtomicFlowPreimage memory preimage, uint256 missingLegIndex) = _preimageWithInvalidRemoteLeg(predicted);
+        (AtomicFlowPreimage memory preimage, uint256 missingLegIndex) = _preimageWithInvalidRemoteLeg(
+            predicted,
+            destinationChainId
+        );
         ctxPreimage = preimage;
         ctx.missingLegIndex = missingLegIndex;
         ctx.flowId = AtomicFlowFixtures.flowId(preimage);
@@ -313,7 +320,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
 
         vm.recordLogs();
         vm.expectEmit(true, true, true, true, address(manager));
-        emit IAtomicFlowManager.FlowCommitted(ctx.flowId, predicted, DEADLINE, 1);
+        emit IAtomicFlowManager.FlowLegCommitted(ctx.flowId, predicted);
         ctx.bundleHash = l2InteropCenter.sendBundle(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
@@ -339,13 +346,13 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
             "leg must be Committed after the send"
         );
         assertEq(
-            L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafAt(1).value,
-            AtomicFlowFixtures.commitValue(ctx.flowId, ctx.bundleHash),
-            "the leg's commit value must be inserted into the canonical IMT"
+            L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount(),
+            1,
+            "nothing is inserted while this chain still owes its acceptance of the invalid leg"
         );
     }
 
-    /// @dev Refund-authorization phase: proves the invalid leg absent from its source chain's IMT. Uses the
+    /// @dev Refund-authorization phase: proves the invalid leg's source chain never participated. Uses the
     /// late-batch branch — batch settled after the deadline, anchored on a post-deadline settlement root.
     function _authorizeRefundForInvalidRemoteLeg() internal {
         AtomicFlowManager manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
@@ -356,7 +363,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         // the idempotency tests (the first-post-genesis proof builder rejects a second aggregation).
         ImtProof memory absence = _realTimeoutBeginProof(
             destinationChainId,
-            AtomicFlowFixtures.commitValue(ctx.flowId, INVALID_REMOTE_LEG),
+            AtomicFlowFixtures.participationValue(ctx.flowId, destinationChainId),
             uint256(DEADLINE) + 1
         );
         _invalidRemoteAbsence = absence;
@@ -402,23 +409,12 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
 
         bytes32 predicted = _predictBundleHash(calls, salt);
         // Well-formed preimage that does not contain the bundle being sent (e.g. a stale prediction).
-        AtomicFlowPreimage memory preimage;
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY;
-        preimage.deadline = DEADLINE;
-        preimage.settlementLayerChainId = L1_CHAIN_ID;
-        preimage.legBundleHashes = new bytes32[](1);
-        preimage.legBundleHashes[0] = INVALID_REMOTE_LEG;
-        preimage.legChainIds = new uint256[](1);
-        preimage.legChainIds[0] = block.chainid;
+        AtomicFlowPreimage memory preimage = _singleLegPreimage(INVALID_REMOTE_LEG);
 
         uint256 balanceBefore = IERC20(l2Token).balanceOf(address(this));
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                ManagerCommittedBundleNotInFlow.selector,
-                AtomicFlowFixtures.flowId(preimage),
-                predicted
-            )
+            abi.encodeWithSelector(ManagerBundleNotInFlow.selector, AtomicFlowFixtures.flowId(preimage), predicted)
         );
         l2InteropCenter.sendBundle(
             InteroperableAddress.formatEvmV1(destinationChainId),
@@ -479,7 +475,10 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         );
 
         bytes32 predicted = _predictBundleHashFor(_depositor, destinationChainId, calls, salt);
-        (AtomicFlowPreimage memory preimage, uint256 missingLegIndex) = _preimageWithInvalidRemoteLeg(predicted);
+        (AtomicFlowPreimage memory preimage, uint256 missingLegIndex) = _preimageWithInvalidRemoteLeg(
+            predicted,
+            destinationChainId
+        );
         ctxPreimage = preimage;
         ctx.missingLegIndex = missingLegIndex;
         ctx.flowId = AtomicFlowFixtures.flowId(preimage);
@@ -496,7 +495,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         );
         vm.recordLogs();
         vm.expectEmit(true, true, true, true, address(manager));
-        emit IAtomicFlowManager.FlowCommitted(ctx.flowId, predicted, DEADLINE, 1);
+        emit IAtomicFlowManager.FlowLegCommitted(ctx.flowId, predicted);
         vm.prank(_depositor);
         ctx.bundleHash = l2InteropCenter.sendBundle{value: NATIVE_VALUE_LEG_AMOUNT}(
             InteroperableAddress.formatEvmV1(destinationChainId),
@@ -629,14 +628,17 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
 
         bytes32 salt = keccak256("atomic different-base value leg salt");
         bytes32 predicted = _predictBundleHashFor(_depositor, DIFFERENT_BASE_DEST_CHAIN_ID, calls, salt);
-        (AtomicFlowPreimage memory preimage, uint256 missingLegIndex) = _preimageWithInvalidRemoteLeg(predicted);
+        (AtomicFlowPreimage memory preimage, uint256 missingLegIndex) = _preimageWithInvalidRemoteLeg(
+            predicted,
+            DIFFERENT_BASE_DEST_CHAIN_ID
+        );
         ctxPreimage = preimage;
         ctx.missingLegIndex = missingLegIndex;
         ctx.flowId = AtomicFlowFixtures.flowId(preimage);
 
         vm.recordLogs();
         vm.expectEmit(true, true, true, true, address(manager));
-        emit IAtomicFlowManager.FlowCommitted(ctx.flowId, predicted, DEADLINE, 1);
+        emit IAtomicFlowManager.FlowLegCommitted(ctx.flowId, predicted);
         vm.prank(_depositor);
         // No `msg.value`: for a different-base destination the value is collected in the bridged base token.
         ctx.bundleHash = l2InteropCenter.sendBundle(
@@ -747,10 +749,10 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         );
     }
 
-    /// @notice The registration gate through the real registry: an atomic send whose preimage
-    /// declares a co-leg on an unregistered (phantom) chain reverts the whole send — such a leg could
-    /// neither be proven committed nor proven absent, stranding every other leg of the flow.
-    function test_atomicSend_RevertWhen_CoLegChainNotRegistered() public {
+    /// @notice The receive filter through the real L2 Bridgehub: an atomic send whose preimage declares a
+    /// co-leg on a chain that is not an allowed peer (a phantom chain) reverts the whole send — such a leg
+    /// could neither be proven committed nor proven absent, stranding every other leg of the flow.
+    function test_atomicSend_RevertWhen_CoLegChainNotAllowed() public {
         _setUpAtomicStack();
         uint256 phantomChainId = 999_999;
 
@@ -759,12 +761,15 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         InteropCallStarter[] memory calls = _tokenCallStarter(l2Token, TRANSFER_AMOUNT, makeAddr("atomic recipient"));
 
         bytes32 predicted = _predictBundleHash(calls, salt);
-        (AtomicFlowPreimage memory preimage, uint256 remoteIndex) = _preimageWithInvalidRemoteLeg(predicted);
-        // Redeclare the co-leg's source as a chain id never registered in the (real) registry.
+        (AtomicFlowPreimage memory preimage, uint256 remoteIndex) = _preimageWithInvalidRemoteLeg(
+            predicted,
+            destinationChainId
+        );
+        // Redeclare the co-leg's source as a chain id the (real) L2 Bridgehub never allowed as a peer.
         preimage.legChainIds[remoteIndex] = phantomChainId;
 
         uint256 balanceBefore = IERC20(l2Token).balanceOf(address(this));
-        vm.expectRevert(abi.encodeWithSelector(ManagerLegChainNotRegistered.selector, phantomChainId));
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegChainNotAllowed.selector, phantomChainId));
         l2InteropCenter.sendBundle(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
@@ -797,8 +802,8 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
     /// @notice The single-message atomic entry point `sendMessage` (distinct from `sendBundle`): it
     /// independently parses attributes, defaults the unbundler, builds the one-call bundle, parses the
     /// `atomicBundle` attribute and commits the leg. Exercised for REAL end to end — predicted hash via
-    /// `previewMessageHash`, then `sendMessage` — asserting the returned send id, the `FlowCommitted`
-    /// event, the committed leg state, the canonical IMT leaf, and the emitted bundle payload.
+    /// `previewMessageHash`, then `sendMessage` — asserting the returned send id, the `FlowLegCommitted` and
+    /// `FlowParticipated` events, the committed leg state, the canonical IMT leaf, and the emitted bundle payload.
     function test_atomicSendMessage_singleLeg_commitsLeg() public {
         _setUpAtomicStack();
         AtomicFlowManager manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
@@ -812,15 +817,9 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         // preview carries only the salt) via the previewMessageHash quoter.
         bytes32 predicted = _predictMessageHash(recipient7930, payload, salt);
 
-        // Single all-local leg flow whose only leg is this predicted message bundle.
-        AtomicFlowPreimage memory preimage;
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY;
-        preimage.deadline = DEADLINE;
-        preimage.settlementLayerChainId = L1_CHAIN_ID;
-        preimage.legBundleHashes = new bytes32[](1);
-        preimage.legBundleHashes[0] = predicted;
-        preimage.legChainIds = new uint256[](1);
-        preimage.legChainIds[0] = block.chainid;
+        // Single-leg flow whose only leg is this predicted message bundle: committing it is this chain's
+        // only step, so the send also inserts this chain's participation.
+        AtomicFlowPreimage memory preimage = _singleLegPreimage(predicted);
         bytes32 flowId = AtomicFlowFixtures.flowId(preimage);
 
         bytes[] memory attrs = new bytes[](2);
@@ -829,7 +828,9 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
 
         vm.recordLogs();
         vm.expectEmit(true, true, true, true, address(manager));
-        emit IAtomicFlowManager.FlowCommitted(flowId, predicted, DEADLINE, 1);
+        emit IAtomicFlowManager.FlowLegCommitted(flowId, predicted);
+        vm.expectEmit(true, true, true, true, address(manager));
+        emit IAtomicFlowManager.FlowParticipated(flowId, DEADLINE, 1);
         bytes32 sendId = l2InteropCenter.sendMessage(recipient7930, payload, attrs);
 
         assertEq(sendId, keccak256(abi.encodePacked(predicted, uint256(0))), "sendId must be keccak(bundleHash, 0)");
@@ -840,8 +841,8 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         );
         assertEq(
             L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafAt(1).value,
-            AtomicFlowFixtures.commitValue(flowId, predicted),
-            "the leg's commit value must land in the canonical IMT"
+            AtomicFlowFixtures.participationValue(flowId, block.chainid),
+            "this chain's participation value must land in the canonical IMT"
         );
 
         // The emitted bundle carries the single call verbatim (recipient + payload).
@@ -866,7 +867,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         InteropCallStarter[] memory calls = _tokenCallStarter(l2Token, TRANSFER_AMOUNT, makeAddr("atomic recipient"));
 
         bytes32 predicted = _predictBundleHash(calls, salt);
-        (AtomicFlowPreimage memory preimage, ) = _preimageWithInvalidRemoteLeg(predicted);
+        (AtomicFlowPreimage memory preimage, ) = _preimageWithInvalidRemoteLeg(predicted, destinationChainId);
 
         // Same attributes as `_atomicAttributes`, in reverse order: `atomicBundle` first.
         bytes[] memory attrs = new bytes[](2);

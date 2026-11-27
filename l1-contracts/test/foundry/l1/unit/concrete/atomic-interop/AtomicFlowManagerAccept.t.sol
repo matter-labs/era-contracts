@@ -13,20 +13,20 @@ import {
     AtomicFinalityProof,
     ImtProof,
     LegState,
-    ATOMIC_PARTICIPATION_LEAF_TAG,
     ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED,
     ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY
 } from "contracts/atomic-interop/IAtomicInterop.sol";
 import {
-    ManagerAcceptedBundleNotInFlow,
+    ManagerAbsenceChainNotInLeg,
     ManagerAcceptedLegDestinationChainMismatch,
+    ManagerAcceptedLegSourceChainMismatch,
+    ManagerBundleNotInFlow,
     ManagerCommittedLegDestinationChainMismatch,
     ManagerFlowDeadlinePassed,
     ManagerFlowPreimageVersionMismatch,
-    ManagerLegAlreadyAccepted,
-    ManagerLegChainIdsLengthMismatch,
+    ManagerLegAlreadyRecorded,
     ManagerLegChainNotAllowed,
-    ManagerLegChainNotRegistered,
+    ManagerLegDestinationChainIdsLengthMismatch,
     ManagerNotInteropHandler,
     ManagerProofCountMismatch,
     ProofSourceChainMismatch
@@ -34,11 +34,7 @@ import {
 import {IMTLeafValueMismatch, IMTLowLeafNextTooSmall} from "contracts/common/L1ContractErrors.sol";
 import {INTEROP_BUNDLE_VERSION, InteropBundle, InteropCall} from "contracts/common/Messaging.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
-import {
-    L2_BRIDGEHUB_ADDR,
-    L2_INTEROP_CENTER_ADDR,
-    L2_INTEROP_HANDLER_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @notice Covers accepted flows ({ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED}) in `AtomicFlowManager`: the
 /// destination-side `accept`, the destination check `append` adds for them, the one participation value each
@@ -46,8 +42,8 @@ import {
 /// {protocol-docs/atomicity/acceptance.md}.
 /// @dev Manager + commitment tree run at their canonical predeploys. Finality and absence proofs are real
 /// end-to-end per {AtomicInteropProofBuilder}, whose one oracle tree plays every remote chain; each proof's
-/// chain binding is its `sourceChainId`. Bridgehub registration and the receive filter are stubbed: they
-/// are owned by `L2Bridgehub` and covered there.
+/// chain binding is its `sourceChainId`. The receive filter is stubbed: it is owned by `L2Bridgehub` and
+/// covered there.
 contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
     /// @dev Remote chains of the flows below; each is aggregated at most once per test, as the builder
     /// requires.
@@ -55,7 +51,7 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
     uint256 internal constant CHAIN_B = 272;
     uint256 internal constant CHAIN_C = 273;
     uint256 internal constant CHAIN_D = 274;
-    uint256 internal constant UNREGISTERED_CHAIN = 999;
+    uint256 internal constant NOT_ALLOWED_CHAIN = 999;
 
     AtomicFlowManager internal manager;
     L2InteropCommitmentTree internal canonicalTree;
@@ -66,26 +62,12 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
 
         uint256[4] memory remotes = [CHAIN_A, CHAIN_B, CHAIN_C, CHAIN_D];
         for (uint256 i = 0; i < remotes.length; ++i) {
-            _setLegChainRegistered(remotes[i], true);
             _setLegChainAllowed(remotes[i], true);
         }
-        _setLegChainRegistered(UNREGISTERED_CHAIN, false);
+        _setLegChainAllowed(NOT_ALLOWED_CHAIN, false);
     }
 
     // ============ helpers ============
-
-    function _setLegChainRegistered(uint256 _chainId, bool _registered) internal {
-        bytes32 assetId = _registered ? keccak256(abi.encode("base token asset id", _chainId)) : bytes32(0);
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSignature("baseTokenAssetId(uint256)", _chainId),
-            abi.encode(assetId)
-        );
-    }
-
-    function _participationValue(bytes32 _flowId, uint256 _chainId) internal pure returns (uint256) {
-        return uint256(keccak256(abi.encode(ATOMIC_PARTICIPATION_LEAF_TAG, _flowId, _chainId)));
-    }
 
     /// @dev An accepted single-leg flow `_source -> _destination`.
     function _singleLegPreimage(
@@ -95,16 +77,23 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
     ) internal pure returns (AtomicFlowPreimage memory preimage) {
         bytes32[] memory legs = new bytes32[](1);
         legs[0] = _leg;
-        uint256[] memory chains = new uint256[](2);
-        chains[0] = _source;
-        chains[1] = _destination;
-        preimage = AtomicFlowFixtures.nLegPreimage(legs, chains, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED;
+        uint256[] memory sources = new uint256[](1);
+        sources[0] = _source;
+        uint256[] memory destinations = new uint256[](1);
+        destinations[0] = _destination;
+        preimage = AtomicFlowFixtures.nLegPreimage(legs, sources, destinations, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
+    /// @dev Accepts `_bundleHash` as a bundle from the source its leg declares (none for a stray bundle).
     function _acceptAsHandler(bytes32 _bundleHash, AtomicFlowPreimage memory _preimage) internal {
+        uint256 sourceChainId;
+        for (uint256 i = 0; i < _preimage.legBundleHashes.length; ++i) {
+            if (_preimage.legBundleHashes[i] == _bundleHash) {
+                sourceChainId = _preimage.legChainIds[i];
+            }
+        }
         vm.prank(L2_INTEROP_HANDLER_ADDR);
-        manager.accept(_bundleHash, 0, _preimage);
+        manager.accept(_bundleHash, sourceChainId, 0, _preimage);
     }
 
     /// @dev A real encodable bundle from this chain to `_destination`, so `claimRefund` can re-derive its hash.
@@ -134,14 +123,13 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         bytes32[] memory legs = new bytes32[](2);
         legs[0] = outgoingFirst ? _outgoing : _incoming;
         legs[1] = outgoingFirst ? _incoming : _outgoing;
-        uint256[] memory chains = new uint256[](4);
-        // Sources of legs[0], legs[1], then their destinations.
-        chains[0] = outgoingFirst ? block.chainid : _peer;
-        chains[1] = outgoingFirst ? _peer : block.chainid;
-        chains[2] = chains[1];
-        chains[3] = chains[0];
-        preimage = AtomicFlowFixtures.nLegPreimage(legs, chains, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED;
+        uint256[] memory sources = new uint256[](2);
+        sources[0] = outgoingFirst ? block.chainid : _peer;
+        sources[1] = outgoingFirst ? _peer : block.chainid;
+        uint256[] memory destinations = new uint256[](2);
+        destinations[0] = sources[1];
+        destinations[1] = sources[0];
+        preimage = AtomicFlowFixtures.nLegPreimage(legs, sources, destinations, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
     function _appendAsCenter(bytes32 _bundleHash, uint256 _destination, AtomicFlowPreimage memory _preimage) internal {
@@ -165,41 +153,12 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         emit IAtomicFlowManager.FlowParticipated(flowId, DEADLINE, expectedIndex);
         _acceptAsHandler(leg, preimage);
 
-        assertTrue(manager.legAccepted(flowId, leg), "acceptance recorded");
+        assertEq(uint256(manager.legState(flowId, leg)), uint256(LegState.Accepted), "acceptance recorded");
         assertEq(canonicalTree.leafCount(), expectedIndex + 1, "one leaf for the chain");
         assertEq(
             canonicalTree.leafAt(expectedIndex).value,
-            _participationValue(flowId, block.chainid),
+            AtomicFlowFixtures.participationValue(flowId, block.chainid),
             "participation value in the IMT"
-        );
-        assertEq(
-            uint256(manager.legState(flowId, leg)),
-            uint256(LegState.Unset),
-            "no source-leg state on the destination"
-        );
-    }
-
-    /// @notice A pure source's only step is committing its leg, so the send inserts the chain's participation
-    /// value instead of a per-leg commit value.
-    function test_append_AcceptedFlow_PureSource_InsertsParticipation() public {
-        bytes32 leg = keccak256("outgoing leg");
-        AtomicFlowPreimage memory preimage = _singleLegPreimage(leg, block.chainid, CHAIN_A);
-        bytes32 flowId = AtomicFlowFixtures.flowId(preimage);
-        uint256 expectedIndex = canonicalTree.leafCount();
-
-        vm.expectEmit(true, true, true, true, address(manager));
-        emit IAtomicFlowManager.FlowLegCommitted(flowId, leg);
-        vm.expectEmit(true, true, true, true, address(manager));
-        emit IAtomicFlowManager.FlowParticipated(flowId, DEADLINE, expectedIndex);
-        _appendAsCenter(leg, CHAIN_A, preimage);
-
-        assertEq(uint256(manager.legState(flowId, leg)), uint256(LegState.Committed), "leg committed");
-        assertFalse(manager.legAccepted(flowId, leg), "the source does not accept its own outgoing leg");
-        assertEq(canonicalTree.leafCount(), expectedIndex + 1, "one leaf for the chain");
-        assertEq(
-            canonicalTree.leafAt(expectedIndex).value,
-            _participationValue(flowId, block.chainid),
-            "participation value, not a commit value"
         );
     }
 
@@ -213,7 +172,7 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         uint256 leavesBefore = canonicalTree.leafCount();
 
         _acceptAsHandler(incoming, preimage);
-        assertTrue(manager.legAccepted(flowId, incoming), "incoming leg accepted");
+        assertEq(uint256(manager.legState(flowId, incoming)), uint256(LegState.Accepted), "incoming leg accepted");
         assertEq(canonicalTree.leafCount(), leavesBefore, "no leaf while the outgoing leg is uncommitted");
 
         vm.expectEmit(true, true, true, true, address(manager));
@@ -221,7 +180,10 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         _appendAsCenter(outgoing, CHAIN_A, preimage);
 
         assertEq(canonicalTree.leafCount(), leavesBefore + 1, "one leaf for both steps");
-        assertEq(canonicalTree.leafAt(leavesBefore).value, _participationValue(flowId, block.chainid));
+        assertEq(
+            canonicalTree.leafAt(leavesBefore).value,
+            AtomicFlowFixtures.participationValue(flowId, block.chainid)
+        );
     }
 
     /// @notice Same swap in the other order: the send inserts nothing, the acceptance inserts the leaf.
@@ -241,7 +203,25 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         _acceptAsHandler(incoming, preimage);
 
         assertEq(canonicalTree.leafCount(), leavesBefore + 1, "one leaf for both steps");
-        assertEq(canonicalTree.leafAt(leavesBefore).value, _participationValue(flowId, block.chainid));
+        assertEq(
+            canonicalTree.leafAt(leavesBefore).value,
+            AtomicFlowFixtures.participationValue(flowId, block.chainid)
+        );
+    }
+
+    /// @notice A preimage may declare a leg from this chain to itself. Accepting a real incoming bundle under
+    /// that leg records the acceptance but does not count as committing it, so the chain never participates
+    /// and the flow cannot finalize.
+    function test_accept_DeclaredSelfLeg_DoesNotParticipate() public {
+        bytes32 leg = keccak256("bundle from CHAIN_A, declared as sent by this chain");
+        AtomicFlowPreimage memory preimage = _singleLegPreimage(leg, block.chainid, block.chainid);
+        bytes32 flowId = AtomicFlowFixtures.flowId(preimage);
+        uint256 leavesBefore = canonicalTree.leafCount();
+
+        _acceptAsHandler(leg, preimage);
+
+        assertEq(uint256(manager.legState(flowId, leg)), uint256(LegState.Accepted), "acceptance recorded");
+        assertEq(canonicalTree.leafCount(), leavesBefore, "no participation value");
     }
 
     /// @notice A chain that sends several legs of one flow inserts one leaf, on its last send.
@@ -252,18 +232,19 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         bytes32[] memory legs = new bytes32[](2);
         legs[0] = legFirst;
         legs[1] = legSecond;
-        uint256[] memory chains = new uint256[](4);
-        chains[0] = block.chainid;
-        chains[1] = block.chainid;
-        chains[2] = CHAIN_A;
-        chains[3] = CHAIN_B;
+        uint256[] memory sources = new uint256[](2);
+        sources[0] = block.chainid;
+        sources[1] = block.chainid;
+        uint256[] memory destinations = new uint256[](2);
+        destinations[0] = CHAIN_A;
+        destinations[1] = CHAIN_B;
         AtomicFlowPreimage memory preimage = AtomicFlowFixtures.nLegPreimage(
             legs,
-            chains,
+            sources,
+            destinations,
             DEADLINE,
             SETTLEMENT_LAYER_CHAIN_ID
         );
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED;
         bytes32 flowId = AtomicFlowFixtures.flowId(preimage);
         uint256 leavesBefore = canonicalTree.leafCount();
 
@@ -272,7 +253,10 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
 
         _appendAsCenter(legSecond, CHAIN_B, preimage);
         assertEq(canonicalTree.leafCount(), leavesBefore + 1, "one leaf after the last send");
-        assertEq(canonicalTree.leafAt(leavesBefore).value, _participationValue(flowId, block.chainid));
+        assertEq(
+            canonicalTree.leafAt(leavesBefore).value,
+            AtomicFlowFixtures.participationValue(flowId, block.chainid)
+        );
     }
 
     // ============ accept: reverts ============
@@ -283,7 +267,7 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
 
         vm.prank(L2_INTEROP_CENTER_ADDR);
         vm.expectRevert(abi.encodeWithSelector(ManagerNotInteropHandler.selector, L2_INTEROP_CENTER_ADDR));
-        manager.accept(leg, 0, preimage);
+        manager.accept(leg, CHAIN_A, 0, preimage);
     }
 
     /// @notice A source-only flow has no acceptances: its preimage declares no destinations to check.
@@ -293,7 +277,7 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         legs[0] = leg;
         uint256[] memory chains = new uint256[](1);
         chains[0] = CHAIN_A;
-        AtomicFlowPreimage memory preimage = AtomicFlowFixtures.nLegPreimage(
+        AtomicFlowPreimage memory preimage = AtomicFlowFixtures.sourceOnlyPreimage(
             legs,
             chains,
             DEADLINE,
@@ -310,15 +294,13 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         _acceptAsHandler(leg, preimage);
     }
 
-    /// @notice An accepted flow must declare a destination per leg (`2n` chain ids).
+    /// @notice An accepted flow must declare a destination per leg.
     function test_accept_RevertWhen_DestinationsMissing() public {
         bytes32 leg = keccak256("incoming leg");
         AtomicFlowPreimage memory preimage = _singleLegPreimage(leg, CHAIN_A, block.chainid);
-        uint256[] memory sourcesOnly = new uint256[](1);
-        sourcesOnly[0] = CHAIN_A;
-        preimage.legChainIds = sourcesOnly;
+        preimage.legDestinationChainIds = new uint256[](0);
 
-        vm.expectRevert(abi.encodeWithSelector(ManagerLegChainIdsLengthMismatch.selector, 2, 1));
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegDestinationChainIdsLengthMismatch.selector, 1, 0));
         _acceptAsHandler(leg, preimage);
     }
 
@@ -327,7 +309,7 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         bytes32 stray = keccak256("stray bundle");
 
         vm.expectRevert(
-            abi.encodeWithSelector(ManagerAcceptedBundleNotInFlow.selector, AtomicFlowFixtures.flowId(preimage), stray)
+            abi.encodeWithSelector(ManagerBundleNotInFlow.selector, AtomicFlowFixtures.flowId(preimage), stray)
         );
         _acceptAsHandler(stray, preimage);
     }
@@ -349,13 +331,33 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         _acceptAsHandler(leg, preimage);
     }
 
+    /// @notice The bundle must come from the source its leg declares: that source's commit is what finality
+    /// and the refund prove, so a bundle from anywhere else could only leave the flow to time out.
+    function test_accept_RevertWhen_BundleFromAnotherSource() public {
+        bytes32 leg = keccak256("incoming leg");
+        AtomicFlowPreimage memory preimage = _singleLegPreimage(leg, CHAIN_A, block.chainid);
+        bytes32 flowId = AtomicFlowFixtures.flowId(preimage);
+
+        vm.prank(L2_INTEROP_HANDLER_ADDR);
+        vm.expectRevert(
+            abi.encodeWithSelector(ManagerAcceptedLegSourceChainMismatch.selector, flowId, CHAIN_B, CHAIN_A)
+        );
+        manager.accept(leg, CHAIN_B, 0, preimage);
+        assertEq(uint256(manager.legState(flowId, leg)), uint256(LegState.Unset), "nothing recorded");
+    }
+
     function test_accept_RevertWhen_AlreadyAccepted() public {
         bytes32 leg = keccak256("incoming leg");
         AtomicFlowPreimage memory preimage = _singleLegPreimage(leg, CHAIN_A, block.chainid);
         _acceptAsHandler(leg, preimage);
 
         vm.expectRevert(
-            abi.encodeWithSelector(ManagerLegAlreadyAccepted.selector, AtomicFlowFixtures.flowId(preimage), leg)
+            abi.encodeWithSelector(
+                ManagerLegAlreadyRecorded.selector,
+                AtomicFlowFixtures.flowId(preimage),
+                leg,
+                LegState.Accepted
+            )
         );
         _acceptAsHandler(leg, preimage);
     }
@@ -382,12 +384,29 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         _acceptAsHandler(leg, preimage);
     }
 
-    function test_accept_RevertWhen_LegChainNotRegistered() public {
-        bytes32 leg = keccak256("incoming leg");
-        AtomicFlowPreimage memory preimage = _singleLegPreimage(leg, UNREGISTERED_CHAIN, block.chainid);
+    /// @notice The filter covers the destinations of the other legs too: this chain could not prove a
+    /// non-allowed chain's participation, so it could neither execute the flow nor refund it.
+    function test_accept_RevertWhen_OtherLegDestinationNotAllowed() public {
+        bytes32 legX = keccak256("incoming leg");
+        bytes32 legY = keccak256("leg to a chain this one does not allow");
+        bytes32[] memory legs = new bytes32[](2);
+        (legs[0], legs[1]) = legX < legY ? (legX, legY) : (legY, legX);
+        uint256[] memory sources = new uint256[](2);
+        sources[0] = CHAIN_A;
+        sources[1] = CHAIN_A;
+        uint256[] memory destinations = new uint256[](2);
+        destinations[legs[0] == legX ? 0 : 1] = block.chainid;
+        destinations[legs[0] == legX ? 1 : 0] = NOT_ALLOWED_CHAIN;
+        AtomicFlowPreimage memory preimage = AtomicFlowFixtures.nLegPreimage(
+            legs,
+            sources,
+            destinations,
+            DEADLINE,
+            SETTLEMENT_LAYER_CHAIN_ID
+        );
 
-        vm.expectRevert(abi.encodeWithSelector(ManagerLegChainNotRegistered.selector, UNREGISTERED_CHAIN));
-        _acceptAsHandler(leg, preimage);
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegChainNotAllowed.selector, NOT_ALLOWED_CHAIN));
+        _acceptAsHandler(legX, preimage);
     }
 
     // ============ append: declared destination ============
@@ -410,21 +429,22 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         manager.append(leg, CHAIN_B, 0, preimage);
     }
 
-    /// @notice The registration gate scans all `2n` entries of an accepted flow: an unregistered declared
-    /// destination (`legChainIds[n]` here) is rejected at send, as its acceptance could never be proven.
-    function test_append_AcceptedFlow_RevertWhen_DestinationChainNotRegistered() public {
+    /// @notice The receive filter covers the declared destinations too: a leg to a chain this one does not
+    /// allow is rejected at send, as that chain's participation could never be proven here.
+    function test_append_AcceptedFlow_RevertWhen_DestinationChainNotAllowed() public {
         bytes32 leg = keccak256("outgoing leg");
-        AtomicFlowPreimage memory preimage = _singleLegPreimage(leg, block.chainid, UNREGISTERED_CHAIN);
+        AtomicFlowPreimage memory preimage = _singleLegPreimage(leg, block.chainid, NOT_ALLOWED_CHAIN);
 
         vm.prank(L2_INTEROP_CENTER_ADDR);
-        vm.expectRevert(abi.encodeWithSelector(ManagerLegChainNotRegistered.selector, UNREGISTERED_CHAIN));
-        manager.append(leg, UNREGISTERED_CHAIN, 0, preimage);
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegChainNotAllowed.selector, NOT_ALLOWED_CHAIN));
+        manager.append(leg, NOT_ALLOWED_CHAIN, 0, preimage);
     }
 
     // ============ finality ============
 
     /// @dev Two legs `A -> C` and `B -> D`: four participating chains, each with its participation value in
-    /// the oracle tree. Returns the preimage and the four proofs in first-appearance order of `legChainIds`.
+    /// the oracle tree. Returns the preimage and the four proofs in first-appearance order: `legChainIds`, then
+    /// `legDestinationChainIds`.
     function _twoLegAcceptedFlow(
         bool _withLastParticipation
     ) internal returns (AtomicFinalityProof memory finality, bytes32 legFirst, bytes32 legSecond) {
@@ -435,25 +455,28 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         bytes32[] memory legs = new bytes32[](2);
         legs[0] = legFirst;
         legs[1] = legSecond;
-        uint256[] memory chains = new uint256[](4);
-        chains[0] = CHAIN_A;
-        chains[1] = CHAIN_B;
-        chains[2] = CHAIN_C;
-        chains[3] = CHAIN_D;
+        uint256[] memory sources = new uint256[](2);
+        sources[0] = CHAIN_A;
+        sources[1] = CHAIN_B;
+        uint256[] memory destinations = new uint256[](2);
+        destinations[0] = CHAIN_C;
+        destinations[1] = CHAIN_D;
         AtomicFlowPreimage memory preimage = AtomicFlowFixtures.nLegPreimage(
             legs,
-            chains,
+            sources,
+            destinations,
             DEADLINE,
             SETTLEMENT_LAYER_CHAIN_ID
         );
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED;
         bytes32 flowId = AtomicFlowFixtures.flowId(preimage);
 
-        uint256 leafA = _insertCommit(_participationValue(flowId, CHAIN_A));
-        uint256 leafB = _insertCommit(_participationValue(flowId, CHAIN_B));
-        uint256 leafC = _insertCommit(_participationValue(flowId, CHAIN_C));
+        uint256 leafA = _insertCommit(AtomicFlowFixtures.participationValue(flowId, CHAIN_A));
+        uint256 leafB = _insertCommit(AtomicFlowFixtures.participationValue(flowId, CHAIN_B));
+        uint256 leafC = _insertCommit(AtomicFlowFixtures.participationValue(flowId, CHAIN_C));
         // Without D's participation, its proof slot points at C's leaf instead.
-        uint256 leafD = _withLastParticipation ? _insertCommit(_participationValue(flowId, CHAIN_D)) : leafC;
+        uint256 leafD = _withLastParticipation
+            ? _insertCommit(AtomicFlowFixtures.participationValue(flowId, CHAIN_D))
+            : leafC;
 
         finality.flow = AtomicFlow({flowId: flowId, preimage: preimage});
         finality.proofs = new ImtProof[](4);
@@ -463,7 +486,7 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         finality.proofs[3] = _realInclusionProof(CHAIN_D, leafD, DEADLINE - 1);
     }
 
-    /// @dev A swap `A -> B`, `B -> A`: `legChainIds` lists each chain twice, but each participates once.
+    /// @dev A swap `A -> B`, `B -> A`: the preimage lists each chain twice, but each participates once.
     function _swapAcceptedFlow() internal returns (AtomicFinalityProof memory finality, bytes32 legFirst) {
         bytes32 legX = keccak256("swap leg X");
         bytes32 legY = keccak256("swap leg Y");
@@ -473,22 +496,23 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         bytes32[] memory legs = new bytes32[](2);
         legs[0] = legFirst;
         legs[1] = legSecond;
-        uint256[] memory chains = new uint256[](4);
-        chains[0] = CHAIN_A;
-        chains[1] = CHAIN_B;
-        chains[2] = CHAIN_B;
-        chains[3] = CHAIN_A;
+        uint256[] memory sources = new uint256[](2);
+        sources[0] = CHAIN_A;
+        sources[1] = CHAIN_B;
+        uint256[] memory destinations = new uint256[](2);
+        destinations[0] = CHAIN_B;
+        destinations[1] = CHAIN_A;
         AtomicFlowPreimage memory preimage = AtomicFlowFixtures.nLegPreimage(
             legs,
-            chains,
+            sources,
+            destinations,
             DEADLINE,
             SETTLEMENT_LAYER_CHAIN_ID
         );
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED;
         bytes32 flowId = AtomicFlowFixtures.flowId(preimage);
 
-        uint256 leafA = _insertCommit(_participationValue(flowId, CHAIN_A));
-        uint256 leafB = _insertCommit(_participationValue(flowId, CHAIN_B));
+        uint256 leafA = _insertCommit(AtomicFlowFixtures.participationValue(flowId, CHAIN_A));
+        uint256 leafB = _insertCommit(AtomicFlowFixtures.participationValue(flowId, CHAIN_B));
 
         finality.flow = AtomicFlow({flowId: flowId, preimage: preimage});
         finality.proofs = new ImtProof[](2);
@@ -528,29 +552,31 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         _requireFinalizedAsHandler(legFirst, finality);
     }
 
-    /// @notice Proofs follow each chain's first appearance in `legChainIds`, not its positions: a fan-out
-    /// `A -> C`, `A -> D` lists `[A, A, C, D]` and takes the proofs `[A, C, D]`.
+    /// @notice Proofs follow each chain's first appearance in `legChainIds` then `legDestinationChainIds`, not
+    /// its positions: a fan-out `A -> C`, `A -> D` lists sources `[A, A]` and destinations `[C, D]`, and takes
+    /// the proofs `[A, C, D]`.
     function test_requireFlowFinalized_FanOut_ProofsInFirstAppearanceOrder() public {
         bytes32 legX = keccak256("fan-out leg X");
         bytes32 legY = keccak256("fan-out leg Y");
         bytes32[] memory legs = new bytes32[](2);
         (legs[0], legs[1]) = legX < legY ? (legX, legY) : (legY, legX);
-        uint256[] memory chains = new uint256[](4);
-        chains[0] = CHAIN_A;
-        chains[1] = CHAIN_A;
-        chains[2] = CHAIN_C;
-        chains[3] = CHAIN_D;
+        uint256[] memory sources = new uint256[](2);
+        sources[0] = CHAIN_A;
+        sources[1] = CHAIN_A;
+        uint256[] memory destinations = new uint256[](2);
+        destinations[0] = CHAIN_C;
+        destinations[1] = CHAIN_D;
         AtomicFlowPreimage memory preimage = AtomicFlowFixtures.nLegPreimage(
             legs,
-            chains,
+            sources,
+            destinations,
             DEADLINE,
             SETTLEMENT_LAYER_CHAIN_ID
         );
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED;
         bytes32 flowId = AtomicFlowFixtures.flowId(preimage);
-        uint256 leafA = _insertCommit(_participationValue(flowId, CHAIN_A));
-        uint256 leafC = _insertCommit(_participationValue(flowId, CHAIN_C));
-        uint256 leafD = _insertCommit(_participationValue(flowId, CHAIN_D));
+        uint256 leafA = _insertCommit(AtomicFlowFixtures.participationValue(flowId, CHAIN_A));
+        uint256 leafC = _insertCommit(AtomicFlowFixtures.participationValue(flowId, CHAIN_C));
+        uint256 leafD = _insertCommit(AtomicFlowFixtures.participationValue(flowId, CHAIN_D));
 
         AtomicFinalityProof memory finality;
         finality.flow = AtomicFlow({flowId: flowId, preimage: preimage});
@@ -572,7 +598,7 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         uint256[] memory chains = new uint256[](2);
         chains[0] = CHAIN_A;
         chains[1] = CHAIN_A;
-        AtomicFlowPreimage memory preimage = AtomicFlowFixtures.nLegPreimage(
+        AtomicFlowPreimage memory preimage = AtomicFlowFixtures.sourceOnlyPreimage(
             legs,
             chains,
             DEADLINE,
@@ -611,8 +637,8 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IMTLeafValueMismatch.selector,
-                _participationValue(flowId, CHAIN_D),
-                _participationValue(flowId, CHAIN_C)
+                AtomicFlowFixtures.participationValue(flowId, CHAIN_D),
+                AtomicFlowFixtures.participationValue(flowId, CHAIN_C)
             )
         );
         _requireFinalizedAsHandler(legFirst, finality);
@@ -639,19 +665,18 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         manager.append(leg, CHAIN_A, 0, preimage);
         // Decoy: the source's participation is in CHAIN_A's tree too, so a refund that proved the absence of
         // any value but the indexed chain's would fail.
-        _insertCommit(_participationValue(flowId, block.chainid));
+        _insertCommit(AtomicFlowFixtures.participationValue(flowId, block.chainid));
 
-        // Index 1 names CHAIN_A, the leg's destination, in `legChainIds`.
-        uint256 destinationIndex = 1;
+        // The absence is proven on CHAIN_A, the destination of leg 0.
         ImtProof memory absence = _realTimeoutBeginProof(
             CHAIN_A,
-            _participationValue(flowId, CHAIN_A),
+            AtomicFlowFixtures.participationValue(flowId, CHAIN_A),
             uint256(DEADLINE) + 1
         );
 
         vm.expectEmit(true, true, true, true, address(manager));
         emit IAtomicFlowManager.FlowRefundAuthorized(flowId, leg);
-        manager.authorizeRefund(AtomicFlow({flowId: flowId, preimage: preimage}), destinationIndex, absence);
+        manager.authorizeRefund(AtomicFlow({flowId: flowId, preimage: preimage}), 0, absence);
         assertEq(uint256(manager.legState(flowId, leg)), uint256(LegState.Revertable), "leg revertable");
 
         vm.expectEmit(true, true, true, true, address(manager));
@@ -660,9 +685,9 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         assertEq(uint256(manager.legState(flowId, leg)), uint256(LegState.Reverted), "leg reverted");
     }
 
-    /// @notice The double-mint guard covers participations too: the absence must be proven on the chain the
-    /// index names, since its participation value is trivially absent from every other chain's tree.
-    function test_authorizeRefund_AcceptedFlow_RevertWhen_AbsenceOnWrongChain() public {
+    /// @notice The double-mint guard covers participations too: the absence must be proven on a chain of the
+    /// indexed leg, since the value checked is that chain's own participation, absent from every other tree.
+    function test_authorizeRefund_AcceptedFlow_RevertWhen_AbsenceOnChainOutsideLeg() public {
         (, bytes32 leg) = _bundleTo(CHAIN_A);
         AtomicFlowPreimage memory preimage = _singleLegPreimage(leg, block.chainid, CHAIN_A);
         bytes32 flowId = AtomicFlowFixtures.flowId(preimage);
@@ -671,12 +696,12 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
 
         ImtProof memory absence = _realTimeoutBeginProof(
             CHAIN_B,
-            _participationValue(flowId, CHAIN_A),
+            AtomicFlowFixtures.participationValue(flowId, CHAIN_A),
             uint256(DEADLINE) + 1
         );
 
-        vm.expectRevert(abi.encodeWithSelector(ProofSourceChainMismatch.selector, CHAIN_A, CHAIN_B));
-        manager.authorizeRefund(AtomicFlow({flowId: flowId, preimage: preimage}), 1, absence);
+        vm.expectRevert(abi.encodeWithSelector(ManagerAbsenceChainNotInLeg.selector, flowId, 0, CHAIN_B));
+        manager.authorizeRefund(AtomicFlow({flowId: flowId, preimage: preimage}), 0, absence);
         assertEq(uint256(manager.legState(flowId, leg)), uint256(LegState.Committed), "leg still committed");
     }
 
@@ -688,7 +713,7 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         bytes32 flowId = AtomicFlowFixtures.flowId(preimage);
         vm.prank(L2_INTEROP_CENTER_ADDR);
         manager.append(leg, CHAIN_A, 0, preimage);
-        uint256 present = _participationValue(flowId, CHAIN_A);
+        uint256 present = AtomicFlowFixtures.participationValue(flowId, CHAIN_A);
         _insertCommit(present);
 
         // A genuine late-batch proof, re-pointed at `present`'s predecessor: the only leaf that could
@@ -704,7 +729,7 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         absence.imtProof = tree.merklePath(predecessor);
 
         vm.expectRevert(abi.encodeWithSelector(IMTLowLeafNextTooSmall.selector, present, present));
-        manager.authorizeRefund(AtomicFlow({flowId: flowId, preimage: preimage}), 1, absence);
+        manager.authorizeRefund(AtomicFlow({flowId: flowId, preimage: preimage}), 0, absence);
         assertEq(uint256(manager.legState(flowId, leg)), uint256(LegState.Committed), "leg still committed");
     }
 
@@ -720,16 +745,17 @@ contract AtomicFlowManagerAcceptTest is AtomicInteropProofBuilder {
         _appendAsCenter(outgoing, CHAIN_A, preimage);
         assertEq(canonicalTree.leafCount(), leavesBefore, "no participation without the incoming acceptance");
 
-        uint256 peerIndex = preimage.legChainIds[0] == CHAIN_A ? 0 : 1;
+        // CHAIN_A is the source of the incoming leg.
+        uint256 incomingIndex = preimage.legBundleHashes[0] == incoming ? 0 : 1;
         ImtProof memory absence = _realTimeoutBeginProof(
             CHAIN_A,
-            _participationValue(flowId, CHAIN_A),
+            AtomicFlowFixtures.participationValue(flowId, CHAIN_A),
             uint256(DEADLINE) + 1
         );
 
         vm.expectEmit(true, true, true, true, address(manager));
         emit IAtomicFlowManager.FlowRefundAuthorized(flowId, outgoing);
-        manager.authorizeRefund(AtomicFlow({flowId: flowId, preimage: preimage}), peerIndex, absence);
+        manager.authorizeRefund(AtomicFlow({flowId: flowId, preimage: preimage}), incomingIndex, absence);
         assertEq(uint256(manager.legState(flowId, outgoing)), uint256(LegState.Revertable), "leg revertable");
 
         manager.claimRefund(flowId, bundleBytes);

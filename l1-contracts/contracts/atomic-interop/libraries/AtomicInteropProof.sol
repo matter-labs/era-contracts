@@ -76,7 +76,7 @@ library AtomicInteropProof {
     /// @notice Timeout proof: shows `_commitValue` was not committed by the deadline and the flow can
     /// never finalize (the timeout condition from the library header, either branch).
     /// @dev The caller ({AtomicFlowManager.authorizeRefund}) checks
-    /// `_proof.sourceChainId == legChainIds[i]`; the SL match is checked here.
+    /// that `_proof.sourceChainId` is a chain of the missing leg; the SL match is checked here.
     /// @param _absence Non-inclusion proof against the begin (late batch) or end (last in-time batch)
     /// IMT root.
     /// @param _expectedSlChainId The flow's `settlementLayerChainId` the proof's root must settle on.

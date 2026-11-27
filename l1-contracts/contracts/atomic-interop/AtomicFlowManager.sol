@@ -9,6 +9,7 @@ import {
     LegState,
     AtomicFlow,
     AtomicFlowPreimage,
+    SourceOnlyFlowPreimage,
     ImtProof,
     AtomicFinalityProof,
     ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY,
@@ -28,26 +29,26 @@ import {
 import {L2_BRIDGEHUB, L2_INTEROP_ROOT_STORAGE} from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {IL2Bridgehub} from "../core/bridgehub/IL2Bridgehub.sol";
 import {
-    ManagerAcceptedBundleNotInFlow,
+    ManagerAbsenceChainNotInLeg,
     ManagerAcceptedLegDestinationChainMismatch,
+    ManagerAcceptedLegSourceChainMismatch,
     ManagerAlreadyInitialized,
     ManagerL1ChainIdZero,
     ManagerNotInteropCenter,
     ManagerNotInteropHandler,
-    ManagerLegAlreadyAccepted,
-    ManagerLegAlreadyCommitted,
+    ManagerLegAlreadyRecorded,
     ManagerLegNotRevertable,
     ManagerFlowDeadlinePassed,
     ManagerFlowIdMismatch,
     ManagerFlowPreimageVersionMismatch,
     ManagerBundleHashesNotSorted,
-    ManagerCommittedBundleNotInFlow,
+    ManagerBundleNotInFlow,
     ManagerCommittedLegDestinationChainMismatch,
     ManagerCommittedLegSourceChainMismatch,
     ManagerLegChainNotAllowed,
-    ManagerLegChainNotRegistered,
     ManagerTooManyLegs,
     ManagerLegChainIdsLengthMismatch,
+    ManagerLegDestinationChainIdsLengthMismatch,
     ManagerMissingLegIndexOutOfRange,
     ManagerProofCountMismatch,
     ManagerExecutingBundleNotInFlow,
@@ -62,15 +63,12 @@ import {RecoverToL1NotSupported, Unauthorized} from "../common/L1ContractErrors.
 /// destination-side acceptance, per-chain participation, finality gate, timeout refund); it never custodies funds. See {protocol-docs/atomicity/flow.md#the-atomicflowmanager};
 /// the exact finalization/timeout conditions live in the {AtomicInteropProof} library header.
 contract AtomicFlowManager is IAtomicFlowManager {
-    /// @dev (flowId, bundleHash) => source-leg state on this chain.
+    /// @dev (flowId, bundleHash) => leg state on this chain (see {LegState}).
     mapping(bytes32 flowId => mapping(bytes32 bundleHash => LegState)) internal _state;
 
     /// @dev The L1 chain ID, set once in `initL2`; every flow's `settlementLayerChainId` must equal it
     /// (atomic interop is L1-settling only in this release).
     uint256 public L1_CHAIN_ID;
-
-    /// @dev (flowId, bundleHash) => whether this chain, as the leg's destination, accepted it.
-    mapping(bytes32 flowId => mapping(bytes32 bundleHash => bool accepted)) internal _accepted;
 
     /// @dev Only allows calls from the complex upgrader contract on L2.
     modifier onlyUpgrader() {
@@ -115,90 +113,40 @@ contract AtomicFlowManager is IAtomicFlowManager {
         uint256 _lowNullifierIndex,
         AtomicFlowPreimage calldata _flowPreimage
     ) external onlyInteropCenter {
-        bytes32 flowId = _validateAndComputeFlowId(_flowPreimage);
-        _checkSettlementLayerIsL1(_flowPreimage.settlementLayerChainId);
-        _checkDeadlineNotPassed(_flowPreimage);
-
-        // The committing bundle must be one of the flow's legs, declared with this chain as its source
-        // (see {AtomicFlowPreimage}).
-        uint256 n = _flowPreimage.legBundleHashes.length;
-        uint256 legIndex = _legIndex(_flowPreimage, _bundleHash);
-        if (legIndex == n) {
-            revert ManagerCommittedBundleNotInFlow(flowId, _bundleHash);
-        }
+        (bytes32 flowId, uint256 legIndex) = _checkLegStep(_flowPreimage, _bundleHash);
         if (_flowPreimage.legChainIds[legIndex] != block.chainid) {
             revert ManagerCommittedLegSourceChainMismatch(flowId, block.chainid, _flowPreimage.legChainIds[legIndex]);
         }
         // A wrong declared destination could never accept the leg, so the flow would only time out.
-        if (_flowPreimage.version == ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED) {
-            uint256 declaredDestinationChainId = _flowPreimage.legChainIds[n + legIndex];
-            if (declaredDestinationChainId != _destinationChainId) {
-                revert ManagerCommittedLegDestinationChainMismatch(
-                    flowId,
-                    _destinationChainId,
-                    declaredDestinationChainId
-                );
-            }
+        uint256 declaredDestinationChainId = _flowPreimage.legDestinationChainIds[legIndex];
+        if (declaredDestinationChainId != _destinationChainId) {
+            revert ManagerCommittedLegDestinationChainMismatch(flowId, _destinationChainId, declaredDestinationChainId);
         }
 
-        _checkLegChainsRegistered(_flowPreimage);
-
-        if (_state[flowId][_bundleHash] != LegState.Unset) {
-            revert ManagerLegAlreadyCommitted(flowId, _bundleHash);
-        }
-        // Effects before interaction: mark committed before touching the tree.
-        _state[flowId][_bundleHash] = LegState.Committed;
-
-        if (_flowPreimage.version == ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED) {
-            emit FlowLegCommitted(flowId, _bundleHash);
-            _participateIfComplete(flowId, _flowPreimage, _lowNullifierIndex);
-            return;
-        }
-
-        uint256 value = AtomicInteropProof.commitValue(flowId, _bundleHash);
-        // slither-disable-next-line unused-return
-        (uint256 index, ) = IL2InteropCommitmentTree(commitmentTree()).insert(value, _lowNullifierIndex);
-
-        emit FlowCommitted(flowId, _bundleHash, _flowPreimage.deadline, index);
+        _setLegState(flowId, _bundleHash, LegState.Committed);
+        emit FlowLegCommitted(flowId, _bundleHash);
+        _participateIfComplete(flowId, _flowPreimage, _lowNullifierIndex);
     }
 
     /// @inheritdoc IAtomicFlowManager
     function accept(
         bytes32 _bundleHash,
+        uint256 _sourceChainId,
         uint256 _lowNullifierIndex,
         AtomicFlowPreimage calldata _flowPreimage
     ) external onlyInteropHandler {
-        bytes32 flowId = _validateAndComputeFlowId(_flowPreimage);
-        if (_flowPreimage.version != ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED) {
-            revert ManagerFlowPreimageVersionMismatch(ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED, _flowPreimage.version);
-        }
-        _checkSettlementLayerIsL1(_flowPreimage.settlementLayerChainId);
-        _checkDeadlineNotPassed(_flowPreimage);
-
-        uint256 n = _flowPreimage.legBundleHashes.length;
-        uint256 legIndex = _legIndex(_flowPreimage, _bundleHash);
-        if (legIndex == n) {
-            revert ManagerAcceptedBundleNotInFlow(flowId, _bundleHash);
-        }
-        uint256 declaredDestinationChainId = _flowPreimage.legChainIds[n + legIndex];
+        (bytes32 flowId, uint256 legIndex) = _checkLegStep(_flowPreimage, _bundleHash);
+        uint256 declaredDestinationChainId = _flowPreimage.legDestinationChainIds[legIndex];
         if (declaredDestinationChainId != block.chainid) {
             revert ManagerAcceptedLegDestinationChainMismatch(flowId, block.chainid, declaredDestinationChainId);
         }
-
-        // Accept only a flow this chain could execute: every chain whose tree the finality proof reads
-        // must be registered and accepted by this chain's receive filter.
-        _checkLegChainsRegistered(_flowPreimage);
-        uint256 m = _flowPreimage.legChainIds.length;
-        for (uint256 i = 0; i < m; ++i) {
-            _checkLegChainAllowed(_flowPreimage.legChainIds[i]);
+        // A wrong declared source could never commit the leg, so the flow would only time out.
+        if (_flowPreimage.legChainIds[legIndex] != _sourceChainId) {
+            revert ManagerAcceptedLegSourceChainMismatch(flowId, _sourceChainId, _flowPreimage.legChainIds[legIndex]);
         }
 
-        if (_accepted[flowId][_bundleHash]) {
-            revert ManagerLegAlreadyAccepted(flowId, _bundleHash);
-        }
-        _accepted[flowId][_bundleHash] = true;
+        _setLegState(flowId, _bundleHash, LegState.Accepted);
         emit FlowAccepted(flowId, _bundleHash);
-
         _participateIfComplete(flowId, _flowPreimage, _lowNullifierIndex);
     }
 
@@ -251,29 +199,33 @@ contract AtomicFlowManager is IAtomicFlowManager {
         _checkFlowId(_flow);
         _checkSettlementLayerIsL1(_flow.preimage.settlementLayerChainId);
 
-        // Bind the absence proof to the chain declared at the index: a commitment value is trivially
-        // absent from any OTHER chain's tree, so an unbound proof would allow a double-mint refund of a
-        // finalized flow. See {protocol-docs/atomicity/proofs.md#timeout}.
+        // Bind the absence proof to a chain the leg declares: a commitment value is trivially absent from any
+        // OTHER chain's tree, so an unbound proof would allow a double-mint refund of a finalized flow. See
+        // {protocol-docs/atomicity/proofs.md#timeout}.
         AtomicFlowPreimage calldata preimage = _flow.preimage;
-        if (_missingLegIndex >= preimage.legChainIds.length) {
-            revert ManagerMissingLegIndexOutOfRange(preimage.legChainIds.length, _missingLegIndex);
+        uint256 n = preimage.legBundleHashes.length;
+        if (_missingLegIndex >= n) {
+            revert ManagerMissingLegIndexOutOfRange(n, _missingLegIndex);
         }
-        uint256 missingLegChainId = preimage.legChainIds[_missingLegIndex];
-        if (_absence.sourceChainId != missingLegChainId) {
-            revert ProofSourceChainMismatch(missingLegChainId, _absence.sourceChainId);
+        uint256 missingChainId = _absence.sourceChainId;
+        bool isSourceOnly = preimage.version == ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY;
+        if (
+            missingChainId != preimage.legChainIds[_missingLegIndex] &&
+            (isSourceOnly || missingChainId != preimage.legDestinationChainIds[_missingLegIndex])
+        ) {
+            revert ManagerAbsenceChainNotInLeg(_flow.flowId, _missingLegIndex, missingChainId);
         }
-        _checkLegChainAllowed(missingLegChainId);
+        _checkLegChainAllowed(missingChainId);
 
         AtomicInteropProof.verifyTimeoutAbsence(
             _absence,
-            _commitmentValue(_flow.flowId, preimage, _missingLegIndex),
+            _commitmentValue(_flow.flowId, preimage, _missingLegIndex, missingChainId),
             preimage.deadline,
             preimage.settlementLayerChainId
         );
 
         // Mark this chain's committed source legs Revertable (legs committed on other chains are not
         // in this manager's state, so they are skipped).
-        uint256 n = preimage.legBundleHashes.length;
         for (uint256 i = 0; i < n; ++i) {
             bytes32 h = preimage.legBundleHashes[i];
             if (_state[_flow.flowId][h] != LegState.Committed) {
@@ -305,11 +257,6 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// @inheritdoc IAtomicFlowManager
     function legState(bytes32 _flowId, bytes32 _bundleHash) external view returns (LegState) {
         return _state[_flowId][_bundleHash];
-    }
-
-    /// @inheritdoc IAtomicFlowManager
-    function legAccepted(bytes32 _flowId, bytes32 _bundleHash) external view returns (bool) {
-        return _accepted[_flowId][_bundleHash];
     }
 
     /// @inheritdoc IAtomicFlowManager
@@ -367,6 +314,45 @@ contract AtomicFlowManager is IAtomicFlowManager {
         }
     }
 
+    /// @dev The checks a local step of a flow (`append` or `accept`) shares: the preimage is valid and of the
+    /// version new flows are sent in, the flow settles on L1, its deadline has not verifiably passed, every chain
+    /// of the flow passes this chain's receive filter, and `_bundleHash` is one of its legs.
+    /// @return flowId The flow's id, recomputed from `_flowPreimage`.
+    /// @return legIndex The index of `_bundleHash` in `legBundleHashes`.
+    function _checkLegStep(
+        AtomicFlowPreimage calldata _flowPreimage,
+        bytes32 _bundleHash
+    ) internal view returns (bytes32 flowId, uint256 legIndex) {
+        flowId = _validateAndComputeFlowId(_flowPreimage);
+        // Source-only flows sent before accepted flows were introduced stay finalizable and refundable, but
+        // no new one can be started.
+        if (_flowPreimage.version != ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED) {
+            revert ManagerFlowPreimageVersionMismatch(ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED, _flowPreimage.version);
+        }
+        _checkSettlementLayerIsL1(_flowPreimage.settlementLayerChainId);
+        _checkDeadlineNotPassed(_flowPreimage);
+        // This chain must be able to verify every chain's participation, to execute the flow and to refund it.
+        uint256 n = _flowPreimage.legBundleHashes.length;
+        for (uint256 i = 0; i < n; ++i) {
+            _checkLegChainAllowed(_flowPreimage.legChainIds[i]);
+            _checkLegChainAllowed(_flowPreimage.legDestinationChainIds[i]);
+        }
+
+        legIndex = _legIndex(_flowPreimage, _bundleHash);
+        if (legIndex == n) {
+            revert ManagerBundleNotInFlow(flowId, _bundleHash);
+        }
+    }
+
+    /// @dev Records a local step on a leg this chain has not yet recorded one for.
+    function _setLegState(bytes32 _flowId, bytes32 _bundleHash, LegState _newState) internal {
+        LegState current = _state[_flowId][_bundleHash];
+        if (current != LegState.Unset) {
+            revert ManagerLegAlreadyRecorded(_flowId, _bundleHash, current);
+        }
+        _state[_flowId][_bundleHash] = _newState;
+    }
+
     /// @dev Reject a commitment to a flow whose deadline has verifiably passed: an imported settlement-layer
     /// root created after the deadline is exactly what `authorizeRefund` needs, so committing now could only
     /// lock funds into a flow that must be refunded. As an expired-flow guard this is BEST EFFORT only —
@@ -383,23 +369,6 @@ contract AtomicFlowManager is IAtomicFlowManager {
         }
     }
 
-    /// @dev Every chain whose tree holds a commitment of the flow must be Bridgehub-registered: registration
-    /// guarantees MessageRoot presence, without which the commitment could never be proven present OR absent
-    /// and the whole flow would be stranded. See
-    /// {protocol-docs/atomicity/security.md#timeout-protocol-preconditions}.
-    function _checkLegChainsRegistered(AtomicFlowPreimage calldata _flowPreimage) internal view {
-        uint256 m = _flowPreimage.legChainIds.length;
-        for (uint256 i = 0; i < m; ++i) {
-            uint256 legChainId = _flowPreimage.legChainIds[i];
-            if (legChainId == block.chainid) {
-                continue;
-            }
-            if (L2_BRIDGEHUB.baseTokenAssetId(legChainId) == bytes32(0)) {
-                revert ManagerLegChainNotRegistered(legChainId);
-            }
-        }
-    }
-
     /// @dev Index of `_bundleHash` in the strictly ascending `legBundleHashes`, or its length if absent.
     function _legIndex(AtomicFlowPreimage calldata _flowPreimage, bytes32 _bundleHash) internal pure returns (uint256) {
         uint256 n = _flowPreimage.legBundleHashes.length;
@@ -411,37 +380,40 @@ contract AtomicFlowManager is IAtomicFlowManager {
         return n;
     }
 
-    /// @dev The IMT value that `legChainIds[_index]` must hold for the flow: leg `_index`'s commit value in a
-    /// source-only flow, or that chain's participation value in an accepted flow.
+    /// @dev The IMT value `_chainId`, a chain of leg `_leg`, must hold for the flow: the leg's commit value in
+    /// a source-only flow, or that chain's participation value in an accepted flow.
     function _commitmentValue(
         bytes32 _flowId,
         AtomicFlowPreimage calldata _preimage,
-        uint256 _index
+        uint256 _leg,
+        uint256 _chainId
     ) internal pure returns (uint256) {
         if (_preimage.version == ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY) {
-            return AtomicInteropProof.commitValue(_flowId, _preimage.legBundleHashes[_index]);
+            return AtomicInteropProof.commitValue(_flowId, _preimage.legBundleHashes[_leg]);
         }
-        return AtomicInteropProof.participationValue(_flowId, _preimage.legChainIds[_index]);
+        return AtomicInteropProof.participationValue(_flowId, _chainId);
     }
 
     /// @dev The commitments finality proves, in proof order (see {AtomicFinalityProof.proofs}): each leg's commit
     /// on its source for a source-only flow, or each distinct chain's participation, in order of first
-    /// appearance in `legChainIds`, for an accepted flow.
+    /// appearance in `legChainIds` followed by `legDestinationChainIds`, for an accepted flow.
     function _finalityCommitments(
         bytes32 _flowId,
         AtomicFlowPreimage calldata _preimage
     ) internal pure returns (uint256[] memory chainIds, uint256[] memory values) {
-        uint256 m = _preimage.legChainIds.length;
+        uint256 n = _preimage.legBundleHashes.length;
+        uint256 m = n + _preimage.legDestinationChainIds.length;
         chainIds = new uint256[](m);
         values = new uint256[](m);
         uint256 count = 0;
         for (uint256 i = 0; i < m; ++i) {
-            uint256 chainId = _preimage.legChainIds[i];
+            uint256 legIndex = i < n ? i : i - n;
+            uint256 chainId = i < n ? _preimage.legChainIds[i] : _preimage.legDestinationChainIds[legIndex];
             if (_preimage.version == ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED && _isListed(chainIds, count, chainId)) {
                 continue;
             }
             chainIds[count] = chainId;
-            values[count] = _commitmentValue(_flowId, _preimage, i);
+            values[count] = _commitmentValue(_flowId, _preimage, legIndex, chainId);
             ++count;
         }
         assembly ("memory-safe") {
@@ -469,11 +441,15 @@ contract AtomicFlowManager is IAtomicFlowManager {
     ) internal {
         uint256 n = _flowPreimage.legBundleHashes.length;
         for (uint256 i = 0; i < n; ++i) {
-            bytes32 leg = _flowPreimage.legBundleHashes[i];
-            if (_flowPreimage.legChainIds[i] == block.chainid && _state[_flowId][leg] == LegState.Unset) {
+            LegState state = _state[_flowId][_flowPreimage.legBundleHashes[i]];
+            // `Accepted` is not a commit: a preimage may declare a leg from this chain to itself, and accepting
+            // a real incoming bundle under that leg must not also count as sending it.
+            if (
+                _flowPreimage.legChainIds[i] == block.chainid && (state == LegState.Unset || state == LegState.Accepted)
+            ) {
                 return;
             }
-            if (_flowPreimage.legChainIds[n + i] == block.chainid && !_accepted[_flowId][leg]) {
+            if (_flowPreimage.legDestinationChainIds[i] == block.chainid && state != LegState.Accepted) {
                 return;
             }
         }
@@ -486,7 +462,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
     }
 
     /// @dev Atomic interop is L1-settling only in this release (see {protocol-docs/atomicity/security.md#trust-assumptions});
-    /// checked wherever the settlement layer is consumed: `append`, finality and refund verification.
+    /// checked wherever the settlement layer is consumed: local steps, finality and refund verification.
     function _checkSettlementLayerIsL1(uint256 _settlementLayerChainId) internal view {
         if (_settlementLayerChainId != L1_CHAIN_ID) {
             revert ManagerSettlementLayerNotL1(L1_CHAIN_ID, _settlementLayerChainId);
@@ -511,19 +487,16 @@ contract AtomicFlowManager is IAtomicFlowManager {
         }
     }
 
-    /// @dev Canonicalizes and hashes a flowId preimage: `flowId = keccak256(abi.encode(preimage))`.
+    /// @dev Canonicalizes and hashes a flowId preimage (see {AtomicFlowPreimage}).
     /// `version` must be manager-supported ({ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY} or
-    /// {ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED}); `legBundleHashes` must be strictly ascending; `legChainIds`
-    /// is positional (may repeat — a set would let a sibling chain in it enable a wrong-chain refund), so only
-    /// its length is checked: one entry per leg, or two for an accepted flow.
-    /// Shared by the send path (`append`) and `_checkFlowId`, so canonicalization cannot drift.
+    /// {ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED}); `legBundleHashes` must be strictly ascending; the chain id arrays
+    /// are positional (may repeat — a set would let a sibling chain in it enable a wrong-chain refund), so only
+    /// their lengths are checked: one source per leg, and one destination per leg for an accepted flow or none
+    /// for a source-only flow, which its hash does not cover.
+    /// Shared by `_checkLegStep` and `_checkFlowId`, so canonicalization cannot drift.
     function _validateAndComputeFlowId(AtomicFlowPreimage calldata _preimage) internal pure returns (bytes32) {
-        uint256 chainIdsPerLeg;
-        if (_preimage.version == ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY) {
-            chainIdsPerLeg = 1;
-        } else if (_preimage.version == ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED) {
-            chainIdsPerLeg = 2;
-        } else {
+        bool isSourceOnly = _preimage.version == ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY;
+        if (!isSourceOnly && _preimage.version != ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED) {
             revert ManagerFlowPreimageVersionMismatch(ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED, _preimage.version);
         }
         uint256 n = _preimage.legBundleHashes.length;
@@ -537,8 +510,26 @@ contract AtomicFlowManager is IAtomicFlowManager {
                 revert ManagerBundleHashesNotSorted();
             }
         }
-        if (_preimage.legChainIds.length != chainIdsPerLeg * n) {
-            revert ManagerLegChainIdsLengthMismatch(chainIdsPerLeg * n, _preimage.legChainIds.length);
+        if (_preimage.legChainIds.length != n) {
+            revert ManagerLegChainIdsLengthMismatch(n, _preimage.legChainIds.length);
+        }
+        uint256 destinations = isSourceOnly ? 0 : n;
+        if (_preimage.legDestinationChainIds.length != destinations) {
+            revert ManagerLegDestinationChainIdsLengthMismatch(destinations, _preimage.legDestinationChainIds.length);
+        }
+        if (isSourceOnly) {
+            return
+                keccak256(
+                    abi.encode(
+                        SourceOnlyFlowPreimage({
+                            version: _preimage.version,
+                            deadline: _preimage.deadline,
+                            settlementLayerChainId: _preimage.settlementLayerChainId,
+                            legBundleHashes: _preimage.legBundleHashes,
+                            legChainIds: _preimage.legChainIds
+                        })
+                    )
+                );
         }
         return keccak256(abi.encode(_preimage));
     }

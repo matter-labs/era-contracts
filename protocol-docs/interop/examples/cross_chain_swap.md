@@ -5,7 +5,8 @@ transfers a different asset from chain C to chain A. Each source creates its own
 bundle belongs to one `AtomicFlowPreimage`:
 
 - `legBundleHashes` contains all previewed bundle hashes in strictly ascending order;
-- `legChainIds` contains the corresponding source chain for each hash;
+- `legChainIds` contains the corresponding source chain for each hash, and `legDestinationChainIds` its
+  destination chain;
 - `deadline` is the latest L1 settlement timestamp at which every commitment may enter its source
   chain's settled tree;
 - `settlementLayerChainId` is the L1 chain ID in this release.
@@ -13,15 +14,18 @@ bundle belongs to one `AtomicFlowPreimage`:
 Each participant obtains its bundle hash from `previewBundleHash`, computes the same preimage and
 `flowId`, obtains the insertion's `lowNullifierIndex`, and sends its real bundle with the
 `atomicBundle` attribute. `AtomicFlowManager.append` checks that the sent bundle hash is one of the
-declared legs, that its declared source is the current chain, that every source chain is registered,
-and that the deadline has not already passed.
+declared legs, that its declared source is the current chain and its declared destination the bundle's,
+that every chain of the flow passes this chain's receive filter, and that the deadline has not already
+passed. Anyone then accepts each bundle on its destination (`acceptAtomicBundle`), which runs the same flow
+checks there. Each of A, B and C inserts its participation value with its last step
+({protocol-docs/atomicity/acceptance.md}).
 
-No destination can execute after only a subset of legs commits. Each
-`executeAtomicBundle(bundle, finalityProof)` proves inclusion for every declared leg and authenticates
+No destination can execute after only a subset of chains takes part. Each
+`executeAtomicBundle(bundle, finalityProof)` proves inclusion of every chain's participation and authenticates
 the corresponding commitment-tree roots through the imported interop root. Once that proof succeeds,
 destinations may be driven independently.
 
-If any leg is absent after the deadline, an absence proof for that one leg authorizes recovery for all
+If any chain's participation is absent after the deadline, one absence proof authorizes recovery for all
 committed legs of the flow on each source chain. Finality and timeout proofs are mutually exclusive,
 so the same flow cannot become executable and refundable.
 

@@ -87,8 +87,10 @@ The timeout proof relies on three preconditions, each enforced on chain:
    timeout — can be verified against it: every proof path terminates in the chain's chain-id leaf inside
    an imported aggregation root. Interop towards a chain must therefore only be enabled once the chain is
    registered (has its `sharedTree` leaf) AND has a batch in its chain tree (precondition 1) — exactly
-   what the `ChainRegistrationSender` gate checks, and what `AtomicFlowManager.append` re-checks for
-   every co-leg's declared source chain (see {protocol-docs/atomicity/flow.md#1-atomic-send-append}).
+   what the `ChainRegistrationSender` gate checks before allowing a peer. `AtomicFlowManager.append` and
+   `accept` require every chain of the flow to be an allowed peer or the chain itself (the
+   [receive filter](../interop-gating.md#receive-filter), see
+   {protocol-docs/atomicity/flow.md#1-atomic-send-append}).
 
 3. **Every batch leaf carries the timestamp at which it entered the shared root.** Enforced by
    `MessageRootBase.addChainBatchRootV32`, which folds the settlement-layer `block.timestamp` into the
@@ -116,7 +118,7 @@ The timeout proof relies on three preconditions, each enforced on chain:
 1. **Pre-v33 counterparty chains can still brick funds.** Atomic interop requires protocol version
    v33 or newer on every participating chain. If pre-v33 chains are allowed into the ecosystem, it is
    the **user's responsibility** to pick a counterparty chain that supports atomic interop (v33 or
-   newer). The on-chain checks (`append`'s registered-source-chain check, the timeout-protocol
+   newer). The on-chain checks (the receive filter `append` applies to every chain of the flow, the timeout-protocol
    preconditions above) may make it look like the protocol aims for funds never bricking — that is
    NOT the case: a leg sent towards, or declared from, a chain that never gained atomic-interop
    support can strand its funds.
@@ -144,7 +146,9 @@ The timeout proof relies on three preconditions, each enforced on chain:
    `InteropCall.version` fields are validated only when a call is actually executed
    (`_executeCalls`). A bundle whose calls carry a wrong version can therefore be verified — and
    cancelled via unbundling — yet never executed. This is considered acceptable: such a bundle can
-   only be produced by a malformed sender, and cancellation remains available.
+   only be produced by a malformed sender, and cancellation remains available. An atomic leg is the
+   exception: `acceptAtomicBundle` checks every call's header, so such a leg is never accepted and its flow
+   times out.
 
 5. **Rotating an asset handler strands in-flight atomic burns.** Timeout recovery
    (`L2AssetRouter.recoverAtomicCall`) resolves the handler for the burned asset through the mutable

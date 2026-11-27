@@ -6,7 +6,8 @@ and then inserts one **participation value** into its own IMT. A flow finalizes 
 is in time; otherwise the timeout refund ([recovery.md](./recovery.md)) returns the committed legs. That refund is
 the only one: no separate expiry or retirement path is needed.
 
-Source-only flows (`0x01`) keep the original rules and stay finalizable and refundable on every path.
+New flows are sent as `0x02` only. Source-only flows (`0x01`) sent before this release keep the original rules
+and stay finalizable and refundable.
 
 ## Why
 
@@ -25,9 +26,9 @@ off-chain service having stored them, and on a chain without such a service anyo
 
 ## Commitments
 
-For `n` legs, `legChainIds` holds `2n` entries: the `n` source chains, then the `n` destination chains, both
-aligned with `legBundleHashes`. The **participating chains** are its distinct entries, in order of first appearance.
-Each participating chain `c` inserts one value into its own IMT:
+For `n` legs, `legChainIds` holds the `n` source chains and `legDestinationChainIds` the `n` destination chains,
+both aligned with `legBundleHashes`. The **participating chains** are their distinct entries, in order of first
+appearance, sources first. Each participating chain `c` inserts one value into its own IMT:
 
 `participationValue = keccak256(ATOMIC_PARTICIPATION_LEAF_TAG, flowId, c)`
 
@@ -37,9 +38,9 @@ and in separate transactions; only the last one inserts.
 
 - **Finality** (`requireFlowFinalized`) takes one inclusion proof per participating chain, in that order, with the
   same in-time condition as before ([finality proofs](./proofs.md#finality)).
-- **Timeout** (`authorizeRefund`) takes an index into `legChainIds`; the participation value of the chain at that
-  index is proven absent past the deadline. The absence proof is bound to that chain, exactly as for a missing
-  commit ([timeout proofs](./proofs.md#timeout)). A chain can also prove its own value absent, e.g. a swap chain that
+- **Timeout** (`authorizeRefund`) takes a leg index; the participation value of that leg's source or destination
+  is proven absent past the deadline. The absence proof is bound to that chain, exactly as for a missing commit
+  ([timeout proofs](./proofs.md#timeout)). A chain can also prove its own value absent, e.g. a swap chain that
   sent its leg but never accepted the incoming one.
 - The [receive filter](../interop-gating.md#receive-filter) applies to these proofs. A refund needs the refunding
   chain to allow the chain named in the absence proof.
@@ -53,15 +54,18 @@ and in separate transactions; only the last one inserts.
 checks what execution would check on the bundle itself, then calls `AtomicFlowManager.accept`, which records the
 acceptance and inserts the chain's participation value if this was its last local step:
 
-- the bundle is for this chain and its base token, and has not been verified or executed;
-- the preimage is `0x02`, contains the bundle, and declares this chain as its destination;
-- every chain of the flow is registered and passes this chain's receive filter
+- the bundle is for this chain and its base token, its calls have the supported version and header, and it has
+  not been verified or executed;
+- the preimage is `0x02`, contains the bundle, declares this chain as its destination and the bundle's source as
+  its source;
+- every chain of the flow passes this chain's receive filter
   ([receive filter](../interop-gating.md#receive-filter));
-- the deadline has not verifiably passed, and the leg is not already accepted.
+- the deadline has not verifiably passed, and the leg is not already recorded.
 
-On the source, `append` checks that the leg's declared destination is the bundle's, so a wrong preimage fails at
-send instead of producing a flow that can only time out. `append` records the leg without a leaf of its own and
-inserts the chain's participation value if this was its last local step.
+On the source, `append` runs the same flow checks, receive filter included, and checks that the leg's declared
+source is this chain and its declared destination is the bundle's, so a wrong preimage fails at send instead of
+producing a flow that can only time out. `append` records the leg without a leaf of its own and inserts the chain's
+participation value if this was its last local step.
 
 `lowNullifierIndex` is used only by the call that inserts the participation value. Anyone can accept a leg, so
 any of a chain's steps can turn out to be its last: callers pass the hint for the chain's participation value on
@@ -103,7 +107,7 @@ Once a flow's deadline has passed, its outcome is fixed and each leg needs at mo
 
 - **Timed out:** the leg is `Committed` on its source and refundable there (`authorizeRefund`, then `claimRefund`).
 - **Finalized:** the leg is accepted on its destination, which holds the bundle (it is in the acceptance
-  transaction) and the acceptance record (`legAccepted`). Only execution is left.
+  transaction) and the acceptance record (`legState` is `Accepted`). Only execution is left.
 
 Both steps are permissionless, and each needs only the chain's own state plus commitments settled on L1. A chain can
 therefore retire an accepted-flow format without the other chains' help:
@@ -134,6 +138,7 @@ Each destination also sends one acceptance transaction per incoming leg, which c
 
 ## Rollout
 
-A destination below this release cannot accept, so a `0x02` leg sent to it can only time out. SDKs and Prividium
-keep sending `0x01` until every interop peer runs this release, then switch to `0x02`. Both versions stay accepted on
-every path.
+A chain on this release sends `0x02` only. A destination below this release cannot accept, so a `0x02` leg sent to
+it can only time out: interop peers upgrade together. `0x01` flows sent before the upgrade stay finalizable and
+refundable. Removing those paths in a later release needs every `0x01` leg refunded or executed first, and
+destinations cannot list the `0x01` legs addressed to them ([retiring a format](#retiring-a-format)).

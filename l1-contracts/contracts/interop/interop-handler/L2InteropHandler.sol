@@ -9,8 +9,8 @@ import {V31_INTEROP_HANDLER_L1_CHAIN_ID_SLOT} from "../InteropConstants.sol";
 import {IL2InteropHandler} from "./IL2InteropHandler.sol";
 import {IAtomicFlowManager} from "../../atomic-interop/IAtomicFlowManager.sol";
 import {AtomicFinalityProof, AtomicFlowPreimage} from "../../atomic-interop/IAtomicInterop.sol";
-import {BundleStatus, InteropBundle} from "../../common/Messaging.sol";
-import {BundleAlreadyProcessed} from "../InteropErrors.sol";
+import {BundleStatus, INTEROP_CALL_VERSION, InteropBundle, InteropCall} from "../../common/Messaging.sol";
+import {BundleAlreadyProcessed, InvalidInteropCallVersion, ShadowAccountNotSupported} from "../InteropErrors.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
 
 /// @title L2InteropHandler
@@ -59,8 +59,20 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
         _ensureNotPaused();
         _validateBundleDestinationContext(bundleHash, interopBundle, interopBundle.sourceChainId);
         require(status == BundleStatus.Unreceived, BundleAlreadyProcessed(bundleHash));
+        // The call checks of `_executeCalls`, repeated rather than shared so `L1InteropHandler`'s code is unchanged.
+        uint256 callsLength = interopBundle.calls.length;
+        for (uint256 i = 0; i < callsLength; ++i) {
+            InteropCall memory interopCall = interopBundle.calls[i];
+            require(interopCall.version == INTEROP_CALL_VERSION, InvalidInteropCallVersion());
+            require(!interopCall.shadowAccount, ShadowAccountNotSupported());
+        }
 
-        IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).accept(bundleHash, _lowNullifierIndex, _flowPreimage);
+        IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).accept(
+            bundleHash,
+            interopBundle.sourceChainId,
+            _lowNullifierIndex,
+            _flowPreimage
+        );
     }
 
     /// @notice Executes a full atomic interop bundle. Instead of an L1-message inclusion proof it requires

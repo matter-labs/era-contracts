@@ -1,7 +1,7 @@
 /**
  * Off-chain port of the on-chain IndexedMerkleTree/FullMerkle plus builders for the {ImtProof}
  * structs that AtomicFlowManager / AtomicInteropProof verify. Must stay bit-for-bit compatible with
- * IndexedMerkleTree.sol / FullMerkle.sol and the on-chain id derivations (flowId / commitValue).
+ * IndexedMerkleTree.sol / FullMerkle.sol and the on-chain id derivations (flowId / participationValue).
  * See {protocol-docs/atomicity/README.md#off-chain-tooling} and {protocol-docs/message-root.md#indexed-merkle-tree-indexedmerkletree}.
  */
 
@@ -9,14 +9,14 @@ import type { providers, Wallet } from "ethers";
 import { BigNumber, Contract, utils } from "ethers";
 import { getAbi } from "../core/contracts";
 
-/** Domain tag for commit values: bytes4(keccak256("AtomicInterop.commit.v1")). */
-export const ATOMIC_COMMIT_LEAF_TAG: string = utils
-  .keccak256(utils.toUtf8Bytes("AtomicInterop.commit.v1"))
+/** Domain tag for participation values: bytes4(keccak256("AtomicInterop.participation.v1")). */
+export const ATOMIC_PARTICIPATION_LEAF_TAG: string = utils
+  .keccak256(utils.toUtf8Bytes("AtomicInterop.participation.v1"))
   .slice(0, 10);
 
-/** The current AtomicFlowPreimage.version — mirrors ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY in IAtomicInterop.sol (the
- *  only version accepted today; a bump adds the new version alongside the old on all manager paths). */
-export const ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY = "0x01";
+/** The AtomicFlowPreimage.version new flows are sent in — mirrors ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED in
+ *  IAtomicInterop.sol. See {protocol-docs/atomicity/acceptance.md}. */
+export const ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED = "0x02";
 
 /** Indexed-tree leaf, fields as uint256 decimal strings, in the on-chain field order. */
 export interface IMTLeaf {
@@ -45,10 +45,10 @@ export interface ImtProof {
 
 // ── Leaf / id derivations (must match AtomicInteropProof / AtomicFlowManager) ──────────────
 
-/** The value inserted into a chain's IMT for a leg, as a 0x bytes32 (also a valid uint256). */
-export function commitValue(flowId: string, bundleHash: string): string {
+/** The single value `chainId` inserts into its IMT for an accepted flow, as a 0x bytes32 (also a valid uint256). */
+export function participationValue(flowId: string, chainId: BigNumber | number | string): string {
   return utils.keccak256(
-    utils.defaultAbiCoder.encode(["bytes4", "bytes32", "bytes32"], [ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash])
+    utils.defaultAbiCoder.encode(["bytes4", "bytes32", "uint256"], [ATOMIC_PARTICIPATION_LEAF_TAG, flowId, chainId])
   );
 }
 
@@ -60,9 +60,10 @@ export function indexedLeafHash(leaf: IMTLeaf): string {
 }
 
 /**
- * Mirror of the Solidity `AtomicFlowPreimage` struct. `version` must be manager-supported (currently
- * ATOMIC_FLOW_PREIMAGE_VERSION_SOURCE_ONLY); `legBundleHashes` must be strictly ascending with `legChainIds`
- * positionally aligned; `deadline` is a settlement-layer timestamp.
+ * Mirror of the Solidity `AtomicFlowPreimage` struct. `legBundleHashes` must be strictly ascending; `legChainIds`
+ * holds the legs' source chains and `legDestinationChainIds` their destination chains, both aligned with
+ * `legBundleHashes` ({protocol-docs/atomicity/acceptance.md#commitments}); `deadline` is a settlement-layer
+ * timestamp.
  */
 export interface AtomicFlowPreimage {
   version: string;
@@ -70,10 +71,38 @@ export interface AtomicFlowPreimage {
   settlementLayerChainId: BigNumber | number | string;
   legBundleHashes: string[];
   legChainIds: (BigNumber | number | string)[];
+  legDestinationChainIds: (BigNumber | number | string)[];
+}
+
+/** One leg of an atomic flow: its bundle hash and its source and destination chain ids. */
+export interface AtomicFlowLeg {
+  hash: string;
+  source: BigNumber | number | string;
+  dest: BigNumber | number | string;
+}
+
+/**
+ * Builds an accepted flow's preimage from its legs, sorted by ascending bundle hash so each leg's chain ids stay
+ * aligned with it (sorting them independently would misalign them). The only place the preimage layout is built.
+ */
+export function buildFlowPreimage(
+  legs: AtomicFlowLeg[],
+  deadline: number,
+  settlementLayerChainId: BigNumber | number | string = DEFAULT_SL_CHAIN_ID
+): AtomicFlowPreimage {
+  const sorted = [...legs].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
+  return {
+    version: ATOMIC_FLOW_PREIMAGE_VERSION_ACCEPTED,
+    deadline,
+    settlementLayerChainId,
+    legBundleHashes: sorted.map((l) => l.hash),
+    legChainIds: sorted.map((l) => l.source),
+    legDestinationChainIds: sorted.map((l) => l.dest),
+  };
 }
 
 /** The Solidity tuple type of `AtomicFlowPreimage`, in struct field order. */
-const FLOW_PREIMAGE_TUPLE_TYPE = "tuple(bytes1,uint64,uint256,bytes32[],uint256[])";
+const FLOW_PREIMAGE_TUPLE_TYPE = "tuple(bytes1,uint64,uint256,bytes32[],uint256[],uint256[])";
 
 /**
  * flowId = keccak256(abi.encode(preimage)) — the ABI encoding of the whole `AtomicFlowPreimage`
@@ -83,7 +112,19 @@ export function computeFlowId(preimage: AtomicFlowPreimage): string {
   return utils.keccak256(utils.defaultAbiCoder.encode([FLOW_PREIMAGE_TUPLE_TYPE], [flowPreimageTuple(preimage)]));
 }
 
-/** Encode an {AtomicFlowPreimage} as its Solidity tuple: (version, deadline, settlementLayerChainId, legBundleHashes, legChainIds). */
+/**
+ * The flow's participating chains: the distinct `legChainIds` then `legDestinationChainIds`, in order of first
+ * appearance (finality proof order).
+ */
+export function participatingChains(preimage: AtomicFlowPreimage): string[] {
+  const chains = [...preimage.legChainIds, ...preimage.legDestinationChainIds];
+  return [...new Set(chains.map((id) => BigNumber.from(id).toString()))];
+}
+
+/**
+ * Encode an {AtomicFlowPreimage} as its Solidity tuple: (version, deadline, settlementLayerChainId, legBundleHashes,
+ * legChainIds, legDestinationChainIds).
+ */
 export function flowPreimageTuple(preimage: AtomicFlowPreimage): unknown[] {
   return [
     preimage.version,
@@ -91,6 +132,7 @@ export function flowPreimageTuple(preimage: AtomicFlowPreimage): unknown[] {
     BigNumber.from(preimage.settlementLayerChainId),
     preimage.legBundleHashes,
     preimage.legChainIds.map((c) => BigNumber.from(c)),
+    preimage.legDestinationChainIds.map((c) => BigNumber.from(c)),
   ];
 }
 
@@ -500,7 +542,8 @@ export function atomicFlowTuple(params: { flowId: string; preimage: AtomicFlowPr
 
 /**
  * Build the `AtomicFinalityProof` tuple {L2InteropHandler.executeAtomicBundle} consumes: the flow
- * definition ({AtomicFlow}) plus one inclusion proof per leg, in `preimage.legBundleHashes` order.
+ * definition ({AtomicFlow}) plus one participation inclusion proof per {participatingChains} entry, in that
+ * order ({protocol-docs/atomicity/acceptance.md#commitments}).
  * Tuple field order matches the struct: (flow, proofs).
  */
 export function atomicFinalityProofTuple(params: {
