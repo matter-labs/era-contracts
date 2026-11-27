@@ -219,6 +219,18 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     function deployVerifiers() internal {
         (, string memory plonkName) = DeployCTML1OrGateway.resolve(CTMContract.VerifierPlonk);
+        if (config.airbenderV3.gkrWhirVerifierAddr != address(0)) {
+            // Airbender v3 proofs: the GKR/WHIR adapter takes the PLONK verifier's place.
+            require(
+                config.airbenderV3.gkrWhirVerifierAddr.code.length > 0,
+                "airbender_v3_gkr_whir_verifier_addr holds no code: deploy the generated GkrWhirVerifier first"
+            );
+            require(
+                config.airbenderV3.recursionChainHashes[0] != bytes32(0),
+                "airbender_v3_recursion_chain_hashes must be set"
+            );
+            plonkName = "ZKsyncOSAirbenderV3Verifier";
+        }
 
         ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName);
 

@@ -44,7 +44,17 @@ struct Config {
     bytes32 zkTokenAssetId;
     bool testnetVerifier;
     MultiProofConfig multiProof;
+    AirbenderV3Config airbenderV3;
     ContractsConfig contracts;
+}
+
+/// @notice Deploy-time settings of the Airbender v3 (GKR/WHIR) verifier. When
+///         `gkrWhirVerifierAddr` is set, `ZKsyncOSAirbenderV3Verifier` replaces
+///         `ZKsyncOSVerifierPlonk` inside `ZKsyncOSVerifier`.
+struct AirbenderV3Config {
+    address gkrWhirVerifierAddr;
+    /// Chain hashes for zero, one, and two or more unrolled recursion layers.
+    bytes32[3] recursionChainHashes;
 }
 
 /// @notice Deploy-time settings of the ZiSK multi-proof lane. They sit in
@@ -279,6 +289,16 @@ abstract contract DeployCTMUtils is DeployUtils, BytecodeInfoCache {
         if (toml.keyExists("$.zisk_range_verifier_addr")) {
             config.multiProof.ziskRangeVerifierAddr = toml.readAddress("$.zisk_range_verifier_addr");
         }
+        // Airbender v3: the generated GkrWhirVerifier is deployed beforehand (like the ZiSK
+        // snarkJS backend) and passed by address, with the chain hash of the accepted program.
+        if (toml.keyExists("$.airbender_v3_gkr_whir_verifier_addr")) {
+            config.airbenderV3.gkrWhirVerifierAddr = toml.readAddress("$.airbender_v3_gkr_whir_verifier_addr");
+            bytes32[] memory chainHashes = toml.readBytes32Array("$.airbender_v3_recursion_chain_hashes");
+            require(chainHashes.length == 3, "airbender_v3_recursion_chain_hashes needs 3 entries");
+            for (uint256 i = 0; i < 3; ++i) {
+                config.airbenderV3.recursionChainHashes[i] = chainHashes[i];
+            }
+        }
         if (toml.keyExists("$.zk_token_asset_id")) {
             config.zkTokenAssetId = toml.readBytes32("$.zk_token_asset_id");
         }
@@ -377,6 +397,8 @@ abstract contract DeployCTMUtils is DeployUtils, BytecodeInfoCache {
             return abi.encode();
         } else if (compareStrings(contractName, "ZKsyncOSVerifierPlonk")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "ZKsyncOSAirbenderV3Verifier")) {
+            return abi.encode(config.airbenderV3.gkrWhirVerifierAddr, config.airbenderV3.recursionChainHashes);
         } else if (compareStrings(contractName, "ZiskVerifier")) {
             // The standalone snarkJS Plonk verifier this wraps; deployed
             // beforehand (see verifiers/README.md) and passed by address.
